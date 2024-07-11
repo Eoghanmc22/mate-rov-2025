@@ -1,4 +1,5 @@
 use bevy::{
+    color::palettes::css,
     math::{vec3, Vec3A},
     prelude::*,
     render::{
@@ -24,7 +25,7 @@ impl Plugin for AttitudePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
             .add_systems(Update, (update_motor_conf, rotator_system))
-            .insert_gizmo_group(
+            .insert_gizmo_config(
                 AttitudeGizmo,
                 GizmoConfig {
                     render_layers: RENDER_LAYERS,
@@ -160,7 +161,7 @@ fn add_motor_conf(
                     frt.position.y * 2.0 * 1.5,
                     frt.position.z * 2.0 * 1.5,
                 )),
-                material: materials_pbr.add(Color::rgb(0.8, 0.7, 0.6)),
+                material: materials_pbr.add(Color::srgb(0.8, 0.7, 0.6)),
                 transform: Transform::from_scale(Vec3::splat(3.5)),
                 ..default()
             },
@@ -188,11 +189,11 @@ fn add_motor(
                 radius: 0.005,
                 half_height: 0.5,
             }),
-            material: materials_pbr.add(Color::GREEN),
+            material: materials_pbr.add(Color::from(css::GREEN)),
             transform: Transform::from_translation(Vec3::from(
                 motor.position * 1.5 + motor.orientation / 2.0,
             ))
-            .looking_to(motor.orientation.into(), (-motor.position).into())
+            .looking_to(Vec3::from(motor.orientation), Vec3::from(-motor.position))
                 * Transform::from_rotation(Quat::from_rotation_x(90f32.to_radians())),
             ..default()
         },
@@ -206,9 +207,9 @@ fn add_motor(
                 radius: 0.125,
                 half_height: 0.0625,
             }),
-            material: materials_pbr.add(Color::DARK_GRAY),
+            material: materials_pbr.add(Color::from(css::DARK_GRAY)),
             transform: Transform::from_translation(Vec3::from(motor.position * 1.5))
-                .looking_to(motor.orientation.into(), (-motor.position).into())
+                .looking_to(Vec3::from(motor.orientation), Vec3::from(-motor.position))
                 * Transform::from_rotation(Quat::from_rotation_x(90f32.to_radians())),
             ..default()
         },
@@ -253,7 +254,7 @@ fn rotator_system(
             Vec3::ZERO,
             orientation.0,
             Vec2::splat(5.0),
-            Color::DARK_GRAY,
+            Color::from(css::DARK_GRAY),
         );
 
         for i in 1..=9 {
@@ -263,9 +264,9 @@ fn rotator_system(
                 orientation.0 * vec3(-2.5, y, 0.0),
                 orientation.0 * vec3(2.5, y, 0.0),
                 if y != 0.0 {
-                    Color::DARK_GRAY
+                    Color::from(css::DARK_GRAY)
                 } else {
-                    Color::RED
+                    Color::from(css::RED)
                 },
             );
         }
@@ -277,9 +278,9 @@ fn rotator_system(
                 orientation.0 * vec3(x, -2.5, 0.0),
                 orientation.0 * vec3(x, 2.5, 0.0),
                 if x != 0.0 {
-                    Color::DARK_GRAY
+                    Color::from(css::DARK_GRAY)
                 } else {
-                    Color::GREEN
+                    Color::from(css::GREEN)
                 },
             );
         }
@@ -287,7 +288,7 @@ fn rotator_system(
         gizmos.line(
             orientation.0 * vec3(0.0, 0.0, -2.5),
             orientation.0 * vec3(0.0, 0.0, 2.5),
-            Color::BLUE,
+            Color::from(css::BLUE),
         );
 
         if let Some(&OrientationTarget(up)) = target {
@@ -299,9 +300,9 @@ fn rotator_system(
             //     Color::YELLOW,
             // );
 
-            gizmos.circle(Vec3::ZERO, up * Direction3d::X, 2.0, Color::RED);
-            gizmos.circle(Vec3::ZERO, up * Direction3d::Y, 2.0, Color::GREEN);
-            gizmos.circle(Vec3::ZERO, up * Direction3d::Z, 2.0, Color::BLUE);
+            gizmos.circle(Vec3::ZERO, up * Dir3::X, 2.0, Color::from(css::RED));
+            gizmos.circle(Vec3::ZERO, up * Dir3::Y, 2.0, Color::from(css::GREEN));
+            gizmos.circle(Vec3::ZERO, up * Dir3::Z, 2.0, Color::from(css::BLUE));
         }
     }
 }

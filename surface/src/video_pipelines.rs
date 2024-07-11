@@ -16,7 +16,6 @@ use anyhow::{anyhow, bail, Context};
 use bevy::{
     app::{App, PluginGroup, PluginGroupBuilder, Update},
     ecs::{
-        all_tuples,
         bundle::Bundle,
         component::Component,
         entity::Entity,
@@ -25,6 +24,7 @@ use bevy::{
         world::{EntityRef, EntityWorldMut, World},
     },
     hierarchy::DespawnRecursiveExt,
+    utils::all_tuples,
 };
 use common::{components::RobotId, error::ErrorEvent};
 use crossbeam::{
@@ -75,7 +75,7 @@ impl AppPipelineExt for App {
         self.add_systems(Update, forward_pipeline_inputs::<P>);
 
         self.init_resource::<VideoPipelines>();
-        self.world
+        self.world_mut()
             .resource_mut::<VideoPipelines>()
             .0
             .push(VideoPipeline {

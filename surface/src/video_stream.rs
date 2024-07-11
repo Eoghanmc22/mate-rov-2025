@@ -314,7 +314,8 @@ fn mat_to_image(mat: &Mat, image: &mut Image) -> anyhow::Result<()> {
         let dst_ptr = image.data.as_mut_ptr() as *mut c_void;
         let dst_step = size.width as size_t * 4;
 
-        let out_mat = Mat::new_rows_cols_with_data(
+        // TODO: Look into using the new safe version
+        let out_mat = Mat::new_rows_cols_with_data_unsafe(
             size.height,
             size.width,
             opencv::core::CV_8UC4,

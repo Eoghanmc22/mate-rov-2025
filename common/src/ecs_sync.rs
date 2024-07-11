@@ -211,8 +211,8 @@ where
 {
     app.register_type::<C>();
 
-    let component_id = app.world.init_component::<C>();
-    let ignored_id = app.world.init_component::<Ignore<C>>();
+    let component_id = app.world_mut().init_component::<C>();
+    let ignored_id = app.world_mut().init_component::<Ignore<C>>();
 
     let component_info = Arc::new(ComponentInfo {
         type_name: C::type_path(),
@@ -225,7 +225,7 @@ where
         },
     });
 
-    let mut settings = app.world.resource_mut::<SerializationSettings>();
+    let mut settings = app.world_mut().resource_mut::<SerializationSettings>();
     settings
         .component_by_token
         .insert(component_info.type_name.into(), component_info.clone());
@@ -241,7 +241,7 @@ where
     app.register_type::<E>();
     app.add_event::<E>();
 
-    let component_id = app.world.init_resource::<Events<E>>();
+    let component_id = app.world_mut().init_resource::<Events<E>>();
     let event_info = Arc::new(EventInfo {
         type_name: E::type_path(),
         type_id: TypeId::of::<E>(),
@@ -250,7 +250,7 @@ where
         reader_factory: ErasedManualEventReader::new::<E>,
     });
 
-    let mut settings = app.world.resource_mut::<SerializationSettings>();
+    let mut settings = app.world_mut().resource_mut::<SerializationSettings>();
     settings
         .event_by_token
         .insert(event_info.type_name.into(), event_info.clone());

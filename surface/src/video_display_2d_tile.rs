@@ -1,6 +1,7 @@
 use std::mem;
 
 use bevy::{
+    color::palettes::css,
     prelude::*,
     render::{camera::Camera as BevyCamera, view::RenderLayers},
 };
@@ -311,7 +312,7 @@ fn root(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Row,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::BLUE),
+                background_color: BackgroundColor(Color::from(css::BLUE)),
                 ..default()
             },
             RENDER_LAYERS,
@@ -326,7 +327,7 @@ fn root(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Column,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::BLUE),
+                background_color: BackgroundColor(Color::from(css::BLUE)),
                 ..default()
             },
             RENDER_LAYERS,
@@ -349,7 +350,7 @@ fn subroot(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Row,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::ORANGE),
+                background_color: BackgroundColor(Color::from(css::ORANGE)),
                 ..default()
             },
             RENDER_LAYERS,
@@ -367,7 +368,7 @@ fn subroot(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Column,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::ORANGE),
+                background_color: BackgroundColor(Color::from(css::ORANGE)),
                 ..default()
             },
             RENDER_LAYERS,
@@ -388,7 +389,7 @@ fn container(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Row,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::GREEN),
+                background_color: BackgroundColor(Color::from(css::GREEN)),
                 ..default()
             },
             RENDER_LAYERS,
@@ -404,7 +405,7 @@ fn container(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Row,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::GREEN),
+                background_color: BackgroundColor(Color::from(css::GREEN)),
                 ..default()
             },
             RENDER_LAYERS,
@@ -468,7 +469,7 @@ fn separator(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Row,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::PURPLE),
+                background_color: BackgroundColor(Color::from(css::PURPLE)),
                 ..default()
             },
             RENDER_LAYERS,
@@ -482,7 +483,7 @@ fn separator(layout: VideoLayout) -> impl Bundle {
                     flex_direction: FlexDirection::Row,
                     ..default()
                 },
-                background_color: BackgroundColor(Color::PURPLE),
+                background_color: BackgroundColor(Color::from(css::PURPLE)),
                 ..default()
             },
             RENDER_LAYERS,

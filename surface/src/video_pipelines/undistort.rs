@@ -5,7 +5,7 @@ use bevy::{
 };
 use opencv::{
     calib3d,
-    core::{self, Range, Rect, Scalar, Size},
+    core::{Range, Rect, Size},
     imgproc,
     prelude::*,
 };
@@ -118,8 +118,15 @@ impl Pipeline for UndistortPipeline {
         imgproc::remap_def(img, undistorted, map_x, map_y, imgproc::INTER_LINEAR)
             .context("Remap")?;
 
-        *cropped = undistorted.row_range(rows).context("Crop Rows")?;
-        *cropped = cropped.col_range(cols).context("Crop Cols")?;
+        // FIXME: These clones are bad
+        *cropped = undistorted
+            .row_range(rows)
+            .context("Crop Rows")?
+            .clone_pointee();
+        *cropped = cropped
+            .col_range(cols)
+            .context("Crop Cols")?
+            .clone_pointee();
 
         Ok(cropped)
     }

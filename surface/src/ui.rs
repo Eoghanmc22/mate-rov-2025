@@ -135,7 +135,7 @@ fn topbar(
 
                 if ui.button("Exit").clicked() {
                     cmds.add(|world: &mut World| {
-                        world.send_event(AppExit);
+                        world.send_event(AppExit::Success);
                     })
                 }
             });

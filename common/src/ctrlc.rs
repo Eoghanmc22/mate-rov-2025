@@ -33,6 +33,6 @@ pub fn setup_handler(mut cmds: Commands) -> anyhow::Result<()> {
 
 pub fn check_handler(channel: Res<CtrlcChannel>, mut exit: EventWriter<AppExit>) {
     if let Ok(()) = channel.0.try_recv() {
-        exit.send(AppExit);
+        exit.send(AppExit::Success);
     }
 }

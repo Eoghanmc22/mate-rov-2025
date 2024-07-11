@@ -8,18 +8,12 @@ use bevy::{
     prelude::{EntityRef, EntityWorldMut, World},
 };
 use opencv::{
-    core::{
-        Point, Point2f, Rect, Rect2f, RotatedRect, Scalar, Size, Size2f, Vec2f, Vec4f, VecN, Vector,
-    },
-    imgproc::{self, moments},
+    core::{Point, Point2f, Rect, Scalar, Size2f, Vec2f, Vec4f, Vector},
+    imgproc::{self},
     prelude::*,
-    types::{VectorOfVectorOfPoint, VectorOfVectorOfPoint2f},
 };
 
-use crate::video_pipelines::{
-    edges::EdgesPipeline, scale::ScalePipeline, undistort::UndistortPipeline, AppPipelineExt,
-    Pipeline, PipelineCallbacks, SerialPipeline,
-};
+use crate::video_pipelines::{AppPipelineExt, Pipeline, PipelineCallbacks};
 
 pub struct MeasurePipelinePlugin;
 
@@ -61,7 +55,7 @@ impl From<MeasurementTarget> for MeasurementTargetOpenCv {
 pub struct MeasurePipeline {
     blur: Mat,
     edges: Mat,
-    contours: VectorOfVectorOfPoint,
+    contours: Vector<Vector<Point2f>>,
 
     output: Mat,
 }
@@ -112,7 +106,7 @@ impl Pipeline for MeasurePipeline {
 
         println!("Found {} contours", self.contours.len());
 
-        let mut good_contours = VectorOfVectorOfPoint::new();
+        let mut good_contours: Vector<Vector<Point2f>> = Vector::new();
         let mut best_contour = None;
 
         for (idx, contour) in self.contours.iter().enumerate() {
@@ -183,11 +177,11 @@ impl Pipeline for MeasurePipeline {
                 }
 
                 let mut points = [Point2f::new(0.0, 0.0); 4];
-                rect.points(points.as_mut_slice()).context("Rect points")?;
+                rect.points(&mut points).context("Rect points")?;
 
                 imgproc::draw_contours_def(
                     img,
-                    &VectorOfVectorOfPoint::from(vec![Vector::from_iter(
+                    &Vector::<Vector<Point>>::from(vec![Vector::from_iter(
                         points
                             .into_iter()
                             .map(|it| Point::new(it.x as i32, it.y as i32)),

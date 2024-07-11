@@ -15,13 +15,9 @@ use common::{
 use motor_math::Movement;
 use opencv::{
     calib3d,
-    core::{self, Scalar, Vector},
+    core::{self, Point2f, Point3f, Scalar, Vector},
     imgproc,
     prelude::*,
-    types::{
-        VectorOfPoint, VectorOfPoint2d, VectorOfPoint2f, VectorOfPoint3d, VectorOfPoint3f,
-        VectorOfVectorOfPoint, VectorOff64,
-    },
 };
 use tracing::error;
 
@@ -52,17 +48,17 @@ pub struct SquareTrackingPipeline {
     color_mask: Mat,
 
     // List of contours in the mask
-    contours: VectorOfVectorOfPoint,
+    contours: Vector<Vector<Point2f>>,
 
     // List of contours that look like squares
-    squares: VectorOfVectorOfPoint,
+    squares: Vector<Vector<Point2f>>,
     // The position of the center of shape considered to be the best canidate for being the target
     last_best_square: Option<(f64, f64)>,
 
     // Computed rotation relative to the square
-    rvec: VectorOff64,
+    rvec: Vector<f64>,
     // Computed translation relative to the square
-    tvec: VectorOff64,
+    tvec: Vector<f64>,
     // rotation_mat: Mat,
 }
 
@@ -169,7 +165,7 @@ impl Pipeline for SquareTrackingPipeline {
                     0.02 * imgproc::arc_length(&contour, true).context("Find arc length")?;
 
                 // Approximate a polygon that is a similar shape to the contour
-                let mut approx = VectorOfPoint::default();
+                let mut approx = Vector::default();
                 imgproc::approx_poly_dp(&contour, &mut approx, epsilon, true)
                     .context("Approximate polygon")?;
 
@@ -190,7 +186,7 @@ impl Pipeline for SquareTrackingPipeline {
             // Choose best square based on
             // - Size
             // - Proximity to best square in previous frame (improves temporal consistancy)
-            let mut best: Option<(f64, (f64, f64), VectorOfPoint)> = None;
+            let mut best: Option<(f64, (f64, f64), Vector<Point2f>)> = None;
             for square in &self.squares {
                 let moments = imgproc::moments_def(&square).context("Moments")?;
 
@@ -219,7 +215,7 @@ impl Pipeline for SquareTrackingPipeline {
                 self.last_best_square = Some(position);
 
                 // Draw it on screen
-                let contours: VectorOfVectorOfPoint = vec![square.clone()].into();
+                let contours: Vector<Vector<Point2f>> = vec![square.clone()].into();
                 imgproc::draw_contours_def(img, &contours, -1, (0, 255, 0).into())
                     .context("Draw Contours")?;
 
@@ -227,7 +223,7 @@ impl Pipeline for SquareTrackingPipeline {
                 let square_size = 0.15;
 
                 // 3D points of the four corners of the target
-                let obj_points: VectorOfPoint3f = vec![
+                let obj_points: Vector<Point3f> = vec![
                     (-square_size / 2.0, square_size / 2.0, 0.0).into(),
                     (square_size / 2.0, square_size / 2.0, 0.0).into(),
                     (square_size / 2.0, -square_size / 2.0, 0.0).into(),
@@ -235,29 +231,19 @@ impl Pipeline for SquareTrackingPipeline {
                 ]
                 .into();
 
-                let img_points: VectorOfPoint2f =
+                let img_points: Vector<Point2f> =
                     square.iter().flat_map(|it| it.to::<f32>()).collect();
 
                 // Tempoary hard coded camera martix
-                let camera_matrix = Mat::from_slice_rows_cols(
-                    &[
-                        1.28191219e+03,
-                        0.00000000e+00,
-                        1.01414124e+03,
-                        0.00000000e+00,
-                        1.28020562e+03,
-                        5.30598083e+02,
-                        0.00000000e+00,
-                        0.00000000e+00,
-                        1.00000000e+00,
-                    ],
-                    3,
-                    3,
-                )
+                let camera_matrix = Mat::from_slice_2d(&[
+                    [1.28191219e+03, 0.00000000e+00, 1.01414124e+03],
+                    [0.00000000e+00, 1.28020562e+03, 5.30598083e+02],
+                    [0.00000000e+00, 0.00000000e+00, 1.00000000e+00],
+                ])
                 .context("Create temp camera matrix")?;
 
                 // Tempoary hard coded distortion coefficients
-                let dist_coeffs = VectorOff64::from_slice(&[
+                let dist_coeffs = Vector::from_slice(&[
                     -4.01928524e-01,
                     2.05847758e-01,
                     -1.51617786e-04,
@@ -289,7 +275,7 @@ impl Pipeline for SquareTrackingPipeline {
 
                 // Draw 3D axis on screen
                 {
-                    let points: VectorOfPoint3f = vec![
+                    let points: Vector<Point3f> = vec![
                         (-square_size / 2.0, square_size / 2.0, 0.0).into(),
                         (square_size / 2.0, square_size / 2.0, 0.0).into(),
                         (square_size / 2.0, -square_size / 2.0, 0.0).into(),
@@ -299,7 +285,7 @@ impl Pipeline for SquareTrackingPipeline {
                     ]
                     .into();
 
-                    let mut projected_points: VectorOfPoint2f = Vector::default();
+                    let mut projected_points: Vector<Point2f> = Vector::default();
                     calib3d::project_points_def(
                         &points,
                         &self.rvec,
