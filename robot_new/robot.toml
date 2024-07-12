@@ -9,20 +9,21 @@ port = 44445
 
 [[interfaces]]
 name = "PWM"
-hardware = "pca9685"
+hardware = "pca9685_i2c"
 i2c_bus = 3
 i2c_address = 0x40
+enable_gpio = 26
 
 [[interfaces]]
 name = "ADC"
-hardware = "ads1115"
+hardware = "ads1115_i2c"
 i2c_bus = 1
 i2c_address = 0x48
 
 [[interfaces]]
 name = "Power Sense"
-hardware = "bluerov_powersense"
-data = "ADC"
+hardware = "bluerov_powersense_adc"
+adc_name = "ADC"
 
 [[interfaces]]
 name = "IMU"
@@ -38,9 +39,11 @@ spi_cs = 1
 
 [[interfaces]]
 name = "Depth"
-hardware = "ms5937"
+hardware = "ms5937_i2c"
 i2c_bus = 6
 i2c_address = 0x76
+fluid_density = 1000.0
+sea_level_pressure = 1013.25
 
 [[interfaces]]
 name = "LEDs"
@@ -50,11 +53,9 @@ spi_cs = 0
 
 [[interfaces]]
 name = "Leak"
-hardware = "leak"
+hardware = "leak_gpio"
 gpio = 27
-active = "High"
-
-# TODO: Power Sense
+active_high = true
 
 
 #
@@ -76,6 +77,7 @@ seed_thruster = { position = [
 center_of_mass = [0.0, -0.035, 0.0]
 thruster_amperage_budget = 25.0
 thruster_jerk_limit = 40.0
+thruster_data_path = "motor_data.csv"
 
 
 #
@@ -84,88 +86,72 @@ thruster_jerk_limit = 40.0
 
 [[thrusters]]
 name = "FrontRightBottom"
-type = "T200"
 interface = "PWM"
 pwm_channel = 0
 
 [[thrusters]]
 name = "BackRightBottom"
-type = "T200"
 interface = "PWM"
 pwm_channel = 1
 
 [[thrusters]]
 name = "BackRightTop"
-type = "T200"
 interface = "PWM"
 pwm_channel = 2
 
 [[thrusters]]
 name = "FrontLeftTop"
-type = "T200"
 interface = "PWM"
 pwm_channel = 3
 
 [[thrusters]]
 name = "FrontLeftBottom"
-type = "T200"
 interface = "PWM"
 pwm_channel = 4
 
 [[thrusters]]
 name = "BackLeftBottom"
-type = "T200"
 interface = "PWM"
 pwm_channel = 5
 
 [[thrusters]]
 name = "BackLeftTop"
-type = "T200"
 interface = "PWM"
 pwm_channel = 6
 
 [[thrusters]]
 name = "FrontRightTop"
-type = "T200"
 interface = "PWM"
 pwm_channel = 7
 
 
 #
-# Declare Thruster Force data
-#
-
-[[thrust_data]]
-name = "T200"
-path = "motor_data.csv"
-
-#
 # Declare Servos
 #
 
-[[servo_config.servos]]
+[[servos]]
 name = "FrontCameraRotate"
 interface = "PWM"
 pwm_channel = 15
-cameras = ["Front"]
+# cameras = ["Front"]
 
-[[servo_config.servos]]
+[[servos]]
 name = "Claw1"
 interface = "PWM"
 pwm_channel = 14
-cameras = ["Front"]
+# cameras = ["Front"]
 
-[[servo_config.servos]]
+[[servos]]
 name = "Claw2"
 interface = "PWM"
 pwm_channel = 13
-cameras = ["Front"]
+# cameras = ["Front"]
 
-[[servo_config.servos]]
+[[servos]]
 name = "Claw3"
 interface = "PWM"
 pwm_channel = 12
-cameras = ["Front"]
+# cameras = ["Front"]
 
 
 #
@@ -207,8 +193,8 @@ path = "/dev/video18"
 # Setup Control System
 #
 
-[control.ekf]
 # TODO: Options for pose filtering
+# [control.ekf]
 
 [control.depth_hold]
 # source = "Depth"

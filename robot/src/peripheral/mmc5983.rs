@@ -8,6 +8,7 @@ use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
 
 pub struct Mcc5983 {
     spi: Spi,
+    // FIXME: Never read
     offset: [f32; 3],
 }
 

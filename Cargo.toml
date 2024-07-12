@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "robot",
+    "robot_new",
     "surface",
     "common",
     "networking",
