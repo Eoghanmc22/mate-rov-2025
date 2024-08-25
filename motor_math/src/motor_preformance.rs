@@ -156,19 +156,19 @@ impl<D1: Number> MotorRecord<D1> {
         // debug_assert!((D2::zero()..=D2::one()).contains(&alpha));
 
         MotorRecord {
-            pwm: lerp(self.pwm.re(), other.pwm.re(), alpha.clone()),
-            rpm: lerp(self.rpm.re(), other.rpm.re(), alpha.clone()),
-            current: lerp(self.current.re(), other.current.re(), alpha.clone()),
-            voltage: lerp(self.voltage.re(), other.voltage.re(), alpha.clone()),
-            power: lerp(self.power.re(), other.power.re(), alpha.clone()),
-            force: lerp(self.force.re(), other.force.re(), alpha.clone()),
+            pwm: lerp(self.pwm.re(), other.pwm.re(), alpha),
+            rpm: lerp(self.rpm.re(), other.rpm.re(), alpha),
+            current: lerp(self.current.re(), other.current.re(), alpha),
+            voltage: lerp(self.voltage.re(), other.voltage.re(), alpha),
+            power: lerp(self.power.re(), other.power.re(), alpha),
+            force: lerp(self.force.re(), other.force.re(), alpha),
             efficiency: lerp(self.efficiency.re(), other.efficiency.re(), alpha),
         }
     }
 }
 
 fn lerp<D: Number>(a: f32, b: f32, alpha: D) -> D {
-    (D::one() - alpha.clone()) * a + alpha * b
+    (D::one() - alpha) * a + alpha * b
 }
 
 pub fn read_motor_data<P: AsRef<Path>>(path: P) -> anyhow::Result<MotorData> {

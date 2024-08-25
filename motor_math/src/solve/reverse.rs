@@ -65,7 +65,7 @@ pub fn clamp_amperage_fast<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     motor_data: &MotorData,
     amperage_cap: f32,
 ) -> HashMap<MotorId, MotorRecord<D>> {
-    let amperage_total = motor_cmds.values().map(|it| it.current.clone()).sum::<D>();
+    let amperage_total = motor_cmds.values().map(|it| it.current).sum::<D>();
 
     if amperage_total.re() <= amperage_cap {
         return motor_cmds;
@@ -83,7 +83,7 @@ pub fn clamp_amperage_fast<D: Number, MotorId: Hash + Ord + Clone + Debug>(
             .map(|it| it.direction)
             .unwrap_or(crate::Direction::Clockwise);
 
-        let adjusted_current = data.current.abs() * data.force.signum() * amperage_ratio.clone();
+        let adjusted_current = data.current.abs() * data.force.signum() * amperage_ratio;
         let data_adjusted =
             motor_data.lookup_by_current(adjusted_current, Interpolation::LerpDirection(direction));
 
@@ -101,7 +101,7 @@ pub fn clamp_amperage<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     amperage_cap: f32,
     epsilon: f32,
 ) -> HashMap<MotorId, MotorRecord<D>> {
-    let amperage_total = motor_cmds.values().map(|it| it.current.clone()).sum::<D>();
+    let amperage_total = motor_cmds.values().map(|it| it.current).sum::<D>();
 
     if amperage_total.re() <= amperage_cap {
         return motor_cmds;
@@ -120,7 +120,7 @@ pub fn clamp_amperage<D: Number, MotorId: Hash + Ord + Clone + Debug>(
             .map(|it| it.direction)
             .unwrap_or(crate::Direction::Clockwise);
 
-        let force_current = data.force * force_ratio.clone();
+        let force_current = data.force * force_ratio;
         let data_adjusted =
             motor_data.lookup_by_force(force_current, Interpolation::LerpDirection(direction));
 
@@ -153,7 +153,7 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
 
                 // FIXME: old code of copying force's sign to its self is a no-op could be a bug
                 // let adjusted_force = data.force.copysign(data.force) * mid;
-                let adjusted_force = data.force.clone() * mid.clone();
+                let adjusted_force = data.force * mid;
                 let data = motor_data
                     .lookup_by_force(adjusted_force, Interpolation::LerpDirection(direction));
 
@@ -166,20 +166,20 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
         }
 
         if mid_current.re() >= amperage_cap {
-            upper_bound = mid.clone();
-            upper_current = mid_current.clone();
+            upper_bound = mid;
+            upper_current = mid_current;
         } else {
-            lower_bound = mid.clone();
-            lower_current = mid_current.clone();
+            lower_bound = mid;
+            lower_current = mid_current;
         }
 
         if upper_bound.re() == f32::INFINITY {
             mid *= D::from(amperage_cap) / mid_current;
             // mid *= 2.0;
         } else {
-            let alpha = (D::from(amperage_cap) - lower_current.clone())
-                / (upper_current.clone() - lower_current.clone());
-            mid = upper_bound.clone() * alpha.clone() + lower_bound.clone() * (D::one() - alpha)
+            let alpha = (D::from(amperage_cap) - lower_current)
+                / (upper_current - lower_current);
+            mid = upper_bound * alpha + lower_bound * (D::one() - alpha)
             // mid = upper_bound / 2.0 + lower_bound / 2.0
         }
     }

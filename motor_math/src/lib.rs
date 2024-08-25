@@ -21,8 +21,8 @@ use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 // Should be implemented for f32 and f32 backed num-dual types
-pub trait Number: DualNum<f32> + ComplexField<RealField = Self> + Debug {}
-impl<T> Number for T where T: DualNum<f32> + ComplexField<RealField = Self> + Debug {}
+pub trait Number: DualNum<f32> + ComplexField<RealField = Self> + Debug + Copy {}
+impl<T> Number for T where T: DualNum<f32> + ComplexField<RealField = Self> + Debug + Copy {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MotorConfig<MotorId, D: Number> {
@@ -45,8 +45,8 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
         let matrix = Matrix6xX::<D>::from_iterator(
             motors.len(),
             motors.iter().flat_map(|(_id, motor)| {
-                let force = motor.orientation.clone();
-                let torque = (motor.position.clone() - &center_mass).cross(&motor.orientation);
+                let force = motor.orientation;
+                let torque = (motor.position - center_mass).cross(&motor.orientation);
 
                 [force, torque]
                     .into_iter()
@@ -212,7 +212,7 @@ impl<D: Number> Mul<D> for Movement<D> {
 
     fn mul(self, rhs: D) -> Self::Output {
         Self {
-            force: self.force * rhs.clone(),
+            force: self.force * rhs,
             torque: self.torque * rhs,
         }
     }
@@ -220,7 +220,7 @@ impl<D: Number> Mul<D> for Movement<D> {
 
 impl<D: Number> MulAssign<D> for Movement<D> {
     fn mul_assign(&mut self, rhs: D) {
-        self.force *= rhs.clone();
+        self.force *= rhs;
         self.torque *= rhs;
     }
 }
@@ -230,7 +230,7 @@ impl<D: Number> Div<D> for Movement<D> {
 
     fn div(self, rhs: D) -> Self::Output {
         Self {
-            force: self.force / rhs.clone(),
+            force: self.force / rhs,
             torque: self.torque / rhs,
         }
     }
@@ -238,7 +238,7 @@ impl<D: Number> Div<D> for Movement<D> {
 
 impl<D: Number> DivAssign<D> for Movement<D> {
     fn div_assign(&mut self, rhs: D) {
-        self.force /= rhs.clone();
+        self.force /= rhs;
         self.torque /= rhs;
     }
 }
