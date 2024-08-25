@@ -4,9 +4,8 @@ pub mod reverse;
 #[cfg(test)]
 mod tests {
     extern crate test;
-    use ahash::HashMap;
     use nalgebra::{vector, Vector3};
-    use std::time::Instant;
+    use std::{collections::HashMap, time::Instant};
     use test::Bencher;
 
     use crate::{
@@ -105,7 +104,7 @@ mod tests {
         let motor_data =
             motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
 
-        let mut motors = HashMap::default();
+        let mut motors = HashMap::new();
 
         #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
         enum MotorIds {

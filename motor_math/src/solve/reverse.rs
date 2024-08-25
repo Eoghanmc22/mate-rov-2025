@@ -1,17 +1,19 @@
 //! Desired Movement -> Motor Commands
 
-use std::fmt::Debug;
-use std::hash::Hash;
+use std::hash::{BuildHasherDefault, Hash};
+use std::{collections::HashMap as StdHashMap, fmt::Debug};
 
-use ahash::{HashMap, HashMapExt};
 use nalgebra::{vector, Vector6};
 use serde::{Deserialize, Serialize};
+use stable_hashmap::StableHashMap;
 use tracing::instrument;
 
 use crate::{
     motor_preformance::{Interpolation, MotorData, MotorRecord},
     MotorConfig, Movement, Number,
 };
+
+type HashMap<K, V> = StableHashMap<K, V>;
 
 #[instrument(level = "trace", skip(motor_config), ret)]
 pub fn reverse_solve<D: Number, MotorId: Hash + Ord + Clone + Debug>(
@@ -27,7 +29,7 @@ pub fn reverse_solve<D: Number, MotorId: Hash + Ord + Clone + Debug>(
 
     let forces = motor_config.pseudo_inverse.clone() * movement_vec;
 
-    let mut motor_forces = HashMap::new();
+    let mut motor_forces = HashMap::default();
     for ((motor_id, _motor), force) in motor_config
         .motors
         .iter()
@@ -45,7 +47,7 @@ pub fn forces_to_cmds<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
 ) -> HashMap<MotorId, MotorRecord<D>> {
-    let mut motor_cmds = HashMap::new();
+    let mut motor_cmds = HashMap::default();
     for (motor_id, force) in forces {
         let motor = motor_config.motor(&motor_id).expect("Bad motor id");
         let data = motor_data.lookup_by_force(force, Interpolation::LerpDirection(motor.direction));

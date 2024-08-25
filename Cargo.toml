@@ -7,6 +7,7 @@ members = [
     "common",
     "networking",
     "motor_math",
+    "stable_hashmap",
 ]
 
 # Enable a small amount of optimization in debug mode

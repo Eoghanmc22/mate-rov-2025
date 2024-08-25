@@ -1,11 +1,14 @@
 //! Motor Commands -> Movement
 
-use ahash::HashMap;
-use nalgebra::DVector;
 use std::{fmt::Debug, hash::Hash};
+
+use nalgebra::DVector;
+use stable_hashmap::StableHashMap;
 use tracing::instrument;
 
 use crate::{MotorConfig, Movement, Number};
+
+type HashMap<K, V> = StableHashMap<K, V>;
 
 #[instrument(level = "trace", skip(motor_config), ret)]
 pub fn forward_solve<D: Number, MotorId: Hash + Ord + Debug>(

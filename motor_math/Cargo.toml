@@ -5,9 +5,11 @@ edition = "2021"
 
 # TODO: Are all of these needed?
 [dependencies]
+stable_hashmap = { path = "../stable_hashmap" }
+
 csv = "1"
 serde = { version = "1", features = ["derive"] }
-ahash = "0.8"
+# ahash = { version = "0.8" }
 
 num = "0.4"
 num-dual = { git = "https://github.com/itt-ustutt/num-dual.git", rev = "f4123e30702ec3786c44d70ff66c9afc00583338" }

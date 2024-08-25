@@ -3295,7 +3295,6 @@ dependencies = [
 name = "motor_math"
 version = "0.1.0"
 dependencies = [
- "ahash",
  "anyhow",
  "bevy_reflect",
  "csv",
@@ -3304,6 +3303,7 @@ dependencies = [
  "num-dual",
  "num_enum",
  "serde",
+ "stable_hashmap",
  "tracing",
 ]
 
@@ -4736,6 +4736,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eda41003dc44290527a59b13432d4a0379379fa074b70174882adfbdfd917844"
 dependencies = [
  "bitflags 2.6.0",
+]
+
+[[package]]
+name = "stable_hashmap"
+version = "0.1.0"
+dependencies = [
+ "ahash",
 ]
 
 [[package]]
