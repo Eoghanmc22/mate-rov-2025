@@ -232,7 +232,7 @@ pub struct ActualForce(pub Newtons);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct MotorDefinition(pub ErasedMotorId, pub Motor);
+pub struct MotorDefinition(pub ErasedMotorId, pub Motor<f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
@@ -262,12 +262,12 @@ pub enum ServoMode {
 #[reflect(from_reflect = false)]
 pub struct Motors(
     // TODO(low): This bad
-    #[reflect(ignore)] pub MotorConfig<ErasedMotorId>,
+    #[reflect(ignore)] pub MotorConfig<ErasedMotorId, f32>,
 );
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct TargetMovement(pub Movement);
+pub struct TargetMovement(pub Movement<f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
@@ -279,7 +279,7 @@ pub struct ServoTargets(
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct ActualMovement(pub Movement);
+pub struct ActualMovement(pub Movement<f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
@@ -287,7 +287,7 @@ pub struct MeasuredVoltage(pub Volts);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq, Default)]
-pub struct MovementContribution(pub Movement);
+pub struct MovementContribution(pub Movement<f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
