@@ -4,17 +4,21 @@ use anyhow::Context;
 use serde::Deserialize;
 use tracing::instrument;
 
-use crate::Direction;
+use crate::{Direction, Number};
 
 pub struct MotorData {
-    force_index: Vec<MotorRecord>,
-    current_index: Vec<MotorRecord>,
+    force_index: Vec<MotorRecord<f32>>,
+    current_index: Vec<MotorRecord<f32>>,
 }
 
 impl MotorData {
     #[instrument(level = "trace", skip(self), ret)]
-    pub fn lookup_by_force(&self, force: f32, interpolation: Interpolation) -> MotorRecord {
-        let partition_point = self.force_index.partition_point(|x| x.force < force);
+    pub fn lookup_by_force<D: Number>(
+        &self,
+        force: D,
+        interpolation: Interpolation,
+    ) -> MotorRecord<D> {
+        let partition_point = self.force_index.partition_point(|x| x.force < force.re());
 
         let idx_b = partition_point.max(1).min(self.force_index.len() - 1);
         let idx_a = idx_b - 1;
@@ -26,14 +30,14 @@ impl MotorData {
     }
 
     #[instrument(level = "trace", skip(self), ret)]
-    pub fn lookup_by_current(
+    pub fn lookup_by_current<D: Number>(
         &self,
-        signed_current: f32,
+        signed_current: D,
         interpolation: Interpolation,
-    ) -> MotorRecord {
+    ) -> MotorRecord<D> {
         let partition_point = self
             .current_index
-            .partition_point(|x| x.current.copysign(x.force) < signed_current);
+            .partition_point(|x| x.current.copysign(x.force) < signed_current.re());
 
         let idx_b = partition_point.max(1).min(self.current_index.len() - 1);
         let idx_a = idx_b - 1;
@@ -51,27 +55,33 @@ impl MotorData {
         )
     }
 
-    fn interpolate(
-        a: &MotorRecord,
-        b: &MotorRecord,
-        value: f32,
+    fn interpolate<D: Number>(
+        a: &MotorRecord<f32>,
+        b: &MotorRecord<f32>,
+        value: D,
         value_a: f32,
         value_b: f32,
         interpolation: Interpolation,
-    ) -> MotorRecord {
+    ) -> MotorRecord<D> {
         let record = match interpolation {
             Interpolation::LerpDirection(_) | Interpolation::Lerp => {
                 let alpha = (value - value_a) / (value_b - value_a);
                 a.lerp(b, alpha)
             }
             Interpolation::Direction(_) | Interpolation::OriginalData => {
-                let dist_a = (value_a - value).abs();
-                let dist_b = (value_b - value).abs();
+                let dist_a = (value_a - value.re()).abs();
+                let dist_b = (value_b - value.re()).abs();
 
-                if dist_a <= dist_b {
-                    *a
-                } else {
-                    *b
+                let record = if dist_a <= dist_b { a } else { b };
+
+                MotorRecord {
+                    pwm: record.pwm.into(),
+                    rpm: record.rpm.into(),
+                    current: record.current.into(),
+                    voltage: record.voltage.into(),
+                    power: record.power.into(),
+                    force: record.force.into(),
+                    efficiency: record.efficiency.into(),
                 }
             }
         };
@@ -80,7 +90,7 @@ impl MotorData {
             Interpolation::LerpDirection(direction) | Interpolation::Direction(direction) => {
                 if let Direction::CounterClockwise = direction {
                     MotorRecord {
-                        pwm: 3000.0 - record.pwm,
+                        pwm: D::from(3000.0) - record.pwm,
                         ..record
                     }
                 } else {
@@ -92,8 +102,8 @@ impl MotorData {
     }
 }
 
-impl From<Vec<MotorRecord>> for MotorData {
-    fn from(value: Vec<MotorRecord>) -> Self {
+impl From<Vec<MotorRecord<f32>>> for MotorData {
+    fn from(value: Vec<MotorRecord<f32>>) -> Self {
         let mut force_index = value.clone();
 
         force_index.sort_by(|a, b| f32::total_cmp(&a.force, &b.force));
@@ -130,34 +140,35 @@ pub enum Interpolation {
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
-pub struct MotorRecord {
-    pub pwm: f32,
-    pub rpm: f32,
-    pub current: f32,
-    pub voltage: f32,
-    pub power: f32,
-    pub force: f32,
-    pub efficiency: f32,
+pub struct MotorRecord<D> {
+    pub pwm: D,
+    pub rpm: D,
+    pub current: D,
+    pub voltage: D,
+    pub power: D,
+    pub force: D,
+    pub efficiency: D,
 }
 
-impl MotorRecord {
-    pub fn lerp(&self, other: &Self, alpha: f32) -> Self {
-        debug_assert!((0.0..=1.0).contains(&alpha));
+impl<D1: Number> MotorRecord<D1> {
+    // This goofy generics stuff should allow the motor data tables to be in f32 and alpha to be a dual num
+    pub fn lerp<D2: Number>(&self, other: &Self, alpha: D2) -> MotorRecord<D2> {
+        // debug_assert!((D2::zero()..=D2::one()).contains(&alpha));
 
-        Self {
-            pwm: lerp(self.pwm, other.pwm, alpha),
-            rpm: lerp(self.rpm, other.rpm, alpha),
-            current: lerp(self.current, other.current, alpha),
-            voltage: lerp(self.voltage, other.voltage, alpha),
-            power: lerp(self.power, other.power, alpha),
-            force: lerp(self.force, other.force, alpha),
-            efficiency: lerp(self.efficiency, other.efficiency, alpha),
+        MotorRecord {
+            pwm: lerp(self.pwm.re(), other.pwm.re(), alpha.clone()),
+            rpm: lerp(self.rpm.re(), other.rpm.re(), alpha.clone()),
+            current: lerp(self.current.re(), other.current.re(), alpha.clone()),
+            voltage: lerp(self.voltage.re(), other.voltage.re(), alpha.clone()),
+            power: lerp(self.power.re(), other.power.re(), alpha.clone()),
+            force: lerp(self.force.re(), other.force.re(), alpha.clone()),
+            efficiency: lerp(self.efficiency.re(), other.efficiency.re(), alpha),
         }
     }
 }
 
-fn lerp(a: f32, b: f32, alpha: f32) -> f32 {
-    (1.0 - alpha) * a + alpha * b
+fn lerp<D: Number>(a: f32, b: f32, alpha: D) -> D {
+    (D::one() - alpha.clone()) * a + alpha * b
 }
 
 pub fn read_motor_data<P: AsRef<Path>>(path: P) -> anyhow::Result<MotorData> {
@@ -165,7 +176,7 @@ pub fn read_motor_data<P: AsRef<Path>>(path: P) -> anyhow::Result<MotorData> {
 
     let mut data = Vec::default();
     for result in csv.into_deserialize() {
-        let record: MotorRecord = result.context("Parse motor record")?;
+        let record: MotorRecord<f32> = result.context("Parse motor record")?;
         data.push(record);
     }
 

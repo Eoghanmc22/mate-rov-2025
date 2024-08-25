@@ -10,46 +10,51 @@ pub mod utils;
 pub mod x3d;
 
 use std::{
-    collections::BTreeMap,
     fmt::Debug,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
-use glam::Vec3A;
-use nalgebra::{Matrix6xX, MatrixXx6};
+use nalgebra::{ComplexField, Matrix6xX, MatrixXx6, Vector3};
+use num_dual::DualNum;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct MotorConfig<MotorId: Ord> {
-    // FIXME(low): Is there any reason this isnt a Vec?
-    motors: BTreeMap<MotorId, Motor>,
+// Should be implemented for f32 and f32 backed num-dual types
+pub trait Number: DualNum<f32> + ComplexField<RealField = Self> + Debug {}
+impl<T> Number for T where T: DualNum<f32> + ComplexField<RealField = Self> + Debug {}
 
-    matrix: Matrix6xX<f32>,
-    pseudo_inverse: MatrixXx6<f32>,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct MotorConfig<MotorId, D: Number> {
+    motors: Vec<(MotorId, Motor<D>)>,
+    matrix: Matrix6xX<D>,
+    pseudo_inverse: MatrixXx6<D>,
 }
 
-impl<MotorId: Ord + Debug> MotorConfig<MotorId> {
+impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
     #[instrument(level = "trace", skip_all, ret)]
-    pub fn new_raw(motors: impl IntoIterator<Item = (MotorId, Motor)>, center_mass: Vec3A) -> Self {
-        let motors: BTreeMap<_, _> = motors.into_iter().collect();
+    pub fn new_raw(
+        motors: impl IntoIterator<Item = (MotorId, Motor<D>)>,
+        center_mass: Vector3<D>,
+    ) -> Self {
+        let mut motors: Vec<_> = motors.into_iter().collect();
+        motors.sort_by(|a, b| MotorId::cmp(&a.0, &b.0));
+        motors.dedup_by(|a, b| a.0 == b.0);
 
-        let matrix = Matrix6xX::from_iterator(
+        // TODO: There has to be a better way
+        let matrix = Matrix6xX::<D>::from_iterator(
             motors.len(),
-            motors
-                .iter()
-                .flat_map(|it| {
-                    [
-                        it.1.orientation,
-                        (it.1.position - center_mass).cross(it.1.orientation),
-                    ]
+            motors.iter().flat_map(|(_id, motor)| {
+                let force = motor.orientation.clone();
+                let torque = (motor.position.clone() - &center_mass).cross(&motor.orientation);
+
+                [force, torque]
                     .into_iter()
-                })
-                .flat_map(|it| it.to_array().into_iter()),
+                    .flat_map(|it| it.data.0.into_iter().flatten())
+            }),
         );
 
-        let pseudo_inverse = matrix.clone().pseudo_inverse(0.0001).unwrap();
+        let pseudo_inverse = matrix.clone().pseudo_inverse(D::from(0.0001)).unwrap();
 
         Self {
             motors,
@@ -58,20 +63,21 @@ impl<MotorId: Ord + Debug> MotorConfig<MotorId> {
         }
     }
 
-    pub fn motor(&self, motor: &MotorId) -> Option<&Motor> {
-        self.motors.get(motor)
+    pub fn motor(&self, motor: &MotorId) -> Option<&Motor<D>> {
+        // self.motors.get(motor)
+        self.motors.iter().find(|it| &it.0 == motor).map(|it| &it.1)
     }
 
-    pub fn motors(&self) -> impl Iterator<Item = (&MotorId, &Motor)> {
-        self.motors.iter()
+    pub fn motors(&self) -> impl Iterator<Item = (&MotorId, &Motor<D>)> {
+        self.motors.iter().map(|it| (&it.0, &it.1))
     }
 }
 
 pub type ErasedMotorId = u8;
 
-impl<MotorId: Ord + Into<ErasedMotorId> + Clone> MotorConfig<MotorId> {
+impl<MotorId: Ord + Into<ErasedMotorId> + Clone, D: Number> MotorConfig<MotorId, D> {
     /// Order of ErasedMotorIds must match the order of MotorId given by the ord trait
-    pub fn erase(self) -> MotorConfig<ErasedMotorId> {
+    pub fn erase(self) -> MotorConfig<ErasedMotorId, D> {
         let MotorConfig {
             motors,
             matrix,
@@ -91,11 +97,11 @@ impl<MotorId: Ord + Into<ErasedMotorId> + Clone> MotorConfig<MotorId> {
     }
 }
 
-impl MotorConfig<ErasedMotorId> {
+impl<D: Number> MotorConfig<ErasedMotorId, D> {
     /// Order of ErasedMotorIds must match the order of MotorId given by the ord trait
     pub fn unerase<MotorId: Ord + TryFrom<ErasedMotorId>>(
         self,
-    ) -> Result<MotorConfig<MotorId>, <MotorId as TryFrom<ErasedMotorId>>::Error> {
+    ) -> Result<MotorConfig<MotorId, D>, <MotorId as TryFrom<ErasedMotorId>>::Error> {
         let MotorConfig {
             motors,
             matrix,
@@ -115,13 +121,14 @@ impl MotorConfig<ErasedMotorId> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
-#[reflect(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Motor {
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+// #[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
+// #[reflect(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Motor<D: Number> {
     /// Offset from origin
-    pub position: Vec3A,
+    pub position: Vector3<D>,
     /// Unit vector
-    pub orientation: Vec3A,
+    pub orientation: Vector3<D>,
 
     pub direction: Direction,
 }
@@ -156,15 +163,16 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Reflect, PartialEq)]
-#[reflect(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Movement {
-    pub force: Vec3A,
-    pub torque: Vec3A,
+#[derive(Debug, Clone, Default, PartialEq)]
+// #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Reflect, PartialEq)]
+// #[reflect(Serialize, Deserialize, Debug, PartialEq)]
+pub struct Movement<D: Number> {
+    pub force: Vector3<D>,
+    pub torque: Vector3<D>,
 }
 
-impl Add for Movement {
-    type Output = Movement;
+impl<D: Number> Add for Movement<D> {
+    type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         Self {
@@ -174,14 +182,15 @@ impl Add for Movement {
     }
 }
 
-impl AddAssign for Movement {
+impl<D: Number> AddAssign for Movement<D> {
     fn add_assign(&mut self, rhs: Self) {
-        *self = *self + rhs;
+        self.force += rhs.force;
+        self.torque += rhs.torque;
     }
 }
 
-impl Sub for Movement {
-    type Output = Movement;
+impl<D: Number> Sub for Movement<D> {
+    type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
         Self {
@@ -191,42 +200,45 @@ impl Sub for Movement {
     }
 }
 
-impl SubAssign for Movement {
+impl<D: Number> SubAssign for Movement<D> {
     fn sub_assign(&mut self, rhs: Self) {
-        *self = *self - rhs;
+        self.force -= rhs.force;
+        self.torque -= rhs.torque;
     }
 }
 
-impl Mul<f32> for Movement {
-    type Output = Movement;
+impl<D: Number> Mul<D> for Movement<D> {
+    type Output = Self;
 
-    fn mul(self, rhs: f32) -> Self::Output {
+    fn mul(self, rhs: D) -> Self::Output {
         Self {
-            force: self.force * rhs,
+            force: self.force * rhs.clone(),
             torque: self.torque * rhs,
         }
     }
 }
 
-impl MulAssign<f32> for Movement {
-    fn mul_assign(&mut self, rhs: f32) {
-        *self = *self * rhs;
+impl<D: Number> MulAssign<D> for Movement<D> {
+    fn mul_assign(&mut self, rhs: D) {
+        self.force *= rhs.clone();
+        self.torque *= rhs;
     }
 }
 
-impl Div<f32> for Movement {
-    type Output = Movement;
+impl<D: Number> Div<D> for Movement<D> {
+    type Output = Self;
 
-    fn div(self, rhs: f32) -> Self::Output {
+    fn div(self, rhs: D) -> Self::Output {
         Self {
-            force: self.force / rhs,
+            force: self.force / rhs.clone(),
             torque: self.torque / rhs,
         }
     }
 }
 
-impl DivAssign<f32> for Movement {
-    fn div_assign(&mut self, rhs: f32) {
-        *self = *self / rhs;
+impl<D: Number> DivAssign<D> for Movement<D> {
+    fn div_assign(&mut self, rhs: D) {
+        self.force /= rhs.clone();
+        self.torque /= rhs;
     }
 }

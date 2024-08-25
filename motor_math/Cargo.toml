@@ -8,7 +8,9 @@ edition = "2021"
 csv = "1"
 serde = { version = "1", features = ["derive"] }
 ahash = "0.8"
-glam = { version = "0.27", features = ["serde"] }
+
+num = "0.4"
+num-dual = "0.9"
 nalgebra = { version = "0.33", features = ["serde-serialize"] }
 
 num_enum = "0.7"

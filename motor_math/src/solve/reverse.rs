@@ -4,43 +4,47 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 use ahash::{HashMap, HashMapExt};
-use glam::vec3a;
-use nalgebra::Vector6;
+use nalgebra::{vector, Vector6};
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 use crate::{
     motor_preformance::{Interpolation, MotorData, MotorRecord},
-    MotorConfig, Movement,
+    MotorConfig, Movement, Number,
 };
 
 #[instrument(level = "trace", skip(motor_config), ret)]
-pub fn reverse_solve<MotorId: Hash + Ord + Clone + Debug>(
-    movement: Movement,
-    motor_config: &MotorConfig<MotorId>,
-) -> HashMap<MotorId, f32> {
+pub fn reverse_solve<D: Number, MotorId: Hash + Ord + Clone + Debug>(
+    movement: Movement<D>,
+    motor_config: &MotorConfig<MotorId, D>,
+) -> HashMap<MotorId, D> {
     let movement_vec = Vector6::from_iterator(
         [movement.force, movement.torque]
-            .into_iter()
-            .flat_map(|it| it.to_array().into_iter()),
+            .iter()
+            .flat_map(|it| it.as_slice())
+            .cloned(),
     );
 
     let forces = motor_config.pseudo_inverse.clone() * movement_vec;
 
     let mut motor_forces = HashMap::new();
-    for (idx, (motor_id, _motor)) in motor_config.motors.iter().enumerate() {
-        motor_forces.insert(motor_id.clone(), forces[idx]);
+    for ((motor_id, _motor), force) in motor_config
+        .motors
+        .iter()
+        .zip(Vec::from(forces.data).into_iter())
+    {
+        motor_forces.insert(motor_id.clone(), force);
     }
 
     motor_forces
 }
 
 #[instrument(level = "trace", skip(motor_config, motor_data), ret)]
-pub fn forces_to_cmds<MotorId: Hash + Ord + Clone + Debug>(
-    forces: HashMap<MotorId, f32>,
-    motor_config: &MotorConfig<MotorId>,
+pub fn forces_to_cmds<D: Number, MotorId: Hash + Ord + Clone + Debug>(
+    forces: HashMap<MotorId, D>,
+    motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
-) -> HashMap<MotorId, MotorRecord> {
+) -> HashMap<MotorId, MotorRecord<D>> {
     let mut motor_cmds = HashMap::new();
     for (motor_id, force) in forces {
         let motor = motor_config.motor(&motor_id).expect("Bad motor id");
@@ -55,22 +59,22 @@ pub fn forces_to_cmds<MotorId: Hash + Ord + Clone + Debug>(
 /// Does not preserve force ratios
 /// Runs in constant time
 #[instrument(level = "trace", skip(motor_config, motor_data), ret)]
-pub fn clamp_amperage_fast<MotorId: Hash + Ord + Clone + Debug>(
-    motor_cmds: HashMap<MotorId, MotorRecord>,
-    motor_config: &MotorConfig<MotorId>,
+pub fn clamp_amperage_fast<D: Number, MotorId: Hash + Ord + Clone + Debug>(
+    motor_cmds: HashMap<MotorId, MotorRecord<D>>,
+    motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
     amperage_cap: f32,
-) -> HashMap<MotorId, MotorRecord> {
-    let amperage_total = motor_cmds.values().map(|it| it.current).sum::<f32>();
+) -> HashMap<MotorId, MotorRecord<D>> {
+    let amperage_total = motor_cmds.values().map(|it| it.current.clone()).sum::<D>();
 
-    if amperage_total <= amperage_cap {
+    if amperage_total.re() <= amperage_cap {
         return motor_cmds;
     } else {
         // TODO remove?
         // println!("CURRENT LIMIT HIT");
     }
 
-    let amperage_ratio = amperage_cap / amperage_total;
+    let amperage_ratio = D::from(amperage_cap) / amperage_total;
 
     let mut adjusted_motor_cmds = HashMap::default();
     for (motor_id, data) in motor_cmds {
@@ -79,7 +83,7 @@ pub fn clamp_amperage_fast<MotorId: Hash + Ord + Clone + Debug>(
             .map(|it| it.direction)
             .unwrap_or(crate::Direction::Clockwise);
 
-        let adjusted_current = data.current.copysign(data.force) * amperage_ratio;
+        let adjusted_current = data.current.abs() * data.force.signum() * amperage_ratio.clone();
         let data_adjusted =
             motor_data.lookup_by_current(adjusted_current, Interpolation::LerpDirection(direction));
 
@@ -90,16 +94,16 @@ pub fn clamp_amperage_fast<MotorId: Hash + Ord + Clone + Debug>(
 }
 
 #[instrument(level = "trace", skip(motor_config, motor_data), ret)]
-pub fn clamp_amperage<MotorId: Hash + Ord + Clone + Debug>(
-    motor_cmds: HashMap<MotorId, MotorRecord>,
-    motor_config: &MotorConfig<MotorId>,
+pub fn clamp_amperage<D: Number, MotorId: Hash + Ord + Clone + Debug>(
+    motor_cmds: HashMap<MotorId, MotorRecord<D>>,
+    motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
     amperage_cap: f32,
     epsilon: f32,
-) -> HashMap<MotorId, MotorRecord> {
-    let amperage_total = motor_cmds.values().map(|it| it.current).sum::<f32>();
+) -> HashMap<MotorId, MotorRecord<D>> {
+    let amperage_total = motor_cmds.values().map(|it| it.current.clone()).sum::<D>();
 
-    if amperage_total <= amperage_cap {
+    if amperage_total.re() <= amperage_cap {
         return motor_cmds;
     } else {
         // TODO remove?
@@ -116,7 +120,7 @@ pub fn clamp_amperage<MotorId: Hash + Ord + Clone + Debug>(
             .map(|it| it.direction)
             .unwrap_or(crate::Direction::Clockwise);
 
-        let force_current = data.force * force_ratio;
+        let force_current = data.force * force_ratio.clone();
         let data_adjusted =
             motor_data.lookup_by_force(force_current, Interpolation::LerpDirection(direction));
 
@@ -126,16 +130,17 @@ pub fn clamp_amperage<MotorId: Hash + Ord + Clone + Debug>(
     adjusted_motor_cmds
 }
 
-pub fn binary_search_force_ratio<MotorId: Hash + Ord + Clone + Debug>(
-    motor_cmds: &HashMap<MotorId, MotorRecord>,
-    motor_config: &MotorConfig<MotorId>,
+// TODO: Validate this is using dual numbers correctly
+pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>(
+    motor_cmds: &HashMap<MotorId, MotorRecord<D>>,
+    motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
     amperage_cap: f32,
     epsilon: f32,
-) -> f32 {
-    let (mut lower_bound, mut lower_current) = (0.0, 0.0);
-    let (mut upper_bound, mut upper_current) = (f32::INFINITY, f32::INFINITY);
-    let mut mid = 1.0;
+) -> D {
+    let (mut lower_bound, mut lower_current) = (D::zero(), D::zero());
+    let (mut upper_bound, mut upper_current) = (D::from(f32::INFINITY), D::from(f32::INFINITY));
+    let mut mid = D::one();
 
     loop {
         let mid_current = motor_cmds
@@ -146,32 +151,35 @@ pub fn binary_search_force_ratio<MotorId: Hash + Ord + Clone + Debug>(
                     .map(|it| it.direction)
                     .unwrap_or(crate::Direction::Clockwise);
 
-                let adjusted_force = data.force.copysign(data.force) * mid;
+                // FIXME: old code of copying force's sign to its self is a no-op could be a bug
+                // let adjusted_force = data.force.copysign(data.force) * mid;
+                let adjusted_force = data.force.clone() * mid.clone();
                 let data = motor_data
                     .lookup_by_force(adjusted_force, Interpolation::LerpDirection(direction));
 
                 data.current
             })
-            .sum::<f32>();
+            .sum::<D>();
 
-        if (mid_current - amperage_cap).abs() < epsilon {
+        if (mid_current.re() - amperage_cap).abs() < epsilon {
             return mid;
         }
 
-        if mid_current >= amperage_cap {
-            upper_bound = mid;
-            upper_current = mid_current;
+        if mid_current.re() >= amperage_cap {
+            upper_bound = mid.clone();
+            upper_current = mid_current.clone();
         } else {
-            lower_bound = mid;
-            lower_current = mid_current;
+            lower_bound = mid.clone();
+            lower_current = mid_current.clone();
         }
 
-        if upper_bound == f32::INFINITY {
-            mid *= amperage_cap / mid_current;
+        if upper_bound.re() == f32::INFINITY {
+            mid *= D::from(amperage_cap) / mid_current;
             // mid *= 2.0;
         } else {
-            let alpha = (amperage_cap - lower_current) / (upper_current - lower_current);
-            mid = upper_bound * alpha + lower_bound * (1.0 - alpha)
+            let alpha = (D::from(amperage_cap) - lower_current.clone())
+                / (upper_current.clone() - lower_current.clone());
+            mid = upper_bound.clone() * alpha.clone() + lower_bound.clone() * (D::one() - alpha)
             // mid = upper_bound / 2.0 + lower_bound / 2.0
         }
     }
@@ -188,42 +196,42 @@ pub enum Axis {
 }
 
 impl Axis {
-    pub fn movement(&self) -> Movement {
+    pub fn movement<D: Number>(&self) -> Movement<D> {
         match self {
             Axis::X => Movement {
-                force: vec3a(1.0, 0.0, 0.0),
-                torque: vec3a(0.0, 0.0, 0.0),
+                force: vector![D::one(), D::zero(), D::zero()],
+                torque: vector![D::zero(), D::zero(), D::zero()],
             },
             Axis::Y => Movement {
-                force: vec3a(0.0, 1.0, 0.0),
-                torque: vec3a(0.0, 0.0, 0.0),
+                force: vector![D::zero(), D::one(), D::zero()],
+                torque: vector![D::zero(), D::zero(), D::zero()],
             },
             Axis::Z => Movement {
-                force: vec3a(0.0, 0.0, 1.0),
-                torque: vec3a(0.0, 0.0, 0.0),
+                force: vector![D::zero(), D::zero(), D::one()],
+                torque: vector![D::zero(), D::zero(), D::zero()],
             },
             Axis::XRot => Movement {
-                force: vec3a(0.0, 0.0, 0.0),
-                torque: vec3a(1.0, 0.0, 0.0),
+                force: vector![D::zero(), D::zero(), D::zero()],
+                torque: vector![D::one(), D::zero(), D::zero()],
             },
             Axis::YRot => Movement {
-                force: vec3a(0.0, 0.0, 0.0),
-                torque: vec3a(0.0, 1.0, 0.0),
+                force: vector![D::zero(), D::zero(), D::zero()],
+                torque: vector![D::zero(), D::one(), D::zero()],
             },
             Axis::ZRot => Movement {
-                force: vec3a(0.0, 0.0, 0.0),
-                torque: vec3a(0.0, 0.0, 1.0),
+                force: vector![D::zero(), D::zero(), D::zero()],
+                torque: vector![D::zero(), D::zero(), D::one()],
             },
         }
     }
 }
 
-pub fn axis_maximums<MotorId: Hash + Ord + Clone + Debug>(
-    motor_config: &MotorConfig<MotorId>,
+pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
+    motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
     amperage_cap: f32,
     epsilon: f32,
-) -> HashMap<Axis, f32> {
+) -> HashMap<Axis, D> {
     [
         Axis::X,
         Axis::Y,
@@ -233,11 +241,11 @@ pub fn axis_maximums<MotorId: Hash + Ord + Clone + Debug>(
         Axis::ZRot,
     ]
     .into_iter()
-    .map(|it| (it, it.movement()))
+    .map(|it| (it, it.movement::<D>()))
     .map(|(axis, movement)| {
         let initial = 25.0;
 
-        let forces = reverse_solve(movement * initial, motor_config);
+        let forces = reverse_solve(movement * initial.into(), motor_config);
         let cmds = forces_to_cmds(forces, motor_config, motor_data);
         let scale =
             binary_search_force_ratio(&cmds, motor_config, motor_data, amperage_cap, epsilon);

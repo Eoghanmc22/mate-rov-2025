@@ -1,9 +1,9 @@
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
-use glam::Vec3A;
+use nalgebra::Vector3;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
-use crate::{utils::VectorTransform, Motor, MotorConfig};
+use crate::{utils::VectorTransform, Motor, MotorConfig, Number};
 
 #[derive(
     Clone,
@@ -33,8 +33,8 @@ pub enum X3dMotorId {
     BackLeftBottom,
 }
 
-impl MotorConfig<X3dMotorId> {
-    pub fn new(front_right_top: Motor, center_mass: Vec3A) -> Self {
+impl<D: Number> MotorConfig<X3dMotorId, D> {
+    pub fn new(front_right_top: Motor<D>, center_mass: Vector3<D>) -> Self {
         #[rustfmt::skip]
         let motors = [
             (X3dMotorId::FrontRightTop, [].as_slice()),

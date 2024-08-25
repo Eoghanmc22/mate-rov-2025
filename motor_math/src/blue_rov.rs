@@ -1,9 +1,9 @@
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
-use glam::Vec3A;
+use nalgebra::Vector3;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
-use crate::{utils::VectorTransform, Motor, MotorConfig};
+use crate::{utils::VectorTransform, Motor, MotorConfig, Number};
 
 /// Motor ids for blue rov heavy
 #[derive(
@@ -34,11 +34,11 @@ pub enum HeavyMotorId {
     VerticalBackRight,
 }
 
-impl MotorConfig<HeavyMotorId> {
+impl<D: Number> MotorConfig<HeavyMotorId, D> {
     pub fn new(
-        lateral_front_right: Motor,
-        vertical_front_right: Motor,
-        center_mass: Vec3A,
+        lateral_front_right: Motor<D>,
+        vertical_front_right: Motor<D>,
+        center_mass: Vector3<D>,
     ) -> Self {
         #[rustfmt::skip]
         let motors = [
