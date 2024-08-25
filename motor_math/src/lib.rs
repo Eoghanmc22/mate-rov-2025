@@ -163,7 +163,7 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq)]
 // #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Reflect, PartialEq)]
 // #[reflect(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Movement<D: Number> {
