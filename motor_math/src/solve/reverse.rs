@@ -83,7 +83,7 @@ pub fn clamp_amperage_fast<D: Number, MotorId: Hash + Ord + Clone + Debug>(
             .map(|it| it.direction)
             .unwrap_or(crate::Direction::Clockwise);
 
-        let adjusted_current = data.current.abs() * data.force.signum() * amperage_ratio;
+        let adjusted_current = data.current.copysign(data.force) * amperage_ratio;
         let data_adjusted =
             motor_data.lookup_by_current(adjusted_current, Interpolation::LerpDirection(direction));
 
@@ -177,8 +177,7 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
             mid *= D::from(amperage_cap) / mid_current;
             // mid *= 2.0;
         } else {
-            let alpha = (D::from(amperage_cap) - lower_current)
-                / (upper_current - lower_current);
+            let alpha = (D::from(amperage_cap) - lower_current) / (upper_current - lower_current);
             mid = upper_bound * alpha + lower_bound * (D::one() - alpha)
             // mid = upper_bound / 2.0 + lower_bound / 2.0
         }

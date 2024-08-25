@@ -15,14 +15,14 @@ use std::{
 };
 
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
-use nalgebra::{ComplexField, Matrix6xX, MatrixXx6, Vector3};
+use nalgebra::{Matrix6xX, MatrixXx6, RealField, Vector3};
 use num_dual::DualNum;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 // Should be implemented for f32 and f32 backed num-dual types
-pub trait Number: DualNum<f32> + ComplexField<RealField = Self> + Debug + Copy {}
-impl<T> Number for T where T: DualNum<f32> + ComplexField<RealField = Self> + Debug + Copy {}
+pub trait Number: DualNum<f32> + RealField + Debug + Copy {}
+impl<T> Number for T where T: DualNum<f32> + RealField + Debug + Copy {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MotorConfig<MotorId, D: Number> {
