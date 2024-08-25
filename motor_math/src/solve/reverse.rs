@@ -1,7 +1,7 @@
 //! Desired Movement -> Motor Commands
 
-use std::hash::{BuildHasherDefault, Hash};
-use std::{collections::HashMap as StdHashMap, fmt::Debug};
+use std::fmt::Debug;
+use std::hash::Hash;
 
 use nalgebra::{vector, Vector6};
 use serde::{Deserialize, Serialize};
@@ -163,6 +163,9 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
             })
             .sum::<D>();
 
+        if mid_current.re() == 0.0 {
+            return D::one();
+        }
         if (mid_current.re() - amperage_cap).abs() < epsilon {
             return mid;
         }
