@@ -26,9 +26,9 @@ impl<T> Number for T where T: DualNum<f32> + RealField + Debug + Copy {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MotorConfig<MotorId, D: Number> {
-    motors: Vec<(MotorId, Motor<D>)>,
-    matrix: Matrix6xX<D>,
-    pseudo_inverse: MatrixXx6<D>,
+    pub motors: Vec<(MotorId, Motor<D>)>,
+    pub matrix: Matrix6xX<D>,
+    pub pseudo_inverse: MatrixXx6<D>,
 }
 
 impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {

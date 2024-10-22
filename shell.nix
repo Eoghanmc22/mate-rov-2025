@@ -2,6 +2,7 @@
   let
     overrides = (builtins.fromTOML (builtins.readFile ./rust-toolchain.toml));
     libPath = with pkgs; lib.makeLibraryPath [
+      gcc
       clang
       # Replace llvmPackages with llvmPackages_X, where X is the latest LLVM version (at the time of writing, 16)
       llvmPackages.bintools
@@ -27,6 +28,9 @@ in
       gst_all_1.gst-plugins-ugly
       gst_all_1.gst-libav
       ffmpeg
+      kitty
+      #rustup
+      #cargo
     ];
     RUSTC_VERSION = overrides.toolchain.channel;
     # https://github.com/rust-lang/rust-bindgen#environment-variables

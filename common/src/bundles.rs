@@ -5,7 +5,7 @@ use crate::components::{
     Inertial, Leak, LoadAverage, Magnetic, MeasuredVoltage, Memory, MotorDefinition, Motors,
     MovementAxisMaximums, MovementContribution, MovementCurrentCap, Networks, OperatingSystem,
     Orientation, Processes, PwmChannel, PwmSignal, Robot, RobotId, RobotStatus, ServoDefinition,
-    ServoMode, ServoTargets, TargetForce, TargetMovement, Temperatures, Uptime,
+    ServoMode, TargetForce, TargetMovement, Temperatures, Uptime,
 };
 
 #[derive(Bundle, PartialEq)]

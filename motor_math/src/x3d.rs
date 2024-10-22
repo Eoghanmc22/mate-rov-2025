@@ -37,7 +37,7 @@ impl<D: Number> MotorConfig<X3dMotorId, D> {
     pub fn new(front_right_top: Motor<D>, center_mass: Vector3<D>) -> Self {
         #[rustfmt::skip]
         let motors = [
-            (X3dMotorId::FrontRightTop, [].as_slice()),
+            // (X3dMotorId::FrontRightTop, [].as_slice()),
 
             (X3dMotorId::FrontRightBottom, [VectorTransform::ReflectXY].as_slice()),
             (X3dMotorId::FrontLeftTop, [VectorTransform::ReflectYZ].as_slice()),
@@ -47,7 +47,7 @@ impl<D: Number> MotorConfig<X3dMotorId, D> {
             (X3dMotorId::BackLeftTop, [VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
             (X3dMotorId::BackRightBottom, [VectorTransform::ReflectXZ, VectorTransform::ReflectXY].as_slice()),
 
-            (X3dMotorId::BackLeftBottom, [VectorTransform::ReflectXY, VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
+            // (X3dMotorId::BackLeftBottom, [VectorTransform::ReflectXY, VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
         ];
 
         let motors = motors.into_iter().map(|(motor_id, transforms)| {

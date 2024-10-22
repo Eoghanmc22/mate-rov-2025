@@ -1,10 +1,5 @@
 //! Code shared between both the surface and robot projects
-#![feature(
-    try_blocks,
-    const_fn_floating_point_arithmetic,
-    const_float_classify,
-    hash_extract_if
-)]
+#![feature(try_blocks, hash_extract_if)]
 #![allow(clippy::type_complexity)]
 
 use bevy::{
