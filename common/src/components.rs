@@ -6,7 +6,11 @@ use bevy::{
     reflect::{std_traits::ReflectDefault, Reflect, ReflectDeserialize, ReflectSerialize},
 };
 use glam::Quat;
-use motor_math::{solve::reverse::Axis, ErasedMotorId, Motor, MotorConfig, Movement};
+use motor_math::{
+    glam::{MotorGlam, MovementGlam},
+    solve::reverse::Axis,
+    ErasedMotorId, MotorConfig,
+};
 use serde::{Deserialize, Serialize};
 use stable_hashmap::StableHashMap;
 
@@ -233,7 +237,7 @@ pub struct ActualForce(pub Newtons);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct MotorDefinition(pub ErasedMotorId, pub Motor<f32>);
+pub struct MotorDefinition(pub ErasedMotorId, pub MotorGlam);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
@@ -265,7 +269,7 @@ pub struct Motors(pub MotorConfig<ErasedMotorId, f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct TargetMovement(pub Movement<f32>);
+pub struct TargetMovement(pub MovementGlam);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
@@ -273,7 +277,7 @@ pub struct ServoTargets(pub StableHashMap<Cow<'static, str>, f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct ActualMovement(pub Movement<f32>);
+pub struct ActualMovement(pub MovementGlam);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
@@ -281,7 +285,7 @@ pub struct MeasuredVoltage(pub Volts);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq, Default)]
-pub struct MovementContribution(pub Movement<f32>);
+pub struct MovementContribution(pub MovementGlam);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]

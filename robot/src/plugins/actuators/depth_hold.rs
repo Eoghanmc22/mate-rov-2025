@@ -8,7 +8,7 @@ use common::{
     types::{units::Meters, utils::PidController},
 };
 use glam::Vec3A;
-use motor_math::Movement;
+use motor_math::{glam::MovementGlam, Movement};
 
 use crate::plugins::core::robot::LocalRobot;
 
@@ -29,7 +29,7 @@ fn setup_depth_hold(mut cmds: Commands, robot: Res<LocalRobot>) {
         .spawn((
             MovementContributionBundle {
                 name: Name::new("Depth Hold"),
-                contribution: MovementContribution(Movement::default()),
+                contribution: MovementContribution(MovementGlam::default()),
                 robot: RobotId(robot.net_id),
             },
             // TODO(high): Tune
@@ -69,9 +69,9 @@ fn depth_hold_system(
         let res = pid.update(-depth_error.0, -depth_td.0, pid_config, time.delta());
 
         let correction = orientation.0.inverse() * Vec3A::Z * res.correction;
-        let movement = Movement {
+        let movement = MovementGlam {
             force: correction,
-            torque: Vec3A::ZERO,
+            torque: Default::default(),
         };
 
         cmds.entity(state.0)

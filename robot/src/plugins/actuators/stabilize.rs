@@ -10,7 +10,7 @@ use common::{
     types::utils::PidController,
 };
 use glam::{vec3a, Vec3A};
-use motor_math::Movement;
+use motor_math::{glam::MovementGlam, Movement};
 
 use crate::plugins::core::robot::LocalRobot;
 
@@ -40,7 +40,7 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
         .spawn((
             MovementContributionBundle {
                 name: Name::new("Stabalize Pitch"),
-                contribution: MovementContribution(Movement::default()),
+                contribution: MovementContribution(MovementGlam::default()),
                 robot: RobotId(robot.net_id),
             },
             // TODO(high): Tune
@@ -60,7 +60,7 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
         .spawn((
             MovementContributionBundle {
                 name: Name::new("Stabalize Roll"),
-                contribution: MovementContribution(Movement::default()),
+                contribution: MovementContribution(MovementGlam::default()),
                 robot: RobotId(robot.net_id),
             },
             // TODO(high): Tune
@@ -80,7 +80,7 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
         .spawn((
             MovementContributionBundle {
                 name: Name::new("Stabalize Yaw"),
-                contribution: MovementContribution(Movement::default()),
+                contribution: MovementContribution(MovementGlam::default()),
                 robot: RobotId(robot.net_id),
             },
             // TODO(high): Tune
@@ -145,17 +145,17 @@ fn stabalize_system(
             .yaw_controller
             .update(yaw_error, yaw_td, yaw_pid_config, time.delta());
 
-        let pitch_movement = Movement {
+        let pitch_movement = MovementGlam {
             force: Vec3A::ZERO,
             torque: /*orientation.0.inverse() **/ Vec3A::X * res_pitch.correction,
         };
 
-        let roll_movement = Movement {
+        let roll_movement = MovementGlam {
             force: Vec3A::ZERO,
             torque: /*orientation.0.inverse() **/ Vec3A::Y * res_roll.correction,
         };
 
-        let yaw_movement = Movement {
+        let yaw_movement = MovementGlam {
             force: Vec3A::ZERO,
             torque: /*orientation.0.inverse() **/ Vec3A::Z * res_yaw.correction,
         };

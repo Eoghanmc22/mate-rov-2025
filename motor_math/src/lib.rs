@@ -4,6 +4,8 @@
 // +XR: Pitch Up, +YR: Roll Clockwise, +ZR: Yaw Counter Clockwise (top view)
 
 pub mod blue_rov;
+#[cfg(feature = "glam")]
+pub mod glam;
 pub mod motor_preformance;
 pub mod solve;
 pub mod utils;

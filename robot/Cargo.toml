@@ -7,6 +7,8 @@ edition = "2021"
 common = { path = "../common" }
 networking = { path = "../networking" }
 motor_math = { path = "../motor_math" }
+stable_hashmap = { path = "../stable_hashmap" }
+
 
 bevy = { version = "0.14", default-features = false }
 
@@ -20,7 +22,7 @@ rgb = "0.8"
 sysinfo = { version = "0.29", default-features = false }
 
 ahrs = { git = "https://github.com/jmagnuson/ahrs-rs.git" }
-nalgebra = { version = "0.32", features = ["convert-glam027"] }
+nalgebra = { version = "0.33", features = ["convert-glam027"] }
 glam = { version = "0.27", features = ["serde"] }
 
 anyhow = "1"

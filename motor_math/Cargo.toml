@@ -14,6 +14,7 @@ serde = { version = "1", features = ["derive"] }
 num = "0.4"
 num-dual = { git = "https://github.com/itt-ustutt/num-dual.git", rev = "f4123e30702ec3786c44d70ff66c9afc00583338" }
 nalgebra = { version = "0.33", features = ["serde-serialize"] }
+glam = { version = "0.27", features = ["serde"], optional = true }
 
 num_enum = "0.7"
 
@@ -21,3 +22,6 @@ anyhow = "1"
 tracing = "0.1"
 
 bevy_reflect = "0.14"
+
+[features]
+glam = ["dep:glam"]

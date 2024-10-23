@@ -154,7 +154,7 @@ fn read_new_data(
 
             let rst = madgwick_filter.0.update_imu(&gyro, &accel);
             if let Err(msg) = rst {
-                errors.send(anyhow!("Process IMU frame: {msg}").into());
+                errors.send(anyhow!("Process IMU frame: {msg:?}").into());
             }
         }
 

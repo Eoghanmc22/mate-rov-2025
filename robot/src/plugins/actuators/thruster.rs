@@ -14,11 +14,13 @@ use common::{
 };
 use motor_math::{
     blue_rov::HeavyMotorId,
+    glam::MovementGlam,
     motor_preformance::{self, Interpolation, MotorData, MotorRecord},
     solve::{self, reverse},
     x3d::X3dMotorId,
-    Direction, ErasedMotorId, Movement,
+    Direction, ErasedMotorId,
 };
+use stable_hashmap::StableHashMap;
 
 use crate::{
     config::{MotorConfigDefinition, RobotConfig},
@@ -140,7 +142,7 @@ fn accumulate_movements(
     };
     let mut robot = cmds.entity(entity);
 
-    let mut total_movement = Movement::default();
+    let mut total_movement = MovementGlam::default();
 
     for (RobotId(robot_net_id), movement) in &movements {
         if robot_net_id == net_id {
@@ -148,7 +150,7 @@ fn accumulate_movements(
         }
     }
 
-    let forces = solve::reverse::reverse_solve(total_movement, motor_config);
+    let forces = solve::reverse::reverse_solve(total_movement.into(), motor_config);
     let motor_cmds = solve::reverse::forces_to_cmds(forces, motor_config, &motor_data.0);
     let forces = motor_cmds
         .into_iter()
@@ -161,7 +163,7 @@ fn accumulate_movements(
 // TODO(mid): Split into smaller systems
 fn accumulate_motor_forces(
     mut cmds: Commands,
-    mut last_movement: Local<HashMap<ErasedMotorId, MotorRecord>>,
+    mut last_movement: Local<StableHashMap<ErasedMotorId, MotorRecord<f32>>>,
 
     robot: Query<
         (Entity, &NetId, &Motors, &MovementCurrentCap, &JerkLimit),
@@ -185,7 +187,7 @@ fn accumulate_motor_forces(
     };
     let mut robot = cmds.entity(entity);
 
-    let mut all_forces = HashMap::default();
+    let mut all_forces = StableHashMap::default();
 
     for (&RobotId(robot_net_id), motor_force_contributions) in &motor_forces {
         if robot_net_id == net_id {
@@ -196,7 +198,7 @@ fn accumulate_motor_forces(
     }
 
     let target_movement = solve::forward::forward_solve(motor_config, &all_forces);
-    robot.insert(TargetMovement(target_movement));
+    robot.insert(TargetMovement(target_movement.into()));
 
     let motor_cmds = all_forces
         .iter()
@@ -267,7 +269,7 @@ fn accumulate_motor_forces(
         .collect();
 
     let actual_movement = solve::forward::forward_solve(motor_config, &motor_forces);
-    robot.insert(ActualMovement(actual_movement));
+    robot.insert(ActualMovement(actual_movement.into()));
 
     for (motor_entity, MotorDefinition(id, _motor), &RobotId(robot_net_id)) in &motors {
         if robot_net_id == net_id {

@@ -127,9 +127,9 @@ name = "ahrs"
 version = "0.7.0"
 source = "git+https://github.com/jmagnuson/ahrs-rs.git#07498235d4aeab034bc3d3dda88aec9cdecd6f25"
 dependencies = [
- "nalgebra 0.33.1",
+ "nalgebra",
  "num-traits",
- "simba 0.9.0",
+ "simba",
 ]
 
 [[package]]
@@ -3283,7 +3283,8 @@ dependencies = [
  "anyhow",
  "bevy_reflect",
  "csv",
- "nalgebra 0.33.1",
+ "glam",
+ "nalgebra",
  "num",
  "num-dual",
  "num_enum",
@@ -3336,9 +3337,9 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.32.6"
+version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b5c17de023a86f59ed79891b2e5d5a94c705dbe904a5b5c9c952ea6221b03e4"
+checksum = "3bf139e93ad757869338ad85239cb1d6c067b23b94e5846e637ca6328ee4be60"
 dependencies = [
  "approx",
  "glam",
@@ -3347,24 +3348,8 @@ dependencies = [
  "num-complex",
  "num-rational",
  "num-traits",
- "simba 0.8.1",
- "typenum",
-]
-
-[[package]]
-name = "nalgebra"
-version = "0.33.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bf139e93ad757869338ad85239cb1d6c067b23b94e5846e637ca6328ee4be60"
-dependencies = [
- "approx",
- "matrixmultiply",
- "nalgebra-macros",
- "num-complex",
- "num-rational",
- "num-traits",
  "serde",
- "simba 0.9.0",
+ "simba",
  "typenum",
 ]
 
@@ -3580,9 +3565,9 @@ version = "0.9.1"
 source = "git+https://github.com/itt-ustutt/num-dual.git?rev=f4123e30702ec3786c44d70ff66c9afc00583338#f4123e30702ec3786c44d70ff66c9afc00583338"
 dependencies = [
  "approx",
- "nalgebra 0.33.1",
+ "nalgebra",
  "num-traits",
- "simba 0.9.0",
+ "simba",
 ]
 
 [[package]]
@@ -4353,11 +4338,12 @@ dependencies = [
  "crossbeam",
  "glam",
  "motor_math",
- "nalgebra 0.32.6",
+ "nalgebra",
  "networking",
  "rgb",
  "rppal",
  "serde",
+ "stable_hashmap",
  "sysinfo 0.29.11",
  "toml",
  "tracing",
@@ -4376,7 +4362,7 @@ dependencies = [
  "crossbeam",
  "glam",
  "motor_math",
- "nalgebra 0.32.6",
+ "nalgebra",
  "networking",
  "rgb",
  "rppal",
@@ -4589,19 +4575,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a9e9e0b4211b72e7b8b6e85c807d36c212bdb33ea8587f7569562a84df5465b1"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "simba"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "061507c94fc6ab4ba1c9a0305018408e312e17c041eb63bef8aa726fa33aceae"
-dependencies = [
- "approx",
- "num-complex",
- "num-traits",
- "paste",
- "wide",
 ]
 
 [[package]]
