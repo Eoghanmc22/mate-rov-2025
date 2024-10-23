@@ -13,7 +13,7 @@ use bevy::{
 use bevy_egui::EguiContexts;
 use common::components::{Motors, Orientation, OrientationTarget, Robot};
 use egui::TextureId;
-use motor_math::{x3d::X3dMotorId, Direction, ErasedMotorId, Motor, MotorConfig};
+use motor_math::{glam::MotorGlam, x3d::X3dMotorId, Direction, ErasedMotorId, Motor, MotorConfig};
 
 use crate::DARK_MODE;
 
@@ -122,13 +122,14 @@ fn setup(
     // Makes bevy allocate the gpu resources needed, preveinting a >300ms freeze
     // on first connection to robot
     add_motor_conf(
-        &MotorConfig::<X3dMotorId>::new(
-            Motor {
+        &MotorConfig::<X3dMotorId, f32>::new(
+            MotorGlam {
                 position: Vec3A::default(),
                 orientation: Vec3A::default(),
                 direction: Direction::Clockwise,
-            },
-            Vec3A::ZERO,
+            }
+            .into(),
+            Default::default(),
         )
         .erase(),
         &mut commands,
@@ -142,7 +143,7 @@ fn setup(
 }
 
 fn add_motor_conf(
-    motor_conf: &MotorConfig<ErasedMotorId>,
+    motor_conf: &MotorConfig<ErasedMotorId, f32>,
 
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
@@ -170,14 +171,14 @@ fn add_motor_conf(
         ))
         .with_children(|builder| {
             for (motor_id, motor) in motor_conf.motors() {
-                add_motor(*motor_id, motor, builder, meshes, materials_pbr);
+                add_motor(*motor_id, &motor.into(), builder, meshes, materials_pbr);
             }
         });
 }
 
 fn add_motor(
     motor_id: ErasedMotorId,
-    motor: &Motor,
+    motor: &MotorGlam,
 
     builder: &mut ChildBuilder,
     meshes: &mut ResMut<Assets<Mesh>>,

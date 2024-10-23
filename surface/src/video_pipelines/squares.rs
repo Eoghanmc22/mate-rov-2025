@@ -12,7 +12,7 @@ use common::{
     },
     types::units::Meters,
 };
-use motor_math::Movement;
+use motor_math::{glam::MovementGlam, Movement};
 use opencv::{
     calib3d,
     core::{self, Point2f, Point3f, Scalar, Vector},
@@ -396,7 +396,7 @@ impl Pipeline for SquareTrackingPipeline {
             (robot_orientation * movement_world * speed).clamp_length_max(max_speed);
 
         cmds.pipeline(move |mut entity| {
-            entity.insert(MovementContribution(Movement {
+            entity.insert(MovementContribution(MovementGlam {
                 force: movement_planar.into(),
                 torque: Vec3A::ZERO,
             }));

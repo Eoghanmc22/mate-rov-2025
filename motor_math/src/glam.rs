@@ -56,6 +56,44 @@ impl<N: Number> From<MotorGlam> for Motor<N> {
     }
 }
 
+impl<N: Number + Copy> From<&Motor<N>> for MotorGlam {
+    fn from(value: &Motor<N>) -> Self {
+        let Motor {
+            position,
+            orientation,
+            direction,
+        } = *value;
+        MotorGlam {
+            position: vec3a(position.x.re(), position.y.re(), position.z.re()),
+            orientation: vec3a(orientation.x.re(), orientation.y.re(), orientation.z.re()),
+            direction,
+        }
+    }
+}
+
+impl<N: Number> From<&MotorGlam> for Motor<N> {
+    fn from(value: &MotorGlam) -> Self {
+        let MotorGlam {
+            position,
+            orientation,
+            direction,
+        } = *value;
+        Motor {
+            position: vector!(
+                N::from(position.x),
+                N::from(position.y),
+                N::from(position.z)
+            ),
+            orientation: vector!(
+                N::from(orientation.x),
+                N::from(orientation.y),
+                N::from(orientation.z)
+            ),
+            direction,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Reflect, PartialEq)]
 #[reflect(Debug, PartialEq)]
 pub struct MovementGlam {
@@ -76,6 +114,26 @@ impl<N: Number> From<Movement<N>> for MovementGlam {
 impl<N: Number> From<MovementGlam> for Movement<N> {
     fn from(value: MovementGlam) -> Self {
         let MovementGlam { force, torque } = value;
+        Movement {
+            force: vector!(N::from(force.x), N::from(force.y), N::from(force.z)),
+            torque: vector!(N::from(torque.x), N::from(torque.y), N::from(torque.z)),
+        }
+    }
+}
+
+impl<N: Number + Copy> From<&Movement<N>> for MovementGlam {
+    fn from(value: &Movement<N>) -> Self {
+        let Movement { force, torque } = *value;
+        MovementGlam {
+            force: vec3a(force.x.re(), force.y.re(), force.z.re()),
+            torque: vec3a(torque.x.re(), torque.y.re(), torque.z.re()),
+        }
+    }
+}
+
+impl<N: Number> From<&MovementGlam> for Movement<N> {
+    fn from(value: &MovementGlam) -> Self {
+        let MovementGlam { force, torque } = *value;
         Movement {
             force: vector!(N::from(force.x), N::from(force.y), N::from(force.z)),
             torque: vector!(N::from(torque.x), N::from(torque.y), N::from(torque.z)),

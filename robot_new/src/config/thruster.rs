@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use glam::Vec3A;
-use motor_math::Motor;
+use motor_math::glam::MotorGlam;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -19,11 +19,11 @@ pub struct ThrusterConfigDefinition {
 #[serde(tag = "type")]
 pub enum ThrusterConfigTypeDefinition {
     X3d {
-        seed_thruster: Motor,
+        seed_thruster: MotorGlam,
     },
     BlueRov {
-        vertical_seed_thruster: Motor,
-        lateral_seed_thruster: Motor,
+        vertical_seed_thruster: MotorGlam,
+        lateral_seed_thruster: MotorGlam,
     },
     Custom,
 }

@@ -20,7 +20,7 @@ use leafwing_input_manager::{
     action_state::ActionState, axislike::SingleAxis, input_map::InputMap,
     plugin::InputManagerPlugin, Actionlike, InputManagerBundle,
 };
-use motor_math::{solve::reverse::Axis, Movement};
+use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
 
 // TODO(low): Handle multiple gamepads better
 pub struct InputPlugin;
@@ -232,7 +232,7 @@ fn attach_to_new_robots(mut cmds: Commands, new_robots: Query<(&NetId, &Name), A
             },
             MovementContributionBundle {
                 name: Name::new(format!("HID {name}")),
-                contribution: MovementContribution(Movement::default()),
+                contribution: MovementContribution(MovementGlam::default()),
                 robot: RobotId(*robot),
             },
             ServoContribution(Default::default()),
@@ -341,7 +341,7 @@ fn movement(
             vec3a(x_rot, y_rot, z_rot)
         };
 
-        let movement = Movement { force, torque };
+        let movement = MovementGlam { force, torque };
 
         cmds.entity(entity).insert(MovementContribution(movement));
     }

@@ -19,7 +19,7 @@ use egui::{
     TextBuffer, TextFormat, Visuals,
 };
 use leafwing_input_manager::input_map::InputMap;
-use motor_math::{solve::reverse::Axis, Movement};
+use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
 use tokio::net::lookup_host;
 
 use crate::{
@@ -875,7 +875,7 @@ fn movement_control(
                 ui.add_space(7.0);
 
                 if ui.button("Clear").clicked() {
-                    movement = Movement::default();
+                    movement = MovementGlam::default();
                 }
 
                 if movement != contribution.0 {
