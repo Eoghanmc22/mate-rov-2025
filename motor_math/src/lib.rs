@@ -21,13 +21,17 @@ use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 // Should be implemented for f32 and f32 backed num-dual types
-pub trait Number: DualNum<f32> + RealField + Debug + Copy {}
-impl<T> Number for T where T: DualNum<f32> + RealField + Debug + Copy {}
+pub trait Number: DualNum<f32> + RealField + Debug + Copy + Default {}
+impl<T> Number for T where T: DualNum<f32> + RealField + Debug + Copy + Default {}
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct MotorConfig<MotorId, D: Number> {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Reflect)]
+#[reflect(from_reflect = false)]
+#[reflect(Debug, PartialEq)]
+pub struct MotorConfig<MotorId: Debug + Ord, D: Number> {
     pub motors: Vec<(MotorId, Motor<D>)>,
+    #[reflect(ignore)]
     pub matrix: Matrix6xX<D>,
+    #[reflect(ignore)]
     pub pseudo_inverse: MatrixXx6<D>,
 }
 
@@ -75,7 +79,7 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
 
 pub type ErasedMotorId = u8;
 
-impl<MotorId: Ord + Into<ErasedMotorId> + Clone, D: Number> MotorConfig<MotorId, D> {
+impl<MotorId: Ord + Debug + Into<ErasedMotorId> + Clone, D: Number> MotorConfig<MotorId, D> {
     /// Order of ErasedMotorIds must match the order of MotorId given by the ord trait
     pub fn erase(self) -> MotorConfig<ErasedMotorId, D> {
         let MotorConfig {
@@ -99,7 +103,7 @@ impl<MotorId: Ord + Into<ErasedMotorId> + Clone, D: Number> MotorConfig<MotorId,
 
 impl<D: Number> MotorConfig<ErasedMotorId, D> {
     /// Order of ErasedMotorIds must match the order of MotorId given by the ord trait
-    pub fn unerase<MotorId: Ord + TryFrom<ErasedMotorId>>(
+    pub fn unerase<MotorId: Ord + Debug + TryFrom<ErasedMotorId>>(
         self,
     ) -> Result<MotorConfig<MotorId, D>, <MotorId as TryFrom<ErasedMotorId>>::Error> {
         let MotorConfig {
@@ -121,13 +125,14 @@ impl<D: Number> MotorConfig<ErasedMotorId, D> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-// #[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
-// #[reflect(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
+#[reflect(Debug, PartialEq)]
 pub struct Motor<D: Number> {
     /// Offset from origin
+    #[reflect(ignore)]
     pub position: Vector3<D>,
     /// Unit vector
+    #[reflect(ignore)]
     pub orientation: Vector3<D>,
 
     pub direction: Direction,
@@ -163,11 +168,12 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, PartialEq)]
-// #[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Reflect, PartialEq)]
-// #[reflect(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Reflect, PartialEq)]
+#[reflect(Debug, PartialEq)]
 pub struct Movement<D: Number> {
+    #[reflect(ignore)]
     pub force: Vector3<D>,
+    #[reflect(ignore)]
     pub torque: Vector3<D>,
 }
 

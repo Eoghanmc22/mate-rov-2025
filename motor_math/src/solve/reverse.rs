@@ -3,6 +3,7 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
+use bevy_reflect::Reflect;
 use nalgebra::{vector, Vector6};
 use serde::{Deserialize, Serialize};
 use stable_hashmap::StableHashMap;
@@ -189,7 +190,10 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
+#[derive(
+    Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize, Reflect,
+)]
+#[reflect(Debug, PartialEq)]
 pub enum Axis {
     X,
     Y,

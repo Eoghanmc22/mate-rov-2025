@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 motor_math = { path = "../motor_math" }
 networking = { path = "../networking" }
+stable_hashmap = { path = "../stable_hashmap", features = ["reflect"] }
 
 glam = { version = "0.27", features = ["serde"] }
 serde = { version = "1", features = ["derive", "rc"] }

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::BTreeMap, net::SocketAddr, time::Duration};
+use std::{borrow::Cow, net::SocketAddr, time::Duration};
 
 use bevy::{
     app::App,
@@ -8,6 +8,7 @@ use bevy::{
 use glam::Quat;
 use motor_math::{solve::reverse::Axis, ErasedMotorId, Motor, MotorConfig, Movement};
 use serde::{Deserialize, Serialize};
+use stable_hashmap::StableHashMap;
 
 use crate::{
     adapters::serde::ReflectSerdeAdapter,
@@ -260,10 +261,7 @@ pub enum ServoMode {
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq)]
 #[reflect(from_reflect = false)]
-pub struct Motors(
-    // TODO(low): This bad
-    #[reflect(ignore)] pub MotorConfig<ErasedMotorId, f32>,
-);
+pub struct Motors(pub MotorConfig<ErasedMotorId, f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
@@ -271,11 +269,7 @@ pub struct TargetMovement(pub Movement<f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
-#[reflect(from_reflect = false)]
-pub struct ServoTargets(
-    // TODO(low): This bad
-    #[reflect(ignore)] pub BTreeMap<Cow<'static, str>, f32>,
-);
+pub struct ServoTargets(pub StableHashMap<Cow<'static, str>, f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
@@ -292,25 +286,16 @@ pub struct MovementContribution(pub Movement<f32>);
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
 #[reflect(from_reflect = false)]
-pub struct MotorContribution(
-    // TODO(low): This bad
-    #[reflect(ignore)] pub BTreeMap<ErasedMotorId, Newtons>,
-);
+pub struct MotorContribution(pub StableHashMap<ErasedMotorId, Newtons>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
 #[reflect(from_reflect = false)]
-pub struct ServoContribution(
-    // TODO(low): This bad
-    #[reflect(ignore)] pub BTreeMap<Cow<'static, str>, f32>,
-);
+pub struct ServoContribution(pub StableHashMap<Cow<'static, str>, f32>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct MovementAxisMaximums(
-    // TODO(low): This bad
-    #[reflect(ignore)] pub BTreeMap<Axis, Newtons>,
-);
+pub struct MovementAxisMaximums(pub StableHashMap<Axis, Newtons>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]

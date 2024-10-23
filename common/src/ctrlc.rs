@@ -16,7 +16,7 @@ impl Plugin for CtrlCPlugin {
 #[derive(Resource)]
 struct CtrlcChannel(Receiver<()>);
 
-pub fn setup_handler(mut cmds: Commands) -> anyhow::Result<()> {
+fn setup_handler(mut cmds: Commands) -> anyhow::Result<()> {
     let (tx, rx) = channel::bounded(1);
 
     cmds.insert_resource(CtrlcChannel(rx));
@@ -31,7 +31,7 @@ pub fn setup_handler(mut cmds: Commands) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn check_handler(channel: Res<CtrlcChannel>, mut exit: EventWriter<AppExit>) {
+fn check_handler(channel: Res<CtrlcChannel>, mut exit: EventWriter<AppExit>) {
     if let Ok(()) = channel.0.try_recv() {
         exit.send(AppExit::Success);
     }
