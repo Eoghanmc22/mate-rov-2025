@@ -9,7 +9,7 @@ mod tests {
     use test::Bencher;
 
     use crate::{
-        blue_rov::HeavyMotorId,
+        blue_rov::BlueRovMotorId,
         motor_preformance::{self},
         solve::forward,
         utils::vec_from_angles,
@@ -72,7 +72,7 @@ mod tests {
         let motor_data =
             motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
         let motor_config =
-            MotorConfig::<HeavyMotorId, f32>::new(lateral, vertical, Vector3::default());
+            MotorConfig::<BlueRovMotorId, f32>::new(lateral, vertical, Vector3::default());
 
         let movement = Movement {
             force: vector![0.5, 0.1, 0.4],
@@ -236,7 +236,7 @@ mod tests {
         let motor_data =
             motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
         let motor_config =
-            MotorConfig::<HeavyMotorId, f32>::new(lateral, vertical, Vector3::default());
+            MotorConfig::<BlueRovMotorId, f32>::new(lateral, vertical, Vector3::default());
 
         let movement = Movement {
             force: vector![0.6, 0.0, 0.3],

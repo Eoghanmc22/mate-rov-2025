@@ -1,0 +1,32 @@
+name = "BlueRov"
+port = 44445
+
+center_of_mass = [0.0, 0.0, 0.0]
+motor_amperage_budget = 50.0
+jerk_limit = 100.0
+
+[motor_config.BlueRov.lateral_seed_motor]
+position = [0.10, 0.14, -0.07]
+orientation = [-0.707, 0.707, 0.0]
+direction = "CounterClockwise"
+
+[motor_config.BlueRov.vertical_seed_motor]
+position = [0.11, 0.01, 0.00]
+orientation = [0.00, 0.00, 1.00]
+direction = "CounterClockwise"
+
+[motor_config.X3d.motors]
+LateralFrontLeft = 0
+LateralFrontRight = 1
+LateralBackLeft = 2
+LateralBackRight = 3
+VerticalRight = 4
+VerticalLeft = 5
+
+
+[servo_config.servos]
+
+
+[cameras."/dev/video2"]
+name = "Front"
+transform = { position = { x = 0.0, y = 1.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }

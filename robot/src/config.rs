@@ -3,7 +3,8 @@ use bevy::{ecs::system::Resource, transform::components::Transform};
 use common::types::hw::PwmChannelId;
 use glam::{vec3, EulerRot, Quat, Vec3A};
 use motor_math::{
-    blue_rov::HeavyMotorId, glam::MotorGlam, x3d::X3dMotorId, ErasedMotorId, MotorConfig,
+    blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::MotorGlam, x3d::X3dMotorId,
+    ErasedMotorId, MotorConfig,
 };
 use nalgebra::vector;
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,7 @@ pub struct RobotConfig {
 pub enum MotorConfigDefinition {
     X3d(X3dDefinition),
     BlueRov(BlueRovDefinition),
+    Heavy(HeavyDefinition),
     Custom(CustomDefinition),
 }
 
@@ -39,6 +41,14 @@ pub struct X3dDefinition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlueRovDefinition {
+    pub vertical_seed_motor: MotorGlam,
+    pub lateral_seed_motor: MotorGlam,
+
+    pub motors: HashMap<BlueRovMotorId, PwmChannelId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeavyDefinition {
     pub vertical_seed_motor: MotorGlam,
     pub lateral_seed_motor: MotorGlam,
 
@@ -66,6 +76,16 @@ impl X3dDefinition {
 }
 
 impl BlueRovDefinition {
+    fn to_motor_config(&self, center_mass: Vec3A) -> MotorConfig<BlueRovMotorId, f32> {
+        MotorConfig::<BlueRovMotorId, f32>::new(
+            self.lateral_seed_motor.into(),
+            self.vertical_seed_motor.into(),
+            vector![center_mass.x, center_mass.y, center_mass.z],
+        )
+    }
+}
+
+impl HeavyDefinition {
     fn to_motor_config(&self, center_mass: Vec3A) -> MotorConfig<HeavyMotorId, f32> {
         MotorConfig::<HeavyMotorId, f32>::new(
             self.lateral_seed_motor.into(),
@@ -108,6 +128,26 @@ impl MotorConfigDefinition {
                             (*id).into(),
                             *motor,
                             x3d.motors
+                                .get(id)
+                                .copied()
+                                .expect("Incomplete motor definition"),
+                        )
+                    })
+                    .collect();
+
+                config.erase()
+            }
+            MotorConfigDefinition::Heavy(heavy) => {
+                let config: MotorConfig<_, f32> = heavy.to_motor_config(center_mass);
+
+                motors = config
+                    .motors()
+                    .map(|(id, motor)| {
+                        (
+                            (*id).into(),
+                            *motor,
+                            heavy
+                                .motors
                                 .get(id)
                                 .copied()
                                 .expect("Incomplete motor definition"),

@@ -13,7 +13,8 @@ use common::{
     types::units::Newtons,
 };
 use motor_math::{
-    blue_rov::HeavyMotorId,
+    blue_rov::BlueRovMotorId,
+    blue_rov_heavy::HeavyMotorId,
     glam::MovementGlam,
     motor_preformance::{self, Interpolation, MotorData, MotorRecord},
     solve::{self, reverse},
@@ -75,6 +76,12 @@ fn create_motors(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
                 )
             }
             MotorConfigDefinition::BlueRov(_) => {
+                format!(
+                    "{:?} ({motor_id})",
+                    BlueRovMotorId::try_from(motor_id).expect("Bad motor id for config")
+                )
+            }
+            MotorConfigDefinition::Heavy(_) => {
                 format!(
                     "{:?} ({motor_id})",
                     HeavyMotorId::try_from(motor_id).expect("Bad motor id for config")

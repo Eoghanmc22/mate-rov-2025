@@ -23,30 +23,34 @@ use crate::{utils::VectorTransform, Motor, MotorConfig, Number};
 )]
 #[reflect(Serialize, Deserialize, Debug, PartialEq, Hash)]
 #[repr(u8)]
-pub enum BlueRovMotorId {
+pub enum HeavyMotorId {
     LateralFrontLeft,
     LateralFrontRight,
     LateralBackLeft,
     LateralBackRight,
-    VerticalRight,
-    VerticalLeft,
+    VerticalFrontLeft,
+    VerticalFrontRight,
+    VerticalBackLeft,
+    VerticalBackRight,
 }
 
-impl<D: Number> MotorConfig<BlueRovMotorId, D> {
+impl<D: Number> MotorConfig<HeavyMotorId, D> {
     pub fn new(
         lateral_front_right: Motor<D>,
-        vertical_right: Motor<D>,
+        vertical_front_right: Motor<D>,
         center_mass: Vector3<D>,
     ) -> Self {
         #[rustfmt::skip]
         let motors = [
-            (BlueRovMotorId::LateralFrontRight, lateral_front_right, &[].as_slice()),
-            (BlueRovMotorId::LateralFrontLeft, lateral_front_right, &[VectorTransform::ReflectYZ].as_slice()),
-            (BlueRovMotorId::LateralBackRight, lateral_front_right, &[VectorTransform::ReflectXZ].as_slice()),
-            (BlueRovMotorId::LateralBackLeft, lateral_front_right, &[VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
+            (HeavyMotorId::LateralFrontRight, lateral_front_right, &[].as_slice()),
+            (HeavyMotorId::LateralFrontLeft, lateral_front_right, &[VectorTransform::ReflectYZ].as_slice()),
+            (HeavyMotorId::LateralBackRight, lateral_front_right, &[VectorTransform::ReflectXZ].as_slice()),
+            (HeavyMotorId::LateralBackLeft, lateral_front_right, &[VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
 
-            (BlueRovMotorId::VerticalRight, vertical_right, &[].as_slice()),
-            (BlueRovMotorId::VerticalLeft, vertical_right, &[VectorTransform::ReflectYZ].as_slice()),
+            (HeavyMotorId::VerticalFrontRight, vertical_front_right, &[].as_slice()),
+            (HeavyMotorId::VerticalFrontLeft, vertical_front_right, &[VectorTransform::ReflectYZ].as_slice()),
+            (HeavyMotorId::VerticalBackRight, vertical_front_right, &[VectorTransform::ReflectXZ].as_slice()),
+            (HeavyMotorId::VerticalBackLeft, vertical_front_right, &[VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
         ];
 
         let motors = motors.into_iter().map(|(motor_id, seed, transforms)| {
