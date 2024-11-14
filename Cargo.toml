@@ -8,6 +8,7 @@ members = [
     "networking",
     "motor_math",
     "stable_hashmap",
+    "waterlinked",
 ]
 
 # Enable a small amount of optimization in debug mode

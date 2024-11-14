@@ -8,7 +8,6 @@ use rppal::spi::{Bus, Mode, SlaveSelect, Spi};
 
 pub struct Mcc5983 {
     spi: Spi,
-    // FIXME: Never read
     offset: [f32; 3],
 }
 
@@ -52,9 +51,9 @@ impl Mcc5983 {
         let mag_native_y = (raw_mag_native_y as i32 - 131072) as f32 / 16384.0;
         let mag_native_z = (raw_mag_native_z as i32 - 131072) as f32 / 16384.0;
 
-        let mag_x = mag_native_y;
-        let mag_y = mag_native_x;
-        let mag_z = mag_native_z;
+        let mag_x = mag_native_y - self.offset[1];
+        let mag_y = mag_native_x - self.offset[0];
+        let mag_z = mag_native_z - self.offset[2];
 
         Ok(MagneticFrame {
             mag_x: Gauss(mag_x),
@@ -64,7 +63,7 @@ impl Mcc5983 {
     }
 }
 
-// Implementation based on https://github.com/bluerobotics/icm20602-python
+// Implementation based on https://github.com/bluerobotics/mmc5983-python/
 impl Mcc5983 {
     const REG_XOUT_L: u8 = 0x00;
     const REG_STATUS: u8 = 0x08;
