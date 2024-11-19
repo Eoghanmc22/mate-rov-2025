@@ -172,7 +172,7 @@ fn setup_networking(
                 .next()
                 .context("Take first bind ip")?;
 
-            info!("Binding server acceptor");
+            info!("Binding server acceptor at {bind:?}");
             handle.bind_at(bind).context("Contact net thread")?;
 
             // Set up mdns service broadcasting

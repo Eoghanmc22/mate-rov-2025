@@ -2,6 +2,7 @@ use bevy::{
     app::{App, Plugin, Startup, Update},
     core::Name,
     prelude::{Commands, EventWriter, Local, Query, Res, ResMut, With, World},
+    reflect::List,
 };
 use bevy_egui::{EguiContexts, EguiPlugin};
 use bevy_tokio_tasks::TokioTasksRuntime;
@@ -9,7 +10,8 @@ use common::{
     components::{Robot, RobotId},
     sync::{ConnectToPeer, DisconnectPeer, MdnsPeers, Peer},
 };
-use egui::{CentralPanel, Visuals};
+use egui::{CentralPanel, Color32, Visuals};
+use egui_plot::{Line, MarkerShape, Plot, PlotItem, PlotPoint, PlotPoints, Points};
 use tracing::{error, info, warn};
 
 use crate::{
@@ -36,6 +38,7 @@ fn set_style(mut contexts: EguiContexts) {
 
 fn main_pane(
     mut host: Local<String>,
+    mut position_history: Local<Vec<[f64; 2]>>,
 
     mut cmds: Commands,
     mut contexts: EguiContexts,
@@ -87,6 +90,42 @@ fn main_pane(
                     delta.y,
                     delta.z
                 ));
+            }
+
+            // Position plot
+            if let Some(current_pose) = current_pose {
+                let current_pos = current_pose.0.position;
+                position_history.push([current_pos.x as f64, current_pos.y as f64]);
+
+                Plot::new("Position Track")
+                    .data_aspect(1.0)
+                    .include_x(0.0)
+                    .include_y(0.0)
+                    .width(500.0)
+                    .height(500.0)
+                    .show(ui, |ui| {
+                        ui.line(Line::new((*position_history).clone()).name("Track"));
+                        ui.points(
+                            Points::new([current_pos.x as f64, current_pos.y as f64])
+                                .name("Current Position")
+                                .shape(MarkerShape::Circle)
+                                .color(Color32::BLUE)
+                                .radius(3.0),
+                        );
+
+                        if let Some(target_pose) = target_pose {
+                            let target_pos = target_pose.0.position;
+                            ui.points(
+                                Points::new([target_pos.x as f64, target_pos.y as f64])
+                                    .name("Target Position")
+                                    .shape(MarkerShape::Up)
+                                    .color(Color32::RED)
+                                    .radius(3.0),
+                            );
+                        }
+                    });
+            } else {
+                position_history.clear();
             }
         } else {
             ui.horizontal(|ui| {

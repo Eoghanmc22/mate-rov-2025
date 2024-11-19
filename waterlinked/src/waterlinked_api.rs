@@ -78,34 +78,41 @@ impl WaterLinked {
 pub struct Location {
     pub position_valid: bool,
 
-    pub receiver_distance: Vec<f64>,
-    pub receiver_nsd: Vec<f64>,
-    pub receiver_rssi: Vec<f64>,
-    pub receiver_valid: Vec<f64>,
+    pub receiver_distance: Vec<f32>,
+    pub receiver_nsd: Vec<f32>,
+    pub receiver_rssi: Vec<f32>,
+    pub receiver_valid: Vec<f32>,
 
-    pub std: f64,
+    pub std: f32,
 
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct GpsFix {
     /// Course over ground, degrees (-1 for no data)
-    pub cog: f64,
+    pub cog: f32,
     /// Not sure what type this should be (0 for no data)
-    pub fix_quality: f64,
+    pub fix_quality: f32,
     /// Horizontal dilution of precision. -1 means no data.
-    pub hdop: f64,
+    pub hdop: f32,
     /// Current Latitude
-    pub lat: f64,
+    pub lat: f32,
     /// Current Longitude
-    pub lon: f64,
+    pub lon: f32,
     /// Number of satellites. -1 means no data.
     pub numsats: u32,
     /// Current orientation/compass heading (degrees). -1 means no data.
-    pub orientation: f64,
+    pub orientation: f32,
     /// Speed over ground (km/h). -1 means no data
-    pub sog: f64,
+    pub sog: f32,
+}
+
+pub fn wl_to_mate_coords(x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    // WL: +X: Forward, +Y: Right, +Z: Down
+    // MATE: +X: Right, +Y: Forwards, +Z: Up
+
+    (y, x, -z)
 }

@@ -69,7 +69,9 @@ fn main() -> anyhow::Result<()> {
                 CorePlugins,
                 #[cfg(rpi)]
                 SensorPlugins,
+                #[cfg(rpi)]
                 MovementPlugins,
+                #[cfg(rpi)]
                 MonitorPlugins,
             ),
         ))

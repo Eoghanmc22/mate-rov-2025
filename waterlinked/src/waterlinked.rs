@@ -12,7 +12,7 @@ use tracing::{error, warn};
 
 use crate::{
     trajectory::{CurrentPose, Pose},
-    waterlinked_api::{Location, WaterLinked},
+    waterlinked_api::{wl_to_mate_coords, Location, WaterLinked},
 };
 
 pub struct WaterlinkedPlugin;
@@ -53,7 +53,7 @@ fn start_task(runtime: ResMut<TokioTasksRuntime>) {
 
 fn pose_updater(
     mut cmds: Commands,
-    robot: Query<(Entity, &Orientation), With<Robot>>,
+    robot: Query<(Entity, Option<&Orientation>), With<Robot>>,
     mut reader: EventReader<WaterlinkedLocationEvent>,
 ) {
     let Ok((robot, orientation)) = robot.get_single() else {
@@ -63,20 +63,18 @@ fn pose_updater(
     for event in reader.read() {
         let Location {
             position_valid,
-            receiver_distance,
-            receiver_nsd,
-            receiver_rssi,
-            receiver_valid,
-            std,
             x,
             y,
             z,
+            ..
         } = event.0.clone();
+
+        let (x, y, z) = wl_to_mate_coords(x, y, z);
 
         if position_valid {
             cmds.entity(robot).insert(CurrentPose(Pose {
-                position: vec3a(x as f32, y as f32, z as f32),
-                rotation: orientation.0,
+                position: vec3a(x, y, z),
+                rotation: orientation.map(|it| it.0).unwrap_or_default(),
             }));
         } else {
             warn!("Recieved bad UGPS update");
