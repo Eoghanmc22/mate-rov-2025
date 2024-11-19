@@ -1,7 +1,8 @@
 use bevy::{
     app::{App, Plugin, Startup, Update},
     core::Name,
-    prelude::{Commands, EventWriter, Local, Query, Res, ResMut, With, World},
+    math::{vec3a, Quat},
+    prelude::{Commands, Entity, EventWriter, Local, Query, Res, ResMut, With, World},
     reflect::List,
 };
 use bevy_egui::{EguiContexts, EguiPlugin};
@@ -10,12 +11,12 @@ use common::{
     components::{Robot, RobotId},
     sync::{ConnectToPeer, DisconnectPeer, MdnsPeers, Peer},
 };
-use egui::{CentralPanel, Color32, Visuals};
+use egui::{CentralPanel, Color32, PointerButton, Visuals};
 use egui_plot::{Line, MarkerShape, Plot, PlotItem, PlotPoint, PlotPoints, Points};
 use tracing::{error, info, warn};
 
 use crate::{
-    trajectory::{CurrentPose, TargetPose},
+    trajectory::{CurrentPose, Pose, TargetPose},
     DARK_MODE,
 };
 
@@ -44,14 +45,23 @@ fn main_pane(
     mut contexts: EguiContexts,
     runtime: ResMut<TokioTasksRuntime>,
 
-    robots: Query<(&Name, Option<&CurrentPose>, Option<&TargetPose>, &RobotId), With<Robot>>,
+    robots: Query<
+        (
+            Entity,
+            &Name,
+            Option<&CurrentPose>,
+            Option<&TargetPose>,
+            &RobotId,
+        ),
+        With<Robot>,
+    >,
     mdns_peers: Option<Res<MdnsPeers>>,
     peers: Query<&Peer>,
 
     mut disconnect: EventWriter<DisconnectPeer>,
 ) {
     CentralPanel::default().show(contexts.ctx_mut(), |ui| {
-        if let Ok((name, current_pose, target_pose, robot_id)) = robots.get_single() {
+        if let Ok((robot, name, current_pose, target_pose, robot_id)) = robots.get_single() {
             ui.horizontal(|ui| {
                 ui.label(format!("Connected to {}", name.as_str()));
                 if ui.button("Disconnect").clicked() {
@@ -71,10 +81,15 @@ fn main_pane(
             }
             if let Some(target_pose) = target_pose {
                 let pos = target_pose.0.position;
-                ui.label(format!(
-                    "Target Location: x: {:.02}, y: {:.02}, z: {:.02}",
-                    pos.x, pos.y, pos.z,
-                ));
+                ui.horizontal(|ui| {
+                    ui.label(format!(
+                        "Target Location: x: {:.02}, y: {:.02}, z: {:.02}",
+                        pos.x, pos.y, pos.z,
+                    ));
+                    if ui.button("Clear").clicked() {
+                        cmds.entity(robot).remove::<TargetPose>();
+                    }
+                });
             } else {
                 ui.label("Target Location: None");
             }
@@ -97,7 +112,7 @@ fn main_pane(
                 let current_pos = current_pose.0.position;
                 position_history.push([current_pos.x as f64, current_pos.y as f64]);
 
-                Plot::new("Position Track")
+                let response = Plot::new("Position Track")
                     .data_aspect(1.0)
                     .include_x(0.0)
                     .include_y(0.0)
@@ -119,11 +134,26 @@ fn main_pane(
                                 Points::new([target_pos.x as f64, target_pos.y as f64])
                                     .name("Target Position")
                                     .shape(MarkerShape::Up)
-                                    .color(Color32::RED)
-                                    .radius(3.0),
+                                    .color(Color32::DARK_GREEN)
+                                    .radius(5.0),
                             );
                         }
                     });
+
+                if response
+                    .response
+                    .double_clicked_by(PointerButton::Secondary)
+                {
+                    let mouse = response.response.hover_pos();
+                    if let Some(mouse) = mouse {
+                        let position = response.transform.value_from_position(mouse);
+
+                        cmds.entity(robot).insert(TargetPose(Pose {
+                            position: vec3a(position.x as f32, position.y as f32, 0.0),
+                            rotation: Quat::IDENTITY,
+                        }));
+                    }
+                }
             } else {
                 position_history.clear();
             }

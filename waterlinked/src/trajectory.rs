@@ -36,9 +36,13 @@ pub struct CurrentPose(pub Pose);
 
 // NOTE: Outputs are unscaled
 pub fn move_toward(current_pose: &Pose, target_pose: &Pose) -> MovementGlam {
-    let translation =
+    let mut translation =
         current_pose.rotation.inverse() * (target_pose.position - current_pose.position);
-    let rotation = target_pose.rotation * current_pose.rotation.inverse();
+    let mut rotation = target_pose.rotation * current_pose.rotation.inverse();
+
+    // FIXME: Temp simplification to prevent fighting with the other control systems
+    translation.z = 0.0;
+    rotation = Quat::IDENTITY;
 
     MovementGlam {
         force: translation,

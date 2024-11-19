@@ -32,7 +32,8 @@ pub struct WaterlinkedLocationEvent(pub Location);
 fn start_task(runtime: ResMut<TokioTasksRuntime>) {
     runtime.spawn_background_task(|mut ctx| async move {
         let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 4.0));
-        let api = WaterLinked::new("https://demo.waterlinked.com/".try_into().unwrap());
+        // let api = WaterLinked::new("https://demo.waterlinked.com/".try_into().unwrap());
+        let api = WaterLinked::new("192.168.2.94".try_into().unwrap());
 
         loop {
             interval.tick().await;

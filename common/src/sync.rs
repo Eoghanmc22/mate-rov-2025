@@ -180,10 +180,16 @@ fn setup_networking(
             let hostname = hostname.to_str().unwrap();
             let instance_name = &name.0;
 
-            let service_info =
-                ServiceInfo::new(SERVICE_TYPE, instance_name, hostname, (), *port, None)
-                    .context("Create service info")?
-                    .enable_addr_auto();
+            let service_info = ServiceInfo::new(
+                SERVICE_TYPE,
+                instance_name,
+                &format!("{hostname}."),
+                (),
+                *port,
+                None,
+            )
+            .context("Create service info")?
+            .enable_addr_auto();
 
             info!("Begin broadcasting service");
             mdns.register(service_info)

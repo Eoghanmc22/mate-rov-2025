@@ -1,7 +1,12 @@
+# https://chacin.dev/blog/cross-compiling-rust-for-the-raspberry-pi/
+
 [build]
 rustflags = ["-Z", "threads=16"]
 
 [target.aarch64-unknown-linux-gnu]
-# linker = "aarch64-unknown-linux-gnu-gcc"
 linker = "aarch64-none-linux-gnu-gcc"
+runner = "./rpi-runner.sh"
+
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-none-linux-gnueabihf-gcc"
 runner = "./rpi-runner.sh"
