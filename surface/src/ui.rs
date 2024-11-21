@@ -695,7 +695,7 @@ fn hud(
                                 .unwrap_or("Unknown");
                             let host = peer.info.get_hostname();
 
-                            ui.label(format!("{}@{}local", name, host));
+                            ui.label(format!("{}@{}", name, host));
 
                             ui.indent(peer.info.get_fullname(), |ui| {
                                 for addrs in &peer.addresses {

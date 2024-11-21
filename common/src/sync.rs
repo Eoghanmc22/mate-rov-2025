@@ -177,13 +177,13 @@ fn setup_networking(
 
             // Set up mdns service broadcasting
             let hostname = hostname::get().context("Lookup hostname")?;
-            let hostname = hostname.to_str().unwrap();
+            let hostname = dbg!(hostname.to_str().unwrap());
             let instance_name = &name.0;
 
             let service_info = ServiceInfo::new(
                 SERVICE_TYPE,
                 instance_name,
-                &format!("{hostname}."),
+                &format!("{hostname}.local."),
                 (),
                 *port,
                 None,
