@@ -17,6 +17,7 @@ impl MotorData {
         &self,
         force: D,
         interpolation: Interpolation,
+        extrapolate: bool,
     ) -> MotorRecord<D> {
         let partition_point = self.force_index.partition_point(|x| x.force < force.re());
 
@@ -26,7 +27,7 @@ impl MotorData {
         let a = &self.force_index[idx_a];
         let b = &self.force_index[idx_b];
 
-        Self::interpolate(a, b, force, a.force, b.force, interpolation)
+        Self::interpolate(a, b, force, a.force, b.force, interpolation, extrapolate)
     }
 
     #[instrument(level = "trace", skip(self), ret)]
@@ -34,6 +35,7 @@ impl MotorData {
         &self,
         signed_current: D,
         interpolation: Interpolation,
+        extrapolate: bool,
     ) -> MotorRecord<D> {
         let partition_point = self
             .current_index
@@ -52,6 +54,7 @@ impl MotorData {
             a.current.copysign(a.force),
             b.current.copysign(b.force),
             interpolation,
+            extrapolate,
         )
     }
 
@@ -62,11 +65,12 @@ impl MotorData {
         value_a: f32,
         value_b: f32,
         interpolation: Interpolation,
+        extrapolate: bool,
     ) -> MotorRecord<D> {
         let record = match interpolation {
             Interpolation::LerpDirection(_) | Interpolation::Lerp => {
                 let alpha = (value - value_a) / (value_b - value_a);
-                a.lerp(b, alpha)
+                a.lerp(b, alpha, extrapolate)
             }
             Interpolation::Direction(_) | Interpolation::OriginalData => {
                 let dist_a = (value_a - value.re()).abs();
@@ -152,8 +156,15 @@ pub struct MotorRecord<D> {
 
 impl<D1: Number> MotorRecord<D1> {
     // This goofy generics stuff should allow the motor data tables to be in f32 and alpha to be a dual num
-    pub fn lerp<D2: Number>(&self, other: &Self, alpha: D2) -> MotorRecord<D2> {
-        // debug_assert!((D2::zero()..=D2::one()).contains(&alpha));
+    pub fn lerp<D2: Number>(
+        &self,
+        other: &Self,
+        mut alpha: D2,
+        extrapolate: bool,
+    ) -> MotorRecord<D2> {
+        if !extrapolate {
+            alpha = alpha.clamp(D2::zero(), D2::one());
+        }
 
         MotorRecord {
             pwm: lerp(self.pwm.re(), other.pwm.re(), alpha),

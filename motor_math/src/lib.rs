@@ -61,7 +61,7 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
             }),
         );
 
-        let pseudo_inverse = matrix.clone().pseudo_inverse(D::from(0.00001)).unwrap();
+        let pseudo_inverse = matrix.clone().pseudo_inverse(D::from(0.000001)).unwrap();
 
         Self {
             motors,

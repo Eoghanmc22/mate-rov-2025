@@ -126,7 +126,7 @@ fn update_axis_maximums(
         let motor_data = &motor_data.0;
         let current_cap = current_cap.0 .0;
 
-        let maximums = reverse::axis_maximums(motor_config, motor_data, current_cap, 0.01)
+        let maximums = reverse::axis_maximums(motor_config, motor_data, current_cap, 0.05)
             .into_iter()
             .map(|(key, value)| (key, Newtons(value)))
             .collect();
@@ -217,9 +217,11 @@ fn accumulate_motor_forces(
 
             (
                 *motor,
-                motor_data
-                    .0
-                    .lookup_by_force(*force, Interpolation::LerpDirection(direction)),
+                motor_data.0.lookup_by_force(
+                    *force,
+                    Interpolation::LerpDirection(direction),
+                    false,
+                ),
             )
         })
         .collect();
@@ -251,6 +253,7 @@ fn accumulate_motor_forces(
                         let new_record = motor_data.0.lookup_by_force(
                             clamped + last.force,
                             Interpolation::LerpDirection(direction),
+                            false,
                         );
 
                         return (*motor, new_record);
@@ -261,6 +264,7 @@ fn accumulate_motor_forces(
             })
             .collect();
 
+        // FIXME: Why do we clamp amperage twice???
         solve::reverse::clamp_amperage(
             slew_motor_cmds,
             motor_config,
