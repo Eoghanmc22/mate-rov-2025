@@ -67,41 +67,50 @@ pub struct CustomMotor {
 }
 
 impl X3dDefinition {
-    fn to_motor_config(&self, center_mass: Vec3A) -> MotorConfig<X3dMotorId, f32> {
-        MotorConfig::<X3dMotorId, f32>::new(
+    fn to_motor_config(
+        &self,
+        center_mass: Vec3A,
+    ) -> MotorConfig<X3dMotorId, motor_math::FloatType> {
+        MotorConfig::<X3dMotorId, motor_math::FloatType>::new(
             self.seed_motor.into(),
-            vector![center_mass.x, center_mass.y, center_mass.z],
+            vector![center_mass.x as _, center_mass.y as _, center_mass.z as _],
         )
     }
 }
 
 impl BlueRovDefinition {
-    fn to_motor_config(&self, center_mass: Vec3A) -> MotorConfig<BlueRovMotorId, f32> {
-        MotorConfig::<BlueRovMotorId, f32>::new(
+    fn to_motor_config(
+        &self,
+        center_mass: Vec3A,
+    ) -> MotorConfig<BlueRovMotorId, motor_math::FloatType> {
+        MotorConfig::<BlueRovMotorId, motor_math::FloatType>::new(
             self.lateral_seed_motor.into(),
             self.vertical_seed_motor.into(),
-            vector![center_mass.x, center_mass.y, center_mass.z],
+            vector![center_mass.x as _, center_mass.y as _, center_mass.z as _],
         )
     }
 }
 
 impl HeavyDefinition {
-    fn to_motor_config(&self, center_mass: Vec3A) -> MotorConfig<HeavyMotorId, f32> {
-        MotorConfig::<HeavyMotorId, f32>::new(
+    fn to_motor_config(
+        &self,
+        center_mass: Vec3A,
+    ) -> MotorConfig<HeavyMotorId, motor_math::FloatType> {
+        MotorConfig::<HeavyMotorId, motor_math::FloatType>::new(
             self.lateral_seed_motor.into(),
             self.vertical_seed_motor.into(),
-            vector![center_mass.x, center_mass.y, center_mass.z],
+            vector![center_mass.x as _, center_mass.y as _, center_mass.z as _],
         )
     }
 }
 
 impl CustomDefinition {
-    fn to_motor_config(&self, center_mass: Vec3A) -> MotorConfig<String, f32> {
-        MotorConfig::<String, f32>::new_raw(
+    fn to_motor_config(&self, center_mass: Vec3A) -> MotorConfig<String, motor_math::FloatType> {
+        MotorConfig::<String, motor_math::FloatType>::new_raw(
             self.motors
                 .iter()
                 .map(|(id, motor)| (id.to_owned(), motor.motor.into())),
-            vector![center_mass.x, center_mass.y, center_mass.z],
+            vector![center_mass.x as _, center_mass.y as _, center_mass.z as _],
         )
     }
 }
@@ -113,13 +122,14 @@ impl MotorConfigDefinition {
         center_mass: Vec3A,
     ) -> (
         impl Iterator<Item = (ErasedMotorId, MotorGlam, PwmChannelId)>,
-        MotorConfig<ErasedMotorId, f32>,
+        MotorConfig<ErasedMotorId, motor_math::FloatType>,
     ) {
         let motors: Vec<_>;
 
         let config = match self {
             MotorConfigDefinition::X3d(x3d) => {
-                let config: MotorConfig<_, f32> = x3d.to_motor_config(center_mass);
+                let config: MotorConfig<_, motor_math::FloatType> =
+                    x3d.to_motor_config(center_mass);
 
                 motors = config
                     .motors()
@@ -138,7 +148,8 @@ impl MotorConfigDefinition {
                 config.erase()
             }
             MotorConfigDefinition::Heavy(heavy) => {
-                let config: MotorConfig<_, f32> = heavy.to_motor_config(center_mass);
+                let config: MotorConfig<_, motor_math::FloatType> =
+                    heavy.to_motor_config(center_mass);
 
                 motors = config
                     .motors()
@@ -158,7 +169,8 @@ impl MotorConfigDefinition {
                 config.erase()
             }
             MotorConfigDefinition::BlueRov(blue_rov) => {
-                let config: MotorConfig<_, f32> = blue_rov.to_motor_config(center_mass);
+                let config: MotorConfig<_, motor_math::FloatType> =
+                    blue_rov.to_motor_config(center_mass);
 
                 motors = config
                     .motors()
@@ -178,7 +190,8 @@ impl MotorConfigDefinition {
                 config.erase()
             }
             MotorConfigDefinition::Custom(custom) => {
-                let config: MotorConfig<_, f32> = custom.to_motor_config(center_mass);
+                let config: MotorConfig<_, motor_math::FloatType> =
+                    custom.to_motor_config(center_mass);
 
                 motors = config
                     .motors()
@@ -201,7 +214,7 @@ impl MotorConfigDefinition {
                         .motors()
                         .enumerate()
                         .map(|(idx, (_, motor))| (idx as _, *motor)),
-                    vector![center_mass.x, center_mass.y, center_mass.z],
+                    vector![center_mass.x as _, center_mass.y as _, center_mass.z as _],
                 )
             }
         };

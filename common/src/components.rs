@@ -265,7 +265,7 @@ pub enum ServoMode {
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq)]
 #[reflect(from_reflect = false)]
-pub struct Motors(pub MotorConfig<ErasedMotorId, f32>);
+pub struct Motors(pub MotorConfig<ErasedMotorId, motor_math::FloatType>);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]

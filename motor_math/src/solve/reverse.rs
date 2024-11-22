@@ -13,7 +13,7 @@ use tracing::{error, instrument, warn};
 use crate::{
     motor_preformance::{Interpolation, MotorData, MotorRecord},
     solve::forward::forward_solve,
-    MotorConfig, Movement, Number,
+    FloatType, MotorConfig, Movement, Number,
 };
 
 type HashMap<K, V> = StableHashMap<K, V>;
@@ -90,7 +90,7 @@ pub fn clamp_amperage_fast<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     motor_cmds: HashMap<MotorId, MotorRecord<D>>,
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
-    amperage_cap: f32,
+    amperage_cap: FloatType,
 ) -> HashMap<MotorId, MotorRecord<D>> {
     let amperage_total = motor_cmds.values().map(|it| it.current).sum::<D>();
 
@@ -128,8 +128,8 @@ pub fn clamp_amperage<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     motor_cmds: HashMap<MotorId, MotorRecord<D>>,
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
-    amperage_cap: f32,
-    epsilon: f32,
+    amperage_cap: FloatType,
+    epsilon: FloatType,
 ) -> HashMap<MotorId, MotorRecord<D>> {
     let amperage_total = motor_cmds.values().map(|it| it.current).sum::<D>();
 
@@ -169,11 +169,12 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
     motor_cmds: &HashMap<MotorId, MotorRecord<D>>,
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
-    mut amperage_cap: f32,
-    epsilon: f32,
+    mut amperage_cap: FloatType,
+    epsilon: FloatType,
 ) -> D {
     let (mut lower_bound, mut lower_current) = (D::zero(), D::zero());
-    let (mut upper_bound, mut upper_current) = (D::from(f32::INFINITY), D::from(f32::INFINITY));
+    let (mut upper_bound, mut upper_current) =
+        (D::from(FloatType::INFINITY), D::from(FloatType::INFINITY));
     let mut mid = D::one();
 
     let mut max_iters = 15;
@@ -277,7 +278,7 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
         }
 
         // Determines next test point based on the new bounds
-        if upper_bound.re() == f32::INFINITY {
+        if upper_bound.re() == FloatType::INFINITY {
             mid *= D::from(amperage_cap) / mid_current;
         } else {
             let alpha = (D::from(amperage_cap) - lower_current) / (upper_current - lower_current);
@@ -341,8 +342,8 @@ impl Axis {
 pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
-    amperage_cap: f32,
-    epsilon: f32,
+    amperage_cap: FloatType,
+    epsilon: FloatType,
 ) -> HashMap<Axis, D> {
     [
         Axis::X,
@@ -388,7 +389,7 @@ pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     .collect()
 }
 
-fn coerce_zero<D: Number>(value: D, epsilon: f32) -> D {
+fn coerce_zero<D: Number>(value: D, epsilon: FloatType) -> D {
     if value.re().abs() < epsilon {
         return D::zero();
     }

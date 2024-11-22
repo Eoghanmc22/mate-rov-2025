@@ -17,15 +17,18 @@ use std::{
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
+use bevy_reflect::prelude::ReflectDefault;
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
 use nalgebra::{Matrix6xX, MatrixXx6, RealField, Vector3};
 use num_dual::DualNum;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
+pub type FloatType = f64;
+
 // Should be implemented for f32 and f32 backed num-dual types
-pub trait Number: DualNum<f32> + RealField + Debug + Copy + Default {}
-impl<T> Number for T where T: DualNum<f32> + RealField + Debug + Copy + Default {}
+pub trait Number: DualNum<FloatType> + RealField + Debug + Copy {}
+impl<T> Number for T where T: DualNum<FloatType> + RealField + Debug + Copy {}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Reflect)]
 #[reflect(from_reflect = false)]
@@ -61,7 +64,7 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
             }),
         );
 
-        let pseudo_inverse = matrix.clone().pseudo_inverse(D::from(0.000001)).unwrap();
+        let pseudo_inverse = matrix.clone().pseudo_inverse(D::from(0.0001)).unwrap();
 
         Self {
             motors,
@@ -129,7 +132,7 @@ impl<D: Number> MotorConfig<ErasedMotorId, D> {
 }
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
-#[reflect(Debug, PartialEq)]
+#[reflect(Debug, PartialEq, Default)]
 pub struct Motor<D: Number> {
     /// Offset from origin
     #[reflect(ignore)]
@@ -171,13 +174,32 @@ impl Direction {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default, Serialize, Deserialize, Reflect, PartialEq)]
-#[reflect(Debug, PartialEq)]
+impl<D: Number> Default for Motor<D> {
+    fn default() -> Self {
+        Self {
+            position: Vector3::<D>::zeros(),
+            orientation: Vector3::<D>::zeros(),
+            direction: Direction::Clockwise,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
+#[reflect(Debug, PartialEq, Default)]
 pub struct Movement<D: Number> {
     #[reflect(ignore)]
     pub force: Vector3<D>,
     #[reflect(ignore)]
     pub torque: Vector3<D>,
+}
+
+impl<D: Number> Default for Movement<D> {
+    fn default() -> Self {
+        Self {
+            force: Vector3::<D>::zeros(),
+            torque: Vector3::<D>::zeros(),
+        }
+    }
 }
 
 impl<D: Number> Add for Movement<D> {

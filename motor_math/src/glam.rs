@@ -26,8 +26,16 @@ impl<N: Number> From<Motor<N>> for MotorGlam {
             direction,
         } = value;
         MotorGlam {
-            position: vec3a(position.x.re(), position.y.re(), position.z.re()),
-            orientation: vec3a(orientation.x.re(), orientation.y.re(), orientation.z.re()),
+            position: vec3a(
+                position.x.re() as _,
+                position.y.re() as _,
+                position.z.re() as _,
+            ),
+            orientation: vec3a(
+                orientation.x.re() as _,
+                orientation.y.re() as _,
+                orientation.z.re() as _,
+            ),
             direction,
         }
     }
@@ -42,14 +50,14 @@ impl<N: Number> From<MotorGlam> for Motor<N> {
         } = value;
         Motor {
             position: vector!(
-                N::from(position.x),
-                N::from(position.y),
-                N::from(position.z)
+                N::from(position.x as _),
+                N::from(position.y as _),
+                N::from(position.z as _)
             ),
             orientation: vector!(
-                N::from(orientation.x),
-                N::from(orientation.y),
-                N::from(orientation.z)
+                N::from(orientation.x as _),
+                N::from(orientation.y as _),
+                N::from(orientation.z as _)
             ),
             direction,
         }
@@ -64,8 +72,16 @@ impl<N: Number + Copy> From<&Motor<N>> for MotorGlam {
             direction,
         } = *value;
         MotorGlam {
-            position: vec3a(position.x.re(), position.y.re(), position.z.re()),
-            orientation: vec3a(orientation.x.re(), orientation.y.re(), orientation.z.re()),
+            position: vec3a(
+                position.x.re() as _,
+                position.y.re() as _,
+                position.z.re() as _,
+            ),
+            orientation: vec3a(
+                orientation.x.re() as _,
+                orientation.y.re() as _,
+                orientation.z.re() as _,
+            ),
             direction,
         }
     }
@@ -80,14 +96,14 @@ impl<N: Number> From<&MotorGlam> for Motor<N> {
         } = *value;
         Motor {
             position: vector!(
-                N::from(position.x),
-                N::from(position.y),
-                N::from(position.z)
+                N::from(position.x as _),
+                N::from(position.y as _),
+                N::from(position.z as _)
             ),
             orientation: vector!(
-                N::from(orientation.x),
-                N::from(orientation.y),
-                N::from(orientation.z)
+                N::from(orientation.x as _),
+                N::from(orientation.y as _),
+                N::from(orientation.z as _)
             ),
             direction,
         }
@@ -105,8 +121,8 @@ impl<N: Number> From<Movement<N>> for MovementGlam {
     fn from(value: Movement<N>) -> Self {
         let Movement { force, torque } = value;
         MovementGlam {
-            force: vec3a(force.x.re(), force.y.re(), force.z.re()),
-            torque: vec3a(torque.x.re(), torque.y.re(), torque.z.re()),
+            force: vec3a(force.x.re() as _, force.y.re() as _, force.z.re() as _),
+            torque: vec3a(torque.x.re() as _, torque.y.re() as _, torque.z.re() as _),
         }
     }
 }
@@ -115,8 +131,16 @@ impl<N: Number> From<MovementGlam> for Movement<N> {
     fn from(value: MovementGlam) -> Self {
         let MovementGlam { force, torque } = value;
         Movement {
-            force: vector!(N::from(force.x), N::from(force.y), N::from(force.z)),
-            torque: vector!(N::from(torque.x), N::from(torque.y), N::from(torque.z)),
+            force: vector!(
+                N::from(force.x as _),
+                N::from(force.y as _),
+                N::from(force.z as _)
+            ),
+            torque: vector!(
+                N::from(torque.x as _),
+                N::from(torque.y as _),
+                N::from(torque.z as _)
+            ),
         }
     }
 }
@@ -125,8 +149,8 @@ impl<N: Number + Copy> From<&Movement<N>> for MovementGlam {
     fn from(value: &Movement<N>) -> Self {
         let Movement { force, torque } = *value;
         MovementGlam {
-            force: vec3a(force.x.re(), force.y.re(), force.z.re()),
-            torque: vec3a(torque.x.re(), torque.y.re(), torque.z.re()),
+            force: vec3a(force.x.re() as _, force.y.re() as _, force.z.re() as _),
+            torque: vec3a(torque.x.re() as _, torque.y.re() as _, torque.z.re() as _),
         }
     }
 }
@@ -135,8 +159,16 @@ impl<N: Number> From<&MovementGlam> for Movement<N> {
     fn from(value: &MovementGlam) -> Self {
         let MovementGlam { force, torque } = *value;
         Movement {
-            force: vector!(N::from(force.x), N::from(force.y), N::from(force.z)),
-            torque: vector!(N::from(torque.x), N::from(torque.y), N::from(torque.z)),
+            force: vector!(
+                N::from(force.x as _),
+                N::from(force.y as _),
+                N::from(force.z as _)
+            ),
+            torque: vector!(
+                N::from(torque.x as _),
+                N::from(torque.y as _),
+                N::from(torque.z as _)
+            ),
         }
     }
 }

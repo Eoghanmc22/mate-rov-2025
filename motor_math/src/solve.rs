@@ -14,7 +14,7 @@ mod tests {
         solve::forward,
         utils::vec_from_angles,
         x3d::X3dMotorId,
-        Direction, Motor, MotorConfig, Movement,
+        Direction, FloatType, Motor, MotorConfig, Movement,
     };
 
     use super::reverse;
@@ -29,7 +29,8 @@ mod tests {
 
         let motor_data =
             motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
-        let motor_config = MotorConfig::<X3dMotorId, f32>::new(seed_motor, Vector3::default());
+        let motor_config =
+            MotorConfig::<X3dMotorId, FloatType>::new(seed_motor, Vector3::default());
 
         let movement = Movement {
             force: vector![-0.6, 0.5, 0.3],
@@ -72,7 +73,7 @@ mod tests {
         let motor_data =
             motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
         let motor_config =
-            MotorConfig::<BlueRovMotorId, f32>::new(lateral, vertical, Vector3::default());
+            MotorConfig::<BlueRovMotorId, FloatType>::new(lateral, vertical, Vector3::default());
 
         let movement = Movement {
             force: vector![0.5, 0.1, 0.4],
@@ -207,7 +208,8 @@ mod tests {
 
         let motor_data =
             motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
-        let motor_config = MotorConfig::<X3dMotorId, f32>::new(seed_motor, Vector3::default());
+        let motor_config =
+            MotorConfig::<X3dMotorId, FloatType>::new(seed_motor, Vector3::default());
 
         let movement = Movement {
             force: vector![0.6, 0.0, 0.3],
@@ -236,7 +238,7 @@ mod tests {
         let motor_data =
             motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
         let motor_config =
-            MotorConfig::<BlueRovMotorId, f32>::new(lateral, vertical, Vector3::default());
+            MotorConfig::<BlueRovMotorId, FloatType>::new(lateral, vertical, Vector3::default());
 
         let movement = Movement {
             force: vector![0.6, 0.0, 0.3],

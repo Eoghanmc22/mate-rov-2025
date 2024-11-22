@@ -4,11 +4,11 @@ use anyhow::Context;
 use serde::Deserialize;
 use tracing::instrument;
 
-use crate::{Direction, Number};
+use crate::{Direction, FloatType, Number};
 
 pub struct MotorData {
-    force_index: Vec<MotorRecord<f32>>,
-    current_index: Vec<MotorRecord<f32>>,
+    force_index: Vec<MotorRecord<FloatType>>,
+    current_index: Vec<MotorRecord<FloatType>>,
 }
 
 impl MotorData {
@@ -59,11 +59,11 @@ impl MotorData {
     }
 
     fn interpolate<D: Number>(
-        a: &MotorRecord<f32>,
-        b: &MotorRecord<f32>,
+        a: &MotorRecord<FloatType>,
+        b: &MotorRecord<FloatType>,
         value: D,
-        value_a: f32,
-        value_b: f32,
+        value_a: FloatType,
+        value_b: FloatType,
         interpolation: Interpolation,
         extrapolate: bool,
     ) -> MotorRecord<D> {
@@ -106,17 +106,17 @@ impl MotorData {
     }
 }
 
-impl From<Vec<MotorRecord<f32>>> for MotorData {
-    fn from(value: Vec<MotorRecord<f32>>) -> Self {
+impl From<Vec<MotorRecord<FloatType>>> for MotorData {
+    fn from(value: Vec<MotorRecord<FloatType>>) -> Self {
         let mut force_index = value.clone();
 
-        force_index.sort_by(|a, b| f32::total_cmp(&a.force, &b.force));
+        force_index.sort_by(|a, b| FloatType::total_cmp(&a.force, &b.force));
         force_index.dedup_by_key(|it| it.force);
 
         let mut current_index = value.clone();
 
         current_index.sort_by(|a, b| {
-            f32::total_cmp(&a.current.copysign(a.force), &b.current.copysign(b.force))
+            FloatType::total_cmp(&a.current.copysign(a.force), &b.current.copysign(b.force))
         });
         current_index.dedup_by_key(|it| it.current.copysign(it.force));
 
@@ -178,7 +178,7 @@ impl<D1: Number> MotorRecord<D1> {
     }
 }
 
-fn lerp<D: Number>(a: f32, b: f32, alpha: D) -> D {
+fn lerp<D: Number>(a: FloatType, b: FloatType, alpha: D) -> D {
     (D::one() - alpha) * a + alpha * b
 }
 
@@ -187,7 +187,7 @@ pub fn read_motor_data<P: AsRef<Path>>(path: P) -> anyhow::Result<MotorData> {
 
     let mut data = Vec::default();
     for result in csv.into_deserialize() {
-        let record: MotorRecord<f32> = result.context("Parse motor record")?;
+        let record: MotorRecord<FloatType> = result.context("Parse motor record")?;
         data.push(record);
     }
 

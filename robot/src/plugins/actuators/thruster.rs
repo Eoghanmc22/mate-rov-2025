@@ -10,7 +10,7 @@ use common::{
         PwmChannel, PwmManualControl, PwmSignal, RobotId, TargetForce, TargetMovement,
     },
     ecs_sync::{NetId, Replicate},
-    types::units::Newtons,
+    types::units::{Amperes, Newtons},
 };
 use motor_math::{
     blue_rov::BlueRovMotorId,
@@ -126,9 +126,9 @@ fn update_axis_maximums(
         let motor_data = &motor_data.0;
         let current_cap = current_cap.0 .0;
 
-        let maximums = reverse::axis_maximums(motor_config, motor_data, current_cap, 0.05)
+        let maximums = reverse::axis_maximums(motor_config, motor_data, current_cap as _, 0.05)
             .into_iter()
-            .map(|(key, value)| (key, Newtons(value)))
+            .map(|(key, value)| (key, Newtons(value as _)))
             .collect();
 
         info!("Updated motor axis maximums to {maximums:?} at {current_cap:.2}A");
@@ -161,7 +161,7 @@ fn accumulate_movements(
     let motor_cmds = solve::reverse::forces_to_cmds(forces, motor_config, &motor_data.0);
     let forces = motor_cmds
         .into_iter()
-        .map(|(motor, cmd)| (motor, cmd.force.into()))
+        .map(|(motor, cmd)| (motor, Newtons(cmd.force as _)))
         .collect();
 
     robot.insert(MotorContribution(forces));
@@ -170,7 +170,7 @@ fn accumulate_movements(
 // TODO(mid): Split into smaller systems
 fn accumulate_motor_forces(
     mut cmds: Commands,
-    mut last_movement: Local<StableHashMap<ErasedMotorId, MotorRecord<f32>>>,
+    mut last_movement: Local<StableHashMap<ErasedMotorId, MotorRecord<motor_math::FloatType>>>,
 
     robot: Query<
         (Entity, &NetId, &Motors, &MovementCurrentCap, &JerkLimit),
@@ -199,7 +199,7 @@ fn accumulate_motor_forces(
     for (&RobotId(robot_net_id), motor_force_contributions) in &motor_forces {
         if robot_net_id == net_id {
             for (motor, force) in &motor_force_contributions.0 {
-                *all_forces.entry(*motor).or_default() += force.0;
+                *all_forces.entry(*motor).or_default() += force.0 as motor_math::FloatType;
             }
         }
     }
@@ -230,7 +230,7 @@ fn accumulate_motor_forces(
         motor_cmds,
         motor_config,
         &motor_data.0,
-        current_cap.0,
+        current_cap.0 as _,
         0.05,
     );
 
@@ -243,13 +243,13 @@ fn accumulate_motor_forces(
                     let jerk_limit = jerk_limit * time.delta_seconds();
                     let delta = record.force - last.force;
 
-                    if delta.abs() > jerk_limit {
+                    if delta.abs() > jerk_limit as _ {
                         let direction = motor_config
                             .motor(motor)
                             .map(|it| it.direction)
                             .unwrap_or(Direction::Clockwise);
 
-                        let clamped = delta.clamp(-jerk_limit, jerk_limit);
+                        let clamped = delta.clamp(-jerk_limit as _, jerk_limit as _);
                         let new_record = motor_data.0.lookup_by_force(
                             clamped + last.force,
                             Interpolation::LerpDirection(direction),
@@ -269,7 +269,7 @@ fn accumulate_motor_forces(
             slew_motor_cmds,
             motor_config,
             &motor_data.0,
-            current_cap.0,
+            current_cap.0 as _,
             0.05,
         )
     };
@@ -294,9 +294,9 @@ fn accumulate_motor_forces(
 
             if let (Some(target_force), Some(actual_data)) = (target_force, actual_data) {
                 motor.insert((
-                    TargetForce((*target_force).into()),
-                    ActualForce(actual_data.force.into()),
-                    CurrentDraw(actual_data.current.into()),
+                    TargetForce(Newtons(*target_force as _)),
+                    ActualForce(Newtons(actual_data.force as _)),
+                    CurrentDraw(Amperes(actual_data.current as _)),
                     PwmSignal(Duration::from_micros(actual_data.pwm as u64)),
                 ));
             } else {
