@@ -24,7 +24,11 @@ use num_dual::DualNum;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
+#[cfg(feature = "double_precision")]
 pub type FloatType = f64;
+
+#[cfg(not(feature = "double_precision"))]
+pub type FloatType = f32;
 
 // Should be implemented for f32 and f32 backed num-dual types
 pub trait Number: DualNum<FloatType> + RealField + Debug + Copy {}

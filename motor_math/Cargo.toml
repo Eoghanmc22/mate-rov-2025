@@ -25,3 +25,4 @@ bevy_reflect = "0.14"
 
 [features]
 glam = ["dep:glam"]
+double_precision = []
