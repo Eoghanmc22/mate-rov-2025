@@ -51,7 +51,14 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
         motors: impl IntoIterator<Item = (MotorId, Motor<D>)>,
         center_mass: Vector3<D>,
     ) -> Self {
-        let mut motors: Vec<_> = motors.into_iter().collect();
+        let mut motors: Vec<_> = motors
+            .into_iter()
+            .map(|mut it| {
+                it.1.orientation.normalize_mut();
+
+                it
+            })
+            .collect();
         motors.sort_by(|a, b| MotorId::cmp(&a.0, &b.0));
         motors.dedup_by(|a, b| a.0 == b.0);
 

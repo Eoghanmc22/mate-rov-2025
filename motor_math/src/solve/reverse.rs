@@ -339,6 +339,7 @@ impl Axis {
     }
 }
 
+// TODO: This method can still be simplified/improved
 pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
