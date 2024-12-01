@@ -9,6 +9,24 @@ members = [
     "motor_math",
     "stable_hashmap",
     "waterlinked",
+
+    "crates/ecs_sync",
+    "crates/error",
+    "crates/ctrlc",
+    "crates/over_run",
+    "crates/units",
+    "crates/depth_hold",
+    "crates/stabilize",
+    "crates/water_linked_ugps",
+    "crates/thruster",
+    "crates/pwm_ctrl",
+    "crates/can_ctrl",
+    "crates/hw_mon",
+    "crates/voltage_mon",
+    "crates/video_streamer",
+    "crates/bluerobotics_depth",
+    "crates/navagator_pi_hat",
+    "crates/ui_egui", "crates/user_input", "crates/neopixel",
 ]
 
 # Enable a small amount of optimization in debug mode
