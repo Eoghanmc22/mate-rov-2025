@@ -26,7 +26,7 @@ members = [
     "crates/video_streamer",
     "crates/bluerobotics_depth",
     "crates/navagator_pi_hat",
-    "crates/ui_egui", "crates/user_input", "crates/neopixel",
+    "crates/ui_egui", "crates/user_input", "crates/neopixel", "crates_2/interface/spi", "crates_2/interface/i2c", "crates_2/interface/pwm", "crates_2/interface/can", "crates_2/interface/gpio", "crates_2/hardware/raspberry_pi", "crates_2/hardware/ads1115", "crates_2/hardware/icm20602", "crates_2/hardware/mmc5983", "crates_2/hardware/pca9685", "crates_2/algos/sensor_fusion", "crates_2/hardware/leak_sensor", "crates_2/hardware/camera_gstreamer", "crates/hardware/generic", "crates/algos/pid",
 ]
 
 # Enable a small amount of optimization in debug mode

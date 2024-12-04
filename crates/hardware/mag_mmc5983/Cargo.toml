@@ -1,0 +1,6 @@
+[package]
+name = "mmc5983"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
