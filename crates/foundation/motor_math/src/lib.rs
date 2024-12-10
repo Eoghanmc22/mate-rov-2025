@@ -54,7 +54,10 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
         let mut motors: Vec<_> = motors
             .into_iter()
             .map(|mut it| {
-                it.1.orientation.normalize_mut();
+                let norm = it.1.orientation.norm();
+                if norm.re() != 0.0 {
+                    it.1.orientation.unscale_mut(norm);
+                }
 
                 it
             })
