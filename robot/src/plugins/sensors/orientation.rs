@@ -1,5 +1,5 @@
 use std::{
-    thread,
+    iter, thread,
     time::{Duration, Instant},
 };
 
@@ -18,14 +18,19 @@ use tracing::{span, Level};
 
 use crate::{
     peripheral::{icm20602::Icm20602, mmc5983::Mcc5983},
-    plugins::core::robot::{LocalRobot, LocalRobotMarker},
+    plugins::core::robot::LocalRobot,
 };
 
 pub struct OrientationPlugin;
 
 impl Plugin for OrientationPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(MadgwickFilter(Madgwick::new(1.0 / 1000.0, 0.041)));
+        let orientation_offset = Quat::from_euler(EulerRot::YXZ, 90.0f32.to_radians(), 0.0, 0.0);
+        let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.041);
+        madgwick.quat = orientation_offset.into();
+
+        app.insert_resource(OrientationOffset(orientation_offset));
+        app.insert_resource(MadgwickFilter(madgwick));
 
         app.add_systems(Startup, start_inertial_thread.pipe(error::handle_errors));
         app.add_systems(
@@ -47,6 +52,9 @@ struct InertialChannels(
 
 #[derive(Resource)]
 struct MadgwickFilter(Madgwick<f32>);
+
+#[derive(Resource)]
+struct OrientationOffset(Quat);
 
 fn start_inertial_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<()> {
     let (tx_data, rx_data) = channel::bounded(5);
@@ -141,25 +149,38 @@ fn read_new_data(
     mut cmds: Commands,
     channels: Res<InertialChannels>,
     mut madgwick_filter: ResMut<MadgwickFilter>,
+    orientation_offset: Res<OrientationOffset>,
     robot: Res<LocalRobot>,
     mut errors: EventWriter<ErrorEvent>,
 ) {
     for (inertial, magnetic) in channels.0.try_iter() {
         // We currently ignore mag updates as the compass is not calibrated
         // TODO(high): Calibrate the compass
-        for inertial in inertial {
+        for (inertial, magnetic) in inertial.into_iter().zip(
+            magnetic
+                .into_iter()
+                .map(Option::Some)
+                .chain(iter::repeat(None)),
+        ) {
             let gyro = Vector3::new(inertial.gyro_x.0, inertial.gyro_y.0, inertial.gyro_z.0)
                 * (std::f32::consts::PI / 180.0);
             let accel = Vector3::new(inertial.accel_x.0, inertial.accel_y.0, inertial.accel_z.0);
 
-            let rst = madgwick_filter.0.update_imu(&gyro, &accel);
+            let rst = if let Some(magnetic) = magnetic {
+                let mag = Vector3::new(magnetic.mag_x.0, magnetic.mag_y.0, magnetic.mag_z.0);
+
+                madgwick_filter.0.update(&gyro, &accel, &mag)
+            } else {
+                madgwick_filter.0.update_imu(&gyro, &accel)
+            };
+
             if let Err(msg) = rst {
                 errors.send(anyhow!("Process IMU frame: {msg:?}").into());
             }
         }
 
         let quat: glam::Quat = madgwick_filter.0.quat.into();
-        let orientation = Orientation(quat);
+        let orientation = Orientation(orientation_offset.0.inverse() * quat);
 
         let inertial = inertial.last().unwrap();
         let inertial = Inertial(*inertial);
