@@ -180,7 +180,7 @@ fn read_new_data(
         }
 
         let quat: glam::Quat = madgwick_filter.0.quat.into();
-        let orientation = Orientation(orientation_offset.0.inverse() * quat);
+        let orientation = Orientation(quat * orientation_offset.0.inverse());
 
         let inertial = inertial.last().unwrap();
         let inertial = Inertial(*inertial);
