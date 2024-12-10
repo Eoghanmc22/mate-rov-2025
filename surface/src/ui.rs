@@ -7,8 +7,9 @@ use common::{
     bundles::MovementContributionBundle,
     components::{
         Armed, Camera, CpuTotal, CurrentDraw, Depth, DepthTarget, Inertial, LoadAverage,
-        MeasuredVoltage, Memory, MovementAxisMaximums, MovementContribution, OrientationTarget,
-        PwmChannel, PwmManualControl, PwmSignal, Robot, RobotId, RobotStatus, Temperatures,
+        MeasuredVoltage, Memory, MovementAxisMaximums, MovementContribution, Orientation,
+        OrientationTarget, PwmChannel, PwmManualControl, PwmSignal, Robot, RobotId, RobotStatus,
+        Temperatures,
     },
     ecs_sync::{NetId, Replicate},
     events::{CalibrateSeaLevel, ResetServos, ResetYaw, ResyncCameras},
@@ -357,18 +358,18 @@ fn hud(
         (
             &Name,
             Option<&Armed>,
-            Option<&MeasuredVoltage>,
-            Option<&CurrentDraw>,
-            Option<&CpuTotal>,
             Option<&Inertial>,
-            Option<&LoadAverage>,
-            Option<&Memory>,
-            Option<&Temperatures>,
             Option<&Depth>,
-            Option<&DepthTarget>,
-            Option<&OrientationTarget>,
-            Option<&Peer>,
-            Option<&Latency>,
+            (Option<&MeasuredVoltage>, Option<&CurrentDraw>),
+            (
+                Option<&CpuTotal>,
+                Option<&LoadAverage>,
+                Option<&Memory>,
+                Option<&Temperatures>,
+            ),
+            (Option<&DepthTarget>, Option<&OrientationTarget>),
+            (Option<&Peer>, Option<&Latency>),
+            Option<&Orientation>,
             &RobotId,
         ),
         With<Robot>,
@@ -394,18 +395,13 @@ fn hud(
     if let Ok((
         robot_name,
         armed,
-        voltage,
-        current_draw,
-        cpu,
         inertial,
-        load,
-        memory,
-        temps,
         depth,
-        depth_target,
-        orientation_target,
-        peer,
-        latency,
+        (voltage, current_draw),
+        (cpu, load, memory, temps),
+        (depth_target, orientation_target),
+        (peer, latency),
+        orientation,
         robot_id,
     )) = robots.get_single()
     {
@@ -628,6 +624,14 @@ fn hud(
 
                     if let Some(_orientation_target) = orientation_target {
                         ui.label(RichText::new("Orientation Control").size(size));
+                    }
+
+                    // Heading
+                    if let Some(orientation) = orientation {
+                        ui.label(RichText::new(format!(
+                            "Heading {:.02}",
+                            orientation.0.to_euler(EulerRot::ZXY).0.to_degrees()
+                        )));
                     }
                 });
 
