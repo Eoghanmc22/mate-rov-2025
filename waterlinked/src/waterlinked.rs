@@ -3,11 +3,14 @@ use std::time::Duration;
 use anyhow::Context;
 use bevy::{
     app::{Plugin, PreUpdate, Startup, Update},
-    math::vec3a,
-    prelude::{App, Commands, Entity, Event, EventReader, Query, Res, ResMut, With},
+    math::{vec3a, EulerRot, Quat},
+    prelude::{App, Commands, Entity, Event, EventReader, Query, Res, ResMut, Resource, With},
 };
 use bevy_tokio_tasks::TokioTasksRuntime;
-use common::components::{Orientation, Robot};
+use common::{
+    components::{Orientation, Robot},
+    types::units::Radians,
+};
 use tracing::{error, warn};
 
 use crate::{
@@ -20,6 +23,7 @@ pub struct WaterlinkedPlugin;
 impl Plugin for WaterlinkedPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<WaterlinkedLocationEvent>();
+        app.init_resource::<WaterlinkedAngleOffset>();
 
         app.add_systems(Startup, start_task);
         app.add_systems(PreUpdate, pose_updater);
@@ -28,6 +32,9 @@ impl Plugin for WaterlinkedPlugin {
 
 #[derive(Event, Debug)]
 pub struct WaterlinkedLocationEvent(pub Location);
+
+#[derive(Resource, Default)]
+pub struct WaterlinkedAngleOffset(pub Radians);
 
 fn start_task(runtime: Res<TokioTasksRuntime>) {
     runtime.spawn_background_task(|mut ctx| async move {

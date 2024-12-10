@@ -1,14 +1,16 @@
 use bevy::{
     app::{Plugin, Update},
     core::Name,
-    math::{Quat, Vec3A},
-    prelude::{App, Commands, Component, Entity, Local, Query, With},
+    math::{EulerRot, Quat, Vec3A},
+    prelude::{App, Commands, Component, Entity, Local, Query, Res, With},
 };
 use common::{
     bundles::MovementContributionBundle,
     components::{MovementContribution, Robot, RobotId},
 };
 use motor_math::glam::MovementGlam;
+
+use crate::waterlinked::WaterlinkedAngleOffset;
 
 pub const FORCE_GAIN: f32 = 0.01;
 pub const TORQUE_GAIN: f32 = 0.5;
@@ -52,6 +54,7 @@ pub fn move_toward(current_pose: &Pose, target_pose: &Pose) -> MovementGlam {
 
 // FIXME: Ideally, this would run on the rov
 fn trajectory_follower(
+    offset: Res<WaterlinkedAngleOffset>,
     mut movement_contributer: Local<Option<Entity>>,
 
     mut cmds: Commands,
@@ -67,6 +70,7 @@ fn trajectory_follower(
     };
 
     let mut movement = move_toward(&current_pose.0, &target_pose.0);
+    movement.force = Quat::from_euler(EulerRot::ZXY, offset.0 .0, 0.0, 0.0) * movement.force;
     movement.force *= FORCE_GAIN;
     movement.torque *= TORQUE_GAIN;
 

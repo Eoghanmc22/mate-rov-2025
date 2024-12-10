@@ -1,3 +1,5 @@
+use core::f32;
+
 use bevy::{
     app::{App, Plugin, Startup, Update},
     core::Name,
@@ -11,13 +13,14 @@ use common::{
     components::{Robot, RobotId},
     sync::{ConnectToPeer, DisconnectPeer, MdnsPeers, Peer},
 };
-use egui::{CentralPanel, Color32, PointerButton, Visuals};
+use egui::{CentralPanel, Color32, PointerButton, Slider, Visuals};
 use egui_plot::{Line, MarkerShape, Plot, PlotItem, PlotPoint, PlotPoints, Points};
 use tracing::{error, info, warn};
 
 use crate::{
     learn_compass::ResetMagneticLog,
     trajectory::{CurrentPose, Pose, TargetPose},
+    waterlinked::WaterlinkedAngleOffset,
     DARK_MODE,
 };
 
@@ -45,6 +48,8 @@ fn main_pane(
     mut cmds: Commands,
     mut contexts: EguiContexts,
     runtime: ResMut<TokioTasksRuntime>,
+
+    mut angle_offset: ResMut<WaterlinkedAngleOffset>,
 
     robots: Query<
         (
@@ -107,6 +112,10 @@ fn main_pane(
                     delta.z
                 ));
             }
+
+            let mut angle_offset_deg = angle_offset.0 .0.to_degrees();
+            ui.add(Slider::new(&mut angle_offset_deg, -180.0..=180.0).text("Angle Offset"));
+            angle_offset.0 .0 = angle_offset_deg.to_radians();
 
             // Position plot
             if let Some(current_pose) = current_pose {
