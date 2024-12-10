@@ -313,6 +313,8 @@ fn movement(
 
         let force = if depth_target.is_some() {
             if let Some(orientation) = orientation {
+                // TODO: Validate this actually works, and make it into a helper function, also
+                // used for heading display
                 let mut yaw = orientation.0;
                 if yaw.z.abs() * yaw.z.abs() + yaw.w.abs() * yaw.w.abs() > 0.1 {
                     yaw.x = 0.0;

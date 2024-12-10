@@ -1,5 +1,5 @@
 use std::{
-    thread,
+    iter, thread,
     time::{Duration, Instant},
 };
 
@@ -27,7 +27,12 @@ pub struct OrientationPlugin;
 
 impl Plugin for OrientationPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(MadgwickFilter(Madgwick::new(1.0 / 1000.0, 0.041)));
+        let orientation_offset = Quat::from_euler(EulerRot::YXZ, 90.0f32.to_radians(), 0.0, 0.0);
+        let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.041);
+        madgwick.quat = orientation_offset.into();
+
+        app.insert_resource(OrientationOffset(orientation_offset));
+        app.insert_resource(MadgwickFilter(madgwick));
 
         app.add_systems(Startup, start_inertial_thread.pipe(error::handle_errors));
         app.add_systems(
@@ -56,6 +61,9 @@ struct InertialChannels(
 
 #[derive(Resource)]
 struct MadgwickFilter(Madgwick<f32>);
+
+#[derive(Resource)]
+struct OrientationOffset(Quat);
 
 fn start_inertial_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<()> {
     let (tx_data, rx_data) = channel::bounded(5);
@@ -150,6 +158,7 @@ fn read_new_data(
     mut cmds: Commands,
     channels: Res<InertialChannels>,
     mut madgwick_filter: ResMut<MadgwickFilter>,
+    orientation_offset: Res<OrientationOffset>,
     robot: Res<LocalRobot>,
     mut errors: EventWriter<ErrorEvent>,
 ) {
@@ -160,14 +169,21 @@ fn read_new_data(
             let gyro = Vector3::new(gyro.x.0, gyro.y.0, gyro.z.0) * (std::f32::consts::PI / 180.0);
             let accel = Vector3::new(accel.x.0, accel.y.0, accel.z.0);
 
-            let rst = madgwick_filter.0.update_imu(&gyro, &accel);
+            let rst = if let Some(magnetic) = magnetic {
+                let mag = Vector3::new(magnetic.mag_x.0, magnetic.mag_y.0, magnetic.mag_z.0);
+
+                madgwick_filter.0.update(&gyro, &accel, &mag)
+            } else {
+                madgwick_filter.0.update_imu(&gyro, &accel)
+            };
+
             if let Err(msg) = rst {
                 errors.send(anyhow!("Process IMU frame: {msg:?}").into());
             }
         }
 
         let quat: glam::Quat = madgwick_filter.0.quat.into();
-        let orientation = Orientation(quat);
+        let orientation = Orientation(quat * orientation_offset.0.inverse());
 
         let inertial = *inertial.last().unwrap();
         let magnetic = *magnetic.last().unwrap();
