@@ -4,7 +4,7 @@ use anyhow::Context;
 use bevy::{
     app::{Plugin, PreUpdate, Startup, Update},
     math::vec3a,
-    prelude::{App, Commands, Entity, Event, EventReader, Query, ResMut, With},
+    prelude::{App, Commands, Entity, Event, EventReader, Query, Res, ResMut, With},
 };
 use bevy_tokio_tasks::TokioTasksRuntime;
 use common::components::{Orientation, Robot};
@@ -29,7 +29,7 @@ impl Plugin for WaterlinkedPlugin {
 #[derive(Event, Debug)]
 pub struct WaterlinkedLocationEvent(pub Location);
 
-fn start_task(runtime: ResMut<TokioTasksRuntime>) {
+fn start_task(runtime: Res<TokioTasksRuntime>) {
     runtime.spawn_background_task(|mut ctx| async move {
         let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 4.0));
         // let api = WaterLinked::new("https://demo.waterlinked.com/".try_into().unwrap());

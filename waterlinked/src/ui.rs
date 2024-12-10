@@ -16,6 +16,7 @@ use egui_plot::{Line, MarkerShape, Plot, PlotItem, PlotPoint, PlotPoints, Points
 use tracing::{error, info, warn};
 
 use crate::{
+    learn_compass::ResetMagneticLog,
     trajectory::{CurrentPose, Pose, TargetPose},
     DARK_MODE,
 };
@@ -156,6 +157,12 @@ fn main_pane(
                 }
             } else {
                 position_history.clear();
+            }
+
+            if ui.button("Reset Mag Log").clicked() {
+                cmds.add(|world: &mut World| {
+                    world.send_event(ResetMagneticLog);
+                });
             }
         } else {
             ui.horizontal(|ui| {
