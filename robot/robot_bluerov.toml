@@ -16,10 +16,10 @@ orientation = [0.00, 0.00, 1.00]
 direction = "CounterClockwise"
 
 [motor_config.BlueRov.motors]
-LateralFrontLeft = 0
-LateralFrontRight = 1
-LateralBackLeft = 2
-LateralBackRight = 3
+LateralFrontLeft = 1
+LateralFrontRight = 0
+LateralBackLeft = 3
+LateralBackRight = 2
 VerticalRight = 4
 VerticalLeft = 5
 
