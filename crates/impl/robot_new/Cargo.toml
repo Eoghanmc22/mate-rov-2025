@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-common = { path = "../common" }
-networking = { path = "../networking" }
-motor_math = { path = "../motor_math" }
+# common = { path = "../common" }
+networking = { path = "../../foundation/networking" }
+motor_math = { path = "../../foundation/motor_math" }
 
 bevy = { version = "0.14", default-features = false }
 
@@ -30,4 +30,4 @@ crossbeam = "0.8"
 ahash = "0.8"
 
 [features]
-tracy = ["bevy/trace_tracy", "common/tracy_frame_mark"]
+# tracy = ["bevy/trace_tracy", "common/tracy_frame_mark"]

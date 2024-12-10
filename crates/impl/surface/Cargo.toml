@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-common = { path = "../common" }
-networking = { path = "../networking" }
-motor_math = { path = "../motor_math" }
+# common = { path = "../common" }
+networking = { path = "../../foundation/networking" }
+motor_math = { path = "../../foundation/motor_math" }
 
 bevy = { version = "0.14", features = ["wayland", "dynamic_linking"] }
 egui = "0.28"
