@@ -5,14 +5,16 @@ center_of_mass = [0.0, 0.0, 0.0]
 motor_amperage_budget = 50.0
 jerk_limit = 100.0
 
+# Front Right
 [motor_config.BlueRov.lateral_seed_motor]
 position = [0.10, 0.14, -0.07]
-orientation = [-0.707, 0.707, 0.0]
+orientation = [0.707, -0.707, 0.0]
 direction = "CounterClockwise"
 
+# Up RIght
 [motor_config.BlueRov.vertical_seed_motor]
 position = [0.11, 0.01, 0.00]
-orientation = [0.00, 0.00, 1.00]
+orientation = [0.00, 0.00, -1.00]
 direction = "CounterClockwise"
 
 [motor_config.BlueRov.motors]
