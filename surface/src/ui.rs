@@ -628,10 +628,13 @@ fn hud(
 
                     // Heading
                     if let Some(orientation) = orientation {
-                        ui.label(RichText::new(format!(
-                            "Heading {:.02}",
-                            orientation.0.to_euler(EulerRot::ZXY).0.to_degrees()
-                        )));
+                        ui.label(
+                            RichText::new(format!(
+                                "Heading {:.02}",
+                                orientation.0.to_euler(EulerRot::ZXY).0.to_degrees()
+                            ))
+                            .size(size),
+                        );
                     }
                 });
 
