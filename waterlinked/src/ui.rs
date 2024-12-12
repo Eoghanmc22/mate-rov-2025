@@ -18,7 +18,7 @@ use egui_plot::{Line, MarkerShape, Plot, PlotItem, PlotPoint, PlotPoints, Points
 use tracing::{error, info, warn};
 
 use crate::{
-    learn_compass::ResetMagneticLog,
+    learn_compass::{MagneticData, ResetMagneticLog},
     trajectory::{CurrentPose, Pose, TargetPose},
     waterlinked::WaterlinkedAngleOffset,
     DARK_MODE,
@@ -49,6 +49,7 @@ fn main_pane(
     mut contexts: EguiContexts,
     runtime: ResMut<TokioTasksRuntime>,
 
+    mag_data: Res<MagneticData>,
     mut angle_offset: ResMut<WaterlinkedAngleOffset>,
 
     robots: Query<
@@ -168,6 +169,7 @@ fn main_pane(
                 position_history.clear();
             }
 
+            ui.label(format!("{mag_data:.04?}"));
             if ui.button("Reset Mag Log").clicked() {
                 cmds.add(|world: &mut World| {
                     world.send_event(ResetMagneticLog);

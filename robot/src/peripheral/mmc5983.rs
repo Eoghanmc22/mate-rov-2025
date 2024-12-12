@@ -1,5 +1,6 @@
 use common::types::hw::MagneticFrame;
 use common::types::units::Gauss;
+use glam::{vec3a, Vec3A};
 use std::{thread, time::Duration};
 use tracing::{debug, info, instrument, trace};
 
@@ -55,10 +56,12 @@ impl Mcc5983 {
         let mag_y = mag_native_x - self.offset[0];
         let mag_z = mag_native_z - self.offset[2];
 
+        let adjusted = MagneticCalibration::HARD_CODED.adjust(vec3a(mag_x, mag_y, mag_z));
+
         Ok(MagneticFrame {
-            mag_x: Gauss(mag_x),
-            mag_y: Gauss(mag_y),
-            mag_z: Gauss(mag_z),
+            mag_x: Gauss(adjusted.x),
+            mag_y: Gauss(adjusted.y),
+            mag_z: Gauss(adjusted.z),
         })
     }
 }
@@ -185,5 +188,43 @@ impl Mcc5983 {
             .context("Begin read magnetometer frame")?;
 
         Ok(input)
+    }
+}
+
+pub struct MagneticCalibration {
+    min_x: f32,
+    max_x: f32,
+
+    min_y: f32,
+    max_y: f32,
+
+    min_z: f32,
+    max_z: f32,
+}
+
+impl MagneticCalibration {
+    pub const HARD_CODED: Self = MagneticCalibration {
+        min_x: -0.5869,
+        max_x: 0.3240,
+        min_y: -0.5970,
+        max_y: 0.1972,
+        min_z: -0.4848,
+        max_z: 0.3264,
+    };
+
+    pub fn adjust(&self, measurement: Vec3A) -> Vec3A {
+        let x_delta = self.max_x - self.min_x;
+        let y_delta = self.max_y - self.min_y;
+        let z_delta = self.max_z - self.min_z;
+
+        let x_offset = (self.max_x + self.min_x) / 2.0;
+        let y_offset = (self.max_y + self.min_y) / 2.0;
+        let z_offset = (self.max_z + self.min_z) / 2.0;
+
+        vec3a(
+            (measurement.x - x_offset) * 1.0 / x_delta,
+            (measurement.y - y_offset) * 1.0 / y_delta,
+            (measurement.z - z_offset) * 1.0 / z_delta,
+        )
     }
 }

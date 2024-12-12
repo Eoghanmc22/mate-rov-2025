@@ -23,7 +23,7 @@ impl Plugin for LearnCompassPlugin {
 pub struct ResetMagneticLog;
 
 #[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
-struct MagneticData {
+pub struct MagneticData {
     min_x: f32,
     max_x: f32,
 
