@@ -57,6 +57,7 @@ impl Mcc5983 {
         let mag_z = mag_native_z - self.offset[2];
 
         let adjusted = MagneticCalibration::HARD_CODED.adjust(vec3a(mag_x, mag_y, mag_z));
+        // let adjusted = vec3a(mag_x, mag_y, mag_z);
 
         Ok(MagneticFrame {
             mag_x: Gauss(adjusted.x),
@@ -157,7 +158,9 @@ impl Mcc5983 {
             (set.mag_z.0 + reset.mag_z.0) / 2.0,
         ];
 
-        self.offset = offset;
+        info!("Magnetometer calibration: {offset:?}");
+
+        // self.offset = offset;
 
         debug!(?offset, "Calibration complete for MCC5982");
 
@@ -204,12 +207,12 @@ pub struct MagneticCalibration {
 
 impl MagneticCalibration {
     pub const HARD_CODED: Self = MagneticCalibration {
-        min_x: -0.5869,
-        max_x: 0.3240,
-        min_y: -0.5970,
-        max_y: 0.1972,
-        min_z: -0.4848,
-        max_z: 0.3264,
+        min_x: -0.5103,
+        max_x: 0.3747,
+        min_y: -0.5191,
+        max_y: 0.2777,
+        min_z: -0.3760,
+        max_z: 0.4374,
     };
 
     pub fn adjust(&self, measurement: Vec3A) -> Vec3A {
