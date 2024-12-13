@@ -40,35 +40,37 @@ impl<D: Number> MotorConfig<BlueRovMotorId, D> {
     ) -> Self {
         #[rustfmt::skip]
         let motors = [
-            (BlueRovMotorId::LateralFrontRight, lateral_front_right, &[].as_slice()),
-            (BlueRovMotorId::LateralFrontLeft, lateral_front_right, &[VectorTransform::ReflectYZ].as_slice()),
-            (BlueRovMotorId::LateralBackRight, lateral_front_right, &[VectorTransform::ReflectXZ].as_slice()),
-            (BlueRovMotorId::LateralBackLeft, lateral_front_right, &[VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
+            (BlueRovMotorId::LateralFrontRight, lateral_front_right, false, &[].as_slice()),
+            (BlueRovMotorId::LateralFrontLeft, lateral_front_right, false, &[VectorTransform::ReflectYZ].as_slice()),
+            (BlueRovMotorId::LateralBackRight, lateral_front_right, true, &[VectorTransform::ReflectXZ].as_slice()),
+            (BlueRovMotorId::LateralBackLeft, lateral_front_right, true, &[VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
 
-            (BlueRovMotorId::VerticalRight, vertical_right, &[].as_slice()),
-            (BlueRovMotorId::VerticalLeft, vertical_right, &[VectorTransform::ReflectYZ].as_slice()),
+            (BlueRovMotorId::VerticalRight, vertical_right, false, &[].as_slice()),
+            (BlueRovMotorId::VerticalLeft, vertical_right, true, &[VectorTransform::ReflectYZ].as_slice()),
         ];
 
-        let motors = motors.into_iter().map(|(motor_id, seed, transforms)| {
-            let (position, orientation) = transforms.iter().fold(
-                (seed.position, seed.orientation),
-                |(position, orientation), transform| {
-                    (
-                        transform.transform(position),
-                        transform.transform(orientation),
-                    )
-                },
-            );
+        let motors = motors
+            .into_iter()
+            .map(|(motor_id, seed, direction, transforms)| {
+                let (position, orientation) = transforms.iter().fold(
+                    (seed.position, seed.orientation),
+                    |(position, orientation), transform| {
+                        (
+                            transform.transform(position),
+                            transform.transform(orientation),
+                        )
+                    },
+                );
 
-            (
-                motor_id,
-                Motor {
-                    position,
-                    orientation,
-                    direction: seed.direction.flip_n(transforms.len() as _),
-                },
-            )
-        });
+                (
+                    motor_id,
+                    Motor {
+                        position,
+                        orientation,
+                        direction: seed.direction.flip_n(direction as _),
+                    },
+                )
+            });
 
         Self::new_raw(motors, center_mass)
     }
