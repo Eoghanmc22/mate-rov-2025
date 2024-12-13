@@ -1,7 +1,7 @@
 use bevy::{
     app::{Plugin, Update},
     core::Name,
-    math::{EulerRot, NormedVectorSpace, Quat, Vec3A},
+    math::{NormedVectorSpace, Quat, Vec3A},
     prelude::{App, Commands, Component, Entity, Local, Query, Res, With},
 };
 use common::{
@@ -25,7 +25,7 @@ impl Plugin for TrajectoryPlugin {
 }
 
 // Consider using Isometry3d in bevy 15
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Pose {
     pub position: Vec3A,
     pub rotation: Quat,
@@ -71,7 +71,7 @@ fn trajectory_follower(
     };
 
     let mut movement = move_toward(&current_pose.0, &target_pose.0);
-    movement.force = Quat::from_euler(EulerRot::ZXY, offset.0 .0, 0.0, 0.0) * movement.force;
+    movement.force = offset.0 * movement.force;
     movement.force *= FORCE_GAIN;
     movement.torque *= TORQUE_GAIN;
 

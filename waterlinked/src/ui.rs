@@ -3,7 +3,7 @@ use core::f32;
 use bevy::{
     app::{App, Plugin, Startup, Update},
     core::Name,
-    math::{vec3a, Quat},
+    math::{vec3a, EulerRot, Quat},
     prelude::{Commands, Entity, EventWriter, Local, Query, Res, ResMut, With, World},
     reflect::List,
 };
@@ -114,9 +114,13 @@ fn main_pane(
                 ));
             }
 
-            let mut angle_offset_deg = angle_offset.0 .0.to_degrees();
+            let mut angle_offset_deg = angle_offset.0.to_euler(EulerRot::ZXY).0.to_degrees();
+            let angle_offset_deg_copy = angle_offset_deg;
             ui.add(Slider::new(&mut angle_offset_deg, -180.0..=180.0).text("Angle Offset"));
-            angle_offset.0 .0 = angle_offset_deg.to_radians();
+            if angle_offset_deg != angle_offset_deg_copy {
+                angle_offset.0 =
+                    Quat::from_euler(EulerRot::ZXY, angle_offset_deg.to_radians(), 0.0, 0.0);
+            }
 
             // Position plot
             if let Some(current_pose) = current_pose {

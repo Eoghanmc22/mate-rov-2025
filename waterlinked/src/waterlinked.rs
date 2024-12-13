@@ -34,11 +34,11 @@ impl Plugin for WaterlinkedPlugin {
 pub struct WaterlinkedLocationEvent(pub Location);
 
 #[derive(Resource, Default)]
-pub struct WaterlinkedAngleOffset(pub Radians);
+pub struct WaterlinkedAngleOffset(pub Quat);
 
 fn start_task(runtime: Res<TokioTasksRuntime>) {
     runtime.spawn_background_task(|mut ctx| async move {
-        let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 4.0));
+        let mut interval = tokio::time::interval(Duration::from_secs_f64(1.0 / 8.0));
         // let api = WaterLinked::new("https://demo.waterlinked.com/".try_into().unwrap());
         let api = WaterLinked::new("192.168.3.3".try_into().unwrap());
 
@@ -59,7 +59,7 @@ fn start_task(runtime: Res<TokioTasksRuntime>) {
     });
 }
 
-fn pose_updater(
+pub fn pose_updater(
     mut cmds: Commands,
     robot: Query<(Entity, Option<&Orientation>), With<Robot>>,
     mut reader: EventReader<WaterlinkedLocationEvent>,
