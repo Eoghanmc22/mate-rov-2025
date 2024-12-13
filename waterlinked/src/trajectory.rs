@@ -1,7 +1,7 @@
 use bevy::{
     app::{Plugin, Update},
     core::Name,
-    math::{EulerRot, Quat, Vec3A},
+    math::{EulerRot, NormedVectorSpace, Quat, Vec3A},
     prelude::{App, Commands, Component, Entity, Local, Query, Res, With},
 };
 use common::{
@@ -12,8 +12,9 @@ use motor_math::glam::MovementGlam;
 
 use crate::waterlinked::WaterlinkedAngleOffset;
 
-pub const FORCE_GAIN: f32 = 0.01;
+pub const FORCE_GAIN: f32 = 5.0;
 pub const TORQUE_GAIN: f32 = 0.5;
+pub const MAX_FORCE: f32 = 10.0;
 
 pub struct TrajectoryPlugin;
 
@@ -73,6 +74,10 @@ fn trajectory_follower(
     movement.force = Quat::from_euler(EulerRot::ZXY, offset.0 .0, 0.0, 0.0) * movement.force;
     movement.force *= FORCE_GAIN;
     movement.torque *= TORQUE_GAIN;
+
+    if movement.force.norm_squared() > MAX_FORCE * MAX_FORCE {
+        movement.force = movement.force.normalize() * MAX_FORCE;
+    }
 
     if let Some(entity) = *movement_contributer {
         cmds.entity(entity).insert(MovementContribution(movement));
