@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use bevy::{
     app::{App, Plugin, Update},
+    math::vec3a,
     prelude::*,
 };
 use bevy_tokio_tasks::TokioTasksRuntime;
@@ -22,7 +23,7 @@ impl Plugin for LearnCompassPlugin {
 #[derive(Event, Default)]
 pub struct ResetMagneticLog;
 
-#[derive(Resource, Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct MagneticData {
     min_x: f32,
     max_x: f32,
@@ -32,6 +33,24 @@ pub struct MagneticData {
 
     min_z: f32,
     max_z: f32,
+
+    max_magnitude: f32,
+    min_magnitude: f32,
+}
+
+impl Default for MagneticData {
+    fn default() -> Self {
+        Self {
+            min_x: f32::MAX,
+            max_x: f32::MIN,
+            min_y: f32::MAX,
+            max_y: f32::MIN,
+            min_z: f32::MAX,
+            max_z: f32::MIN,
+            max_magnitude: f32::MAX,
+            min_magnitude: f32::MIN,
+        }
+    }
 }
 
 fn log_compass(mut log: ResMut<MagneticData>, robot: Query<&Magnetic, With<Robot>>) {
@@ -44,6 +63,10 @@ fn log_compass(mut log: ResMut<MagneticData>, robot: Query<&Magnetic, With<Robot
 
         log.min_z = log.min_z.min(magnetic.0.mag_z.0);
         log.max_z = log.max_z.max(magnetic.0.mag_z.0);
+
+        let magnitude = vec3a(magnetic.0.mag_x.0, magnetic.0.mag_y.0, magnetic.0.mag_z.0).length();
+        log.min_magnitude = log.min_magnitude.min(magnitude);
+        log.max_magnitude = log.max_magnitude.max(magnitude);
     }
 }
 
@@ -62,7 +85,7 @@ fn save_log(
     mut events: EventWriter<ResetMagneticLog>,
 ) {
     let timer =
-        timer.get_or_insert_with(|| Timer::new(Duration::from_secs(5 * 60), TimerMode::Repeating));
+        timer.get_or_insert_with(|| Timer::new(Duration::from_secs(60 * 5), TimerMode::Repeating));
 
     timer.tick(time.delta());
 
@@ -74,12 +97,22 @@ fn save_log(
                 return;
             };
 
-            let Ok(mut file) = File::options().append(true).open("mag_learn.log").await else {
+            let Ok(mut file) = File::options()
+                .create(true)
+                .append(true)
+                .open("mag_learn.log")
+                .await
+            else {
                 error!("Couldnt open mag log file");
                 return;
             };
 
             let Ok(()) = file.write_all(&json).await else {
+                error!("Couldnt append to mag log");
+                return;
+            };
+
+            let Ok(()) = file.write_all(b"\n").await else {
                 error!("Couldnt append to mag log");
                 return;
             };
