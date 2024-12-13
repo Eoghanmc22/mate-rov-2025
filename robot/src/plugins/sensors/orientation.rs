@@ -21,12 +21,20 @@ use crate::{
     plugins::core::robot::LocalRobot,
 };
 
+const USE_MAGNETOMETER: bool = false;
+
 pub struct OrientationPlugin;
 
 impl Plugin for OrientationPlugin {
     fn build(&self, app: &mut App) {
-        let orientation_offset = Quat::from_euler(EulerRot::YXZ, 90.0f32.to_radians(), 0.0, 0.0);
-        let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.041);
+        let orientation_offset = Quat::from_euler(
+            EulerRot::YXZ,
+            90.0f32.to_radians(),
+            -90.0f32.to_radians(),
+            0.0,
+        );
+        // let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.041);
+        let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.41);
         madgwick.quat = orientation_offset.into();
 
         app.insert_resource(OrientationOffset(orientation_offset));
@@ -154,9 +162,7 @@ fn read_new_data(
     mut errors: EventWriter<ErrorEvent>,
 ) {
     for (inertial, magnetic) in channels.0.try_iter() {
-        // We currently ignore mag updates as the compass is not calibrated
-        // TODO(high): Calibrate the compass
-        for (inertial, magnetic) in inertial.into_iter().zip(
+        for (inertial, mut magnetic) in inertial.into_iter().zip(
             magnetic
                 .into_iter()
                 .map(Option::Some)
@@ -165,6 +171,10 @@ fn read_new_data(
             let gyro = Vector3::new(inertial.gyro_x.0, inertial.gyro_y.0, inertial.gyro_z.0)
                 * (std::f32::consts::PI / 180.0);
             let accel = Vector3::new(inertial.accel_x.0, inertial.accel_y.0, inertial.accel_z.0);
+
+            if !USE_MAGNETOMETER {
+                magnetic = None;
+            }
 
             let rst = if let Some(magnetic) = magnetic {
                 let mag = Vector3::new(magnetic.mag_x.0, magnetic.mag_y.0, magnetic.mag_z.0);
