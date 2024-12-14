@@ -14,7 +14,7 @@ direction = "CounterClockwise"
 # Up RIght
 [motor_config.BlueRov.vertical_seed_motor]
 position = [0.11, 0.01, 0.00]
-orientation = [0.00, 0.00, -1.00]
+orientation = [0.00, 0.00, 1.00]
 direction = "CounterClockwise"
 
 [motor_config.BlueRov.motors]
