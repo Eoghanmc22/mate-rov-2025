@@ -47,8 +47,8 @@ impl Default for MagneticData {
             max_y: f32::MIN,
             min_z: f32::MAX,
             max_z: f32::MIN,
-            max_magnitude: f32::MAX,
-            min_magnitude: f32::MIN,
+            max_magnitude: f32::MIN,
+            min_magnitude: f32::MAX,
         }
     }
 }
