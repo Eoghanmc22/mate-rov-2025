@@ -7,14 +7,15 @@ use bevy::{
 use common::{
     bundles::MovementContributionBundle,
     components::{MovementContribution, Robot, RobotId},
+    ecs_sync::Replicate,
 };
 use motor_math::glam::MovementGlam;
 
 use crate::waterlinked::WaterlinkedAngleOffset;
 
-pub const FORCE_GAIN: f32 = 5.0;
+pub const FORCE_GAIN: f32 = 15.0;
 pub const TORQUE_GAIN: f32 = 0.5;
-pub const MAX_FORCE: f32 = 10.0;
+pub const MAX_FORCE: f32 = 25.0;
 
 pub struct TrajectoryPlugin;
 
@@ -79,13 +80,21 @@ fn trajectory_follower(
         movement.force = movement.force.normalize() * MAX_FORCE;
     }
 
+    println!("movement: {movement:.2?}");
+
     if let Some(entity) = *movement_contributer {
         cmds.entity(entity).insert(MovementContribution(movement));
     } else {
-        cmds.spawn(MovementContributionBundle {
-            name: Name::new("Trajectory Follower"),
-            contribution: MovementContribution(movement),
-            robot: *robot_id,
-        });
+        let entity = cmds
+            .spawn((
+                MovementContributionBundle {
+                    name: Name::new("Trajectory Follower"),
+                    contribution: MovementContribution(movement),
+                    robot: *robot_id,
+                },
+                Replicate,
+            ))
+            .id();
+        *movement_contributer = Some(entity);
     }
 }
