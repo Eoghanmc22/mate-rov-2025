@@ -3,4 +3,14 @@ name = "thruster"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/thruster.rs"
+
 [dependencies]
+bevy = { workspace = true }
+glam = { workspace = true }
+motor_math = { workspace = true }
+stable_hashmap = { workspace = true }
+ahash = { workspace = true }
+units = { workspace = true }
+ecs_sync = { workspace = true }

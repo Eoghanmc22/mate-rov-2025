@@ -1,16 +1,13 @@
 use std::f32::consts::{PI, TAU};
 
 use bevy::prelude::*;
-use common::{
-    bundles::MovementContributionBundle,
-    components::{
-        Armed, MovementContribution, Orientation, OrientationTarget, PidConfig, PidResult, RobotId,
-    },
-    ecs_sync::Replicate,
-    types::utils::PidController,
+use common::components::{
+    Armed, MovementContribution, Orientation, OrientationTarget, PidConfig, PidResult, RobotId,
 };
+use ecs_sync::{adapters::serde::ReflectSerdeAdapter, Replicate};
 use glam::{vec3a, Vec3A};
 use motor_math::{glam::MovementGlam, Movement};
+use pid::PidController;
 
 use crate::plugins::core::robot::LocalRobot;
 

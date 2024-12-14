@@ -3,4 +3,10 @@ name = "pid"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/pid.rs"
+
 [dependencies]
+bevy = { workspace = true }
+serde = { workspace = true }
+ecs_sync = { workspace = true }

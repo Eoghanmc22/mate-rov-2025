@@ -3,4 +3,12 @@ name = "depth_hold"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/depth_hold.rs"
+
 [dependencies]
+bevy = { workspace = true }
+glam = { workspace = true }
+motor_math = { workspace = true }
+
+pid = { path = "../pid" }

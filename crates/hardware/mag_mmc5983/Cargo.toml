@@ -3,4 +3,7 @@ name = "mmc5983"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/mmc5983.rs"
+
 [dependencies]

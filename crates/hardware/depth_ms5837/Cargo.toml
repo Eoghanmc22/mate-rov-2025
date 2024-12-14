@@ -3,4 +3,7 @@ name = "bluerobotics_depth"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/depth.rs"
+
 [dependencies]

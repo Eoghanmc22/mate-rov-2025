@@ -1,3 +1,8 @@
+use bevy::prelude::*;
+use ecs_sync::adapters::serde::ReflectSerdeAdapter;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct PidConfig {
@@ -34,8 +39,8 @@ impl PidController {
         Self {
             last_error: None,
             integral: 0.0,
-            last_deltas: [0.0; 5],
-            delta_idx: 0,
+            // last_deltas: [0.0; 5],
+            // delta_idx: 0,
         }
     }
 

@@ -16,10 +16,11 @@ use crossbeam::channel::{self, Receiver, Sender};
 use nalgebra::Vector3;
 use tracing::{span, Level};
 
-use crate::{
-    peripheral::{icm20602::Icm20602, mmc5983::Mcc5983},
-    plugins::core::robot::{LocalRobot, LocalRobotMarker},
-};
+use crate::plugins::core::robot::{LocalRobot, LocalRobotMarker};
+
+use ecs_sync::adapters::serde::ReflectSerdeAdapter;
+use icm20602::Icm20602;
+use mmc5983::Mcc5983;
 
 // TODO: Register
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq, Default)]

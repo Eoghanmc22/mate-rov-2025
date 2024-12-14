@@ -3,4 +3,7 @@ name = "water_linked_ugps"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/waterlinked.rs"
+
 [dependencies]

@@ -2,6 +2,22 @@
 resolver = "2"
 members = ["crates/*/*"]
 
+[workspace.dependencies]
+bevy = { version = "0.15" }
+glam = { version = "0.29" }
+anyhow = { version = "1" }
+serde = { version = "1", features = ["derive"] }
+crossbeam = { version = "0.8" }
+nalgebra = { version = "0.33" }
+tracing = { version = "0.1" }
+ahash = { version = "0.8" }
+
+motor_math = { path = "crates/foundation/motor_math", features = ["glam"] }
+stable_hashmap = { path = "crates/foundation/stable_hashmap" }
+
+ecs_sync = { path = "crates/core/ecs_sync" }
+units = { path = "crates/core/units" }
+
 # Enable a small amount of optimization in debug mode
 [profile.dev]
 opt-level = 1

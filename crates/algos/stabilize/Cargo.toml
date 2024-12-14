@@ -3,4 +3,12 @@ name = "stabilize"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/stabilize.rs"
+
 [dependencies]
+bevy = { workspace = true }
+glam = { workspace = true }
+motor_math = { workspace = true }
+ecs_sync = { workspace = true }
+pid = { path = "../pid" }

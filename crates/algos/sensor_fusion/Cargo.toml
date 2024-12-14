@@ -3,4 +3,18 @@ name = "sensor_fusion"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/sensor_fusion.rs"
+
 [dependencies]
+ahrs = "0.7.0"
+
+bevy = { workspace = true }
+anyhow = { workspace = true }
+crossbeam = { workspace = true }
+nalgebra = { workspace = true }
+tracing = { workspace = true }
+
+icm20602 = { path = "../../hardware/imu_icm20602" }
+mmc5983 = { path = "../../hardware/mag_mmc5983" }
+ecs_sync = { workspace = true }
