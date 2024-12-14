@@ -62,7 +62,7 @@ fn main() {
                 WaterlinkedPlugin,
                 TrajectoryPlugin,
                 LearnCompassPlugin,
-                LearnReferenceFramePlugin,
+                // LearnReferenceFramePlugin,
             ),
             // 3rd Party
             (TokioTasksPlugin::default()),
