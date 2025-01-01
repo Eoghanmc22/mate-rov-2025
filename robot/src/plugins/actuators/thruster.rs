@@ -231,7 +231,7 @@ fn accumulate_motor_forces(
         motor_config,
         &motor_data.0,
         current_cap.0 as _,
-        0.05,
+        0.01,
     );
 
     // Implement slew rate limiting
@@ -270,7 +270,7 @@ fn accumulate_motor_forces(
             motor_config,
             &motor_data.0,
             current_cap.0 as _,
-            0.05,
+            0.01,
         )
     };
 

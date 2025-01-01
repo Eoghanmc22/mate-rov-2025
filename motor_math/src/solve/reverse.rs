@@ -177,7 +177,8 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
         (D::from(FloatType::INFINITY), D::from(FloatType::INFINITY));
     let mut mid = D::one();
 
-    let mut max_iters = 15;
+    let max_iters = 15;
+    let mut iter_count = 0;
     let mut learn_cap = false;
 
     loop {
@@ -282,16 +283,18 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
             mid *= D::from(amperage_cap) / mid_current;
         } else {
             let alpha = (D::from(amperage_cap) - lower_current) / (upper_current - lower_current);
+            // Not sure why this works but it helps it converge much faster
+            let alpha = (alpha * 15.0 + 0.5 * 1.0) / 16.0;
             mid = upper_bound * alpha + lower_bound * (D::one() - alpha)
         }
 
         // Upper limit on number of iterations
         // Prevents infinite looping
-        max_iters -= 1;
-        if max_iters == 0 {
+        if iter_count >= max_iters {
             warn!("Hit max iters on binary_search_force_ratio");
             return mid;
         }
+        iter_count += 1;
     }
 }
 
