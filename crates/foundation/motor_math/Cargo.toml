@@ -12,7 +12,9 @@ serde = { version = "1", features = ["derive"] }
 # ahash = { version = "0.8" }
 
 num = "0.4"
-num-dual = { git = "https://github.com/itt-ustutt/num-dual.git", rev = "f4123e30702ec3786c44d70ff66c9afc00583338" }
+num-dual = { git = "https://github.com/Eoghanmc22/num-dual.git", rev = "08b163b101cde7e3fa113a6bb93a6423eaf0b875" }
+# num-dual = { path = "../../num-dual" }
+# num-dual = "0.11"
 nalgebra = { version = "0.33", features = ["serde-serialize"] }
 glam = { version = "0.27", features = ["serde"], optional = true }
 
