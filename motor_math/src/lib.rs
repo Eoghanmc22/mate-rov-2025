@@ -19,7 +19,7 @@ use std::{
 
 use bevy_reflect::prelude::ReflectDefault;
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
-use nalgebra::{Matrix6xX, MatrixXx6, RealField, Vector3};
+use nalgebra::{Matrix6xX, MatrixXx6, RealField, Vector3, SVD};
 use num_dual::DualNum;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
@@ -78,7 +78,21 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
             }),
         );
 
-        let pseudo_inverse = matrix.clone().pseudo_inverse(D::from(0.0001)).unwrap();
+        let svd = SVD::try_new_unordered(
+            matrix.clone(),
+            true,
+            true,
+            // D::RealField::default_epsilon() * 5.0,
+            D::from(1e-5),
+            100,
+        )
+        .unwrap_or_else(|| {
+            panic!(
+                "Could not find the pseudo inverse for {}",
+                matrix.map(|it| it.re())
+            )
+        });
+        let pseudo_inverse = svd.pseudo_inverse(D::from(0.0001)).unwrap();
 
         Self {
             motors,
