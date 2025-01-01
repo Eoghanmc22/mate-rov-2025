@@ -55,7 +55,7 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
             .into_iter()
             .map(|mut it| {
                 let norm = it.1.orientation.norm();
-                if norm.re() != 0.0 {
+                if norm.re() > FloatType::EPSILON {
                     it.1.orientation.unscale_mut(norm);
                 }
 
