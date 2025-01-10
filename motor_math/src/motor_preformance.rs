@@ -182,8 +182,20 @@ fn lerp<D: Number>(a: FloatType, b: FloatType, alpha: D) -> D {
     (D::one() - alpha) * a + alpha * b
 }
 
-pub fn read_motor_data<P: AsRef<Path>>(path: P) -> anyhow::Result<MotorData> {
+pub fn read_motor_data_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<MotorData> {
     let csv = csv::Reader::from_path(path).context("Read data")?;
+
+    let mut data = Vec::default();
+    for result in csv.into_deserialize() {
+        let record: MotorRecord<FloatType> = result.context("Parse motor record")?;
+        data.push(record);
+    }
+
+    Ok(data.into())
+}
+
+pub fn read_motor_data_from_string(data: &str) -> anyhow::Result<MotorData> {
+    let csv = csv::Reader::from_reader(data.as_bytes());
 
     let mut data = Vec::default();
     for result in csv.into_deserialize() {

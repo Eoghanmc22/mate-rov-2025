@@ -33,8 +33,8 @@ pub struct ThrusterPlugin;
 impl Plugin for ThrusterPlugin {
     fn build(&self, app: &mut App) {
         // FIXME(low): This is kinda bad
-        let motor_data =
-            motor_preformance::read_motor_data("motor_data.csv").expect("Read motor data");
+        let motor_data = motor_preformance::read_motor_data_from_path("motor_data.csv")
+            .expect("Read motor data");
 
         // TODO(mid): Update motor config when motor definitions change
         app.add_systems(Startup, (create_motors, setup_motor_math))
