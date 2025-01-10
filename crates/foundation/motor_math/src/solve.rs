@@ -27,8 +27,8 @@ mod tests {
             direction: Direction::Clockwise,
         };
 
-        let motor_data =
-            motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
+        let motor_data = motor_preformance::read_motor_data_from_path("../robot/motor_data.csv")
+            .expect("Read motor data");
         let motor_config =
             MotorConfig::<X3dMotorId, FloatType>::new(seed_motor, Vector3::default());
 
@@ -70,8 +70,8 @@ mod tests {
             direction: Direction::Clockwise,
         };
 
-        let motor_data =
-            motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
+        let motor_data = motor_preformance::read_motor_data_from_path("../robot/motor_data.csv")
+            .expect("Read motor data");
         let motor_config =
             MotorConfig::<BlueRovMotorId, FloatType>::new(lateral, vertical, Vector3::default());
 
@@ -102,8 +102,8 @@ mod tests {
 
     #[test]
     fn solve_roundtrip_arbitrary() {
-        let motor_data =
-            motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
+        let motor_data = motor_preformance::read_motor_data_from_path("../robot/motor_data.csv")
+            .expect("Read motor data");
 
         let mut motors = HashMap::new();
 
@@ -206,8 +206,8 @@ mod tests {
             direction: Direction::Clockwise,
         };
 
-        let motor_data =
-            motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
+        let motor_data = motor_preformance::read_motor_data_from_path("../robot/motor_data.csv")
+            .expect("Read motor data");
         let motor_config =
             MotorConfig::<X3dMotorId, FloatType>::new(seed_motor, Vector3::default());
 
@@ -235,8 +235,8 @@ mod tests {
             direction: Direction::Clockwise,
         };
 
-        let motor_data =
-            motor_preformance::read_motor_data("../robot/motor_data.csv").expect("Read motor data");
+        let motor_data = motor_preformance::read_motor_data_from_path("../robot/motor_data.csv")
+            .expect("Read motor data");
         let motor_config =
             MotorConfig::<BlueRovMotorId, FloatType>::new(lateral, vertical, Vector3::default());
 
