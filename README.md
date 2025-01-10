@@ -1,13 +1,13 @@
-# `mate-rov-2024`
+# `mate-rov-2025`
 
-This project is a custom software stack to control ROVs based on a Raspberry Pi 4.
+This project is a custom software stack to control ROVs based on a Raspberry Pi 4/5.
 This project It is based on the bevy game engine and is intended to be used in the MATE ROV Competition.
 
 ## ROV Hardware Support
 
 The software current only has support for the following hardware
 
-- Raspberry Pi 4
+- Raspberry Pi 4 or 5
 - The Blue Robotics Navigator Flight Controller
   - ICM20602 (6-axis IMU, Gyro + Accelerometer)
   - MMC5983 (3-axis Magnetometer)
@@ -32,7 +32,7 @@ TODO: Document gstreamer deps
 
 ## Motor configurations
 
-Unlike most other projects, we support literally every motor configuration provided the following data is available.
+Unlike most other control systems, we support arbitrary thruster configurations provided the following data is available.
 
 - Thruster Performance curves
   - Needs a mapping between PWM, thrust, and amperage draw.
@@ -43,7 +43,7 @@ Unlike most other projects, we support literally every motor configuration provi
   - Position relative to the robot's origin as a vector
 
 Our motor code is dynamic, simple, correct, and fast (just one matrix multiplication).
-Thruster data can be modified in real time if needed, and when a single solution is not possible, the best solution is used.
+Thruster data can be modified in real time if needed, and when a single solution is not possible, the best (least squares) solution is used. Also, it's differentiable.
 See the `motor_code` crate for more.
 
 ## Project Structure
@@ -55,21 +55,18 @@ This code base is broken up into the following crates
   - Actually manages/controls the robot
   - It is written as a headless bevy app
 - `surface`
-  - This is the binary running on the laptop controling the ROV
+  - This is the binary running on the laptop controlling the ROV
   - Connects to the ROV, reads human input, displays cameras, runs computer vision
   - Written as a normal bevy app
 - `common`
   - This library defines the communication between `robot` and `surface`
   - ECS sync, ECS bundles and components, most type definitions, networking protocol
 - `motor_code`
-  - This library implements the secret sauce motor_code
-  - The not-so-heavy lifting behind how be map movement commands to thruster commands
+  - This library implements our secret sauce motor math code
+  - The responsible for mapping movement commands to thruster commands
 - `networking`
   - This library implements a fast non-blocking TCP server and client
   - Handles low level protocol details
-- `runner-rpi`
-  - This binary automates uploading builds of `robot` to the Raspberry Pi over ssh
-  - This should have been a bash script, but now it's blazingly fast
 
 ## System Ordering
 
