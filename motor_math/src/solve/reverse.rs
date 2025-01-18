@@ -1,6 +1,5 @@
 //! Desired Movement -> Motor Commands
 
-use core::f32;
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -184,7 +183,7 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
     loop {
         // Determine the current the current value of mid would draw
         // Returns `mid_force` and `expected_force` for the motor where the difference is largest
-        let (mid_current, mid_force, expected_force, delta_force) = motor_cmds
+        let (mid_current, correction) = motor_cmds
             .iter()
             .map(|(motor_id, data)| {
                 // Determine motor spin direction
@@ -215,18 +214,19 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
                     adjusted_force.abs(),
                 )
             })
-            // (mid_current, mid_force, expected_force, delta_force)
-            .fold((D::zero(), D::zero(), D::zero(), D::zero()), |acc, it| {
-                // Calculate the difference between the requested and actual force
-                let delta = (it.2 - it.1).abs();
+            // (mid_current, correction)
+            .fold((D::zero(), D::one()), |acc, it| {
+                // Calculate the ratio between the requested and actual force
+                let this_correction = it.1 / it.2;
+                let worst_correction = acc.1;
 
                 // Sum the current, and if this is the worst motor so far, replace the preavious force values with those from this motor
-                if delta > acc.3 {
-                    // Delta is worse, replace force data with new values
-                    (acc.0 + it.0, it.1, it.2, delta)
+                if this_correction < worst_correction {
+                    // Correction is worse, replace force data with new values
+                    (acc.0 + it.0, this_correction)
                 } else {
                     // Only sum the current and preserve existing force values
-                    (acc.0 + it.0, acc.1, acc.2, acc.3)
+                    (acc.0 + it.0, acc.1)
                 }
             });
 
@@ -237,10 +237,13 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
         // Prevents the force ratio from diverging when it is impossible to reach the input
         // amperage cap. This happens when `amperage_cap` is greater than the max current the
         // motors can draw
-        if delta_force.re().abs() > epsilon {
+        if correction.re() + epsilon < 1.0 {
             // Should be unreachable
             if learn_cap {
-                error!("Reached potantial loop condition in binary_search_force_ratio")
+                error!(
+                    "BUG: Reached potantial loop condition in binary_search_force_ratio, {:.04}",
+                    correction.re()
+                )
             }
 
             // TODO: Is this correct?
@@ -254,7 +257,7 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
 
             // Calculated a new value of mid such that force produced is exactly equal to the max
             // force the motors are capaible of
-            mid *= mid_force / expected_force;
+            mid *= correction;
 
             // Jump back to the start of the loop to recompute mid_current based on the new mid
             continue;
@@ -378,7 +381,9 @@ pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
         let actual_magnitude = actual_movement.force.dot(&movement.force).re().sqrt()
             + actual_movement.torque.dot(&movement.torque).re().sqrt();
 
-        if (actual_magnitude - guess_magnitude).abs() < epsilon {
+        // TODO: Isnt this always true???
+        let has_axis_epsilon = 0.01;
+        if (actual_magnitude - guess_magnitude).abs() < has_axis_epsilon {
             let cmds = forces_to_cmds_extrapolated(forces, motor_config, motor_data);
             let scale =
                 binary_search_force_ratio(&cmds, motor_config, motor_data, amperage_cap, epsilon);

@@ -109,6 +109,26 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
     pub fn motors(&self) -> impl Iterator<Item = (&MotorId, &Motor<D>)> {
         self.motors.iter().map(|it| (&it.0, &it.1))
     }
+
+    pub fn erase_lossy(self) -> MotorConfig<ErasedMotorId, D> {
+        let MotorConfig {
+            motors,
+            matrix,
+            pseudo_inverse,
+        } = self;
+
+        let motors = motors
+            .into_iter()
+            .enumerate()
+            .map(|(idx, (_id, motor))| (idx as ErasedMotorId, motor))
+            .collect();
+
+        MotorConfig {
+            motors,
+            matrix,
+            pseudo_inverse,
+        }
+    }
 }
 
 pub type ErasedMotorId = u8;

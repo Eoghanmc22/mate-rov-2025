@@ -7,8 +7,8 @@ use tracing::instrument;
 use crate::{Direction, FloatType, Number};
 
 pub struct MotorData {
-    force_index: Vec<MotorRecord<FloatType>>,
-    current_index: Vec<MotorRecord<FloatType>>,
+    force_index: RecordIndex,
+    current_index: RecordIndex,
 }
 
 impl MotorData {
@@ -19,15 +19,17 @@ impl MotorData {
         interpolation: Interpolation,
         extrapolate: bool,
     ) -> MotorRecord<D> {
-        let partition_point = self.force_index.partition_point(|x| x.force < force.re());
+        let nearest_records = self.force_index.lookup_nearest(force.re());
 
-        let idx_b = partition_point.max(1).min(self.force_index.len() - 1);
-        let idx_a = idx_b - 1;
-
-        let a = &self.force_index[idx_a];
-        let b = &self.force_index[idx_b];
-
-        Self::interpolate(a, b, force, a.force, b.force, interpolation, extrapolate)
+        Self::interpolate(
+            nearest_records.0,
+            nearest_records.1,
+            force,
+            nearest_records.0.force,
+            nearest_records.1.force,
+            interpolation,
+            extrapolate,
+        )
     }
 
     #[instrument(level = "trace", skip(self), ret)]
@@ -37,22 +39,14 @@ impl MotorData {
         interpolation: Interpolation,
         extrapolate: bool,
     ) -> MotorRecord<D> {
-        let partition_point = self
-            .current_index
-            .partition_point(|x| x.current.copysign(x.force) < signed_current.re());
-
-        let idx_b = partition_point.max(1).min(self.current_index.len() - 1);
-        let idx_a = idx_b - 1;
-
-        let a = &self.current_index[idx_a];
-        let b = &self.current_index[idx_b];
+        let nearest_records = self.current_index.lookup_nearest(signed_current.re());
 
         Self::interpolate(
-            a,
-            b,
+            nearest_records.0,
+            nearest_records.1,
             signed_current,
-            a.current.copysign(a.force),
-            b.current.copysign(b.force),
+            nearest_records.0.current.copysign(nearest_records.0.force),
+            nearest_records.1.current.copysign(nearest_records.1.force),
             interpolation,
             extrapolate,
         )
@@ -121,8 +115,8 @@ impl From<Vec<MotorRecord<FloatType>>> for MotorData {
         current_index.dedup_by_key(|it| it.current.copysign(it.force));
 
         Self {
-            force_index,
-            current_index,
+            force_index: RecordIndex::new(force_index, |it| it.force),
+            current_index: RecordIndex::new(current_index, |it| it.current.copysign(it.force)),
         }
     }
 }
@@ -204,4 +198,36 @@ pub fn read_motor_data_from_string(data: &str) -> anyhow::Result<MotorData> {
     }
 
     Ok(data.into())
+}
+
+struct RecordIndex {
+    data: Vec<MotorRecord<FloatType>>,
+    supplier: Box<dyn Fn(&MotorRecord<FloatType>) -> FloatType + Send + Sync + 'static>,
+}
+
+impl RecordIndex {
+    pub fn new(
+        data: Vec<MotorRecord<FloatType>>,
+        supplier: impl Fn(&MotorRecord<FloatType>) -> FloatType + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            data,
+            supplier: Box::new(supplier),
+        }
+    }
+
+    pub fn lookup_nearest(
+        &self,
+        val: FloatType,
+    ) -> (&MotorRecord<FloatType>, &MotorRecord<FloatType>) {
+        let partition_point = self.data.partition_point(|x| (self.supplier)(x) < val);
+
+        let idx_b = partition_point.max(1).min(self.data.len() - 1);
+        let idx_a = idx_b - 1;
+
+        let a = &self.data[idx_a];
+        let b = &self.data[idx_b];
+
+        (a, b)
+    }
 }

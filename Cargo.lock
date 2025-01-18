@@ -3778,7 +3778,7 @@ dependencies = [
 [[package]]
 name = "num-dual"
 version = "0.11.0"
-source = "git+https://github.com/Eoghanmc22/num-dual.git?rev=08b163b101cde7e3fa113a6bb93a6423eaf0b875#08b163b101cde7e3fa113a6bb93a6423eaf0b875"
+source = "git+https://github.com/Eoghanmc22/num-dual.git?rev=62e12f43f24de5eb8c7e22f208436e3be8dc1ea4#62e12f43f24de5eb8c7e22f208436e3be8dc1ea4"
 dependencies = [
  "approx",
  "nalgebra",
