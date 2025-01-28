@@ -1,0 +1,13 @@
+[package]
+name = "hardware_impl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+generic = { path = "../generic" }
+anyhow = "1"
+rppal = "0.22"
+tracing = "0.1"
+
+[lints]
+workspace = true

@@ -1,15 +1,13 @@
 [workspace]
 resolver = "2"
 members = [
-    "robot",
-    "robot_new",
-    "surface",
-    "common",
-    "networking",
-    "motor_math",
-    "stable_hashmap",
-    "waterlinked",
+    #"old/*",
+    "crates/*",
 ]
+
+[workspace.lints.clippy]
+type_complexity = "allow"
+too_many_arguments = "allow"
 
 # Enable a small amount of optimization in debug mode
 [profile.dev]

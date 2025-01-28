@@ -1,0 +1,35 @@
+[package]
+name = "core"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+motor_math = { path = "../../../motor_math", features = ["glam"] }
+simple_networking = { path = "../../../simple_networking" }
+stable_hashmap = { path = "../../../stable_hashmap", features = ["reflect"] }
+
+glam = { version = "0.27", features = ["serde"] }
+serde = { version = "1", features = ["derive", "rc"] }
+bincode = "1"
+crossbeam = "0.8"
+
+mdns-sd = "0.11"
+hostname = "0.4"
+flume = "0.11"
+
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+
+rand = "0.8"
+ahash = "0.8"
+
+bevy = { version = "0.14", default-features = false, features = ["serialize"] }
+
+ctrlc = "3"
+
+[features]
+tracy_frame_mark = []

@@ -1,0 +1,12 @@
+[package]
+name = "generic"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.14", default-features = false, features = ["serialize"] }
+serde = { version = "1", features = ["derive", "rc"] }
+anyhow = "1"
+
+[lints]
+workspace = true
