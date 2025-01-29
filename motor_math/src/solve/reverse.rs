@@ -176,7 +176,7 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
         (D::from(FloatType::INFINITY), D::from(FloatType::INFINITY));
     let mut mid = D::one();
 
-    let max_iters = 15;
+    let max_iters = 20;
     let mut iter_count = 0;
     let mut learn_cap = false;
 
@@ -220,8 +220,8 @@ pub fn binary_search_force_ratio<D: Number, MotorId: Hash + Ord + Clone + Debug>
                 let this_correction = it.1 / it.2;
                 let worst_correction = acc.1;
 
-                // Sum the current, and if this is the worst motor so far, replace the preavious force values with those from this motor
-                if this_correction < worst_correction {
+                // Sum the current, and if this is the worst motor so far, replace the previous force values with those from this motor
+                if this_correction < worst_correction && this_correction != D::zero() {
                     // Correction is worse, replace force data with new values
                     (acc.0 + it.0, this_correction)
                 } else {
