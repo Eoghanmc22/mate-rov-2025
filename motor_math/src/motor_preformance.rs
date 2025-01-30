@@ -73,12 +73,18 @@ impl MotorData {
                 let record = if dist_a <= dist_b { a } else { b };
 
                 MotorRecord {
-                    pwm: record.pwm.into(),
-                    rpm: record.rpm.into(),
                     current: record.current.into(),
-                    voltage: record.voltage.into(),
-                    power: record.power.into(),
                     force: record.force.into(),
+
+                    #[cfg(not(feature = "no_motor_control_data"))]
+                    pwm: record.pwm.into(),
+                    #[cfg(not(feature = "no_motor_control_data"))]
+                    rpm: record.rpm.into(),
+                    #[cfg(not(feature = "no_motor_control_data"))]
+                    voltage: record.voltage.into(),
+                    #[cfg(not(feature = "no_motor_control_data"))]
+                    power: record.power.into(),
+                    #[cfg(not(feature = "no_motor_control_data"))]
                     efficiency: record.efficiency.into(),
                 }
             }
@@ -88,6 +94,7 @@ impl MotorData {
             Interpolation::LerpDirection(direction) | Interpolation::Direction(direction) => {
                 if let Direction::CounterClockwise = direction {
                     MotorRecord {
+                        #[cfg(not(feature = "no_motor_control_data"))]
                         pwm: D::from(3000.0) - record.pwm,
                         ..record
                     }
@@ -139,12 +146,18 @@ pub enum Interpolation {
 
 #[derive(Deserialize, Debug, Clone, Copy)]
 pub struct MotorRecord<D> {
-    pub pwm: D,
-    pub rpm: D,
     pub current: D,
-    pub voltage: D,
-    pub power: D,
     pub force: D,
+
+    #[cfg(not(feature = "no_motor_control_data"))]
+    pub pwm: D,
+    #[cfg(not(feature = "no_motor_control_data"))]
+    pub rpm: D,
+    #[cfg(not(feature = "no_motor_control_data"))]
+    pub voltage: D,
+    #[cfg(not(feature = "no_motor_control_data"))]
+    pub power: D,
+    #[cfg(not(feature = "no_motor_control_data"))]
     pub efficiency: D,
 }
 
@@ -161,12 +174,18 @@ impl<D1: Number> MotorRecord<D1> {
         }
 
         MotorRecord {
-            pwm: lerp(self.pwm.re(), other.pwm.re(), alpha),
-            rpm: lerp(self.rpm.re(), other.rpm.re(), alpha),
             current: lerp(self.current.re(), other.current.re(), alpha),
-            voltage: lerp(self.voltage.re(), other.voltage.re(), alpha),
-            power: lerp(self.power.re(), other.power.re(), alpha),
             force: lerp(self.force.re(), other.force.re(), alpha),
+
+            #[cfg(not(feature = "no_motor_control_data"))]
+            pwm: lerp(self.pwm.re(), other.pwm.re(), alpha),
+            #[cfg(not(feature = "no_motor_control_data"))]
+            rpm: lerp(self.rpm.re(), other.rpm.re(), alpha),
+            #[cfg(not(feature = "no_motor_control_data"))]
+            voltage: lerp(self.voltage.re(), other.voltage.re(), alpha),
+            #[cfg(not(feature = "no_motor_control_data"))]
+            power: lerp(self.power.re(), other.power.re(), alpha),
+            #[cfg(not(feature = "no_motor_control_data"))]
             efficiency: lerp(self.efficiency.re(), other.efficiency.re(), alpha),
         }
     }
