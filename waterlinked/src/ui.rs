@@ -19,7 +19,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     learn_compass::{MagneticData, ResetMagneticLog},
-    trajectory::{CurrentPose, Pose, TargetPose},
+    trajectory::{RawPose, Pose, TargetPose},
     waterlinked::WaterlinkedAngleOffset,
     DARK_MODE,
 };
@@ -56,7 +56,7 @@ fn main_pane(
         (
             Entity,
             &Name,
-            Option<&CurrentPose>,
+            Option<&RawPose>,
             Option<&TargetPose>,
             &RobotId,
         ),

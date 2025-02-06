@@ -4,7 +4,7 @@ use bevy::{app::Plugin, math::NormedVectorSpace, prelude::*};
 use common::components::{ActualMovement, Orientation, Robot};
 
 use crate::{
-    trajectory::{CurrentPose, Pose},
+    trajectory::{RawPose, Pose},
     waterlinked::{self, WaterlinkedAngleOffset},
 };
 
@@ -123,10 +123,10 @@ fn update_state(
     mut last_waterlinked_pose: Local<Option<(Pose, Duration)>>,
     mut state: ResMut<LearningState>,
     time: Res<Time<Real>>,
-    query: Query<(&CurrentPose, &ActualMovement, &Orientation), With<Robot>>,
+    query: Query<(&RawPose, &ActualMovement, &Orientation), With<Robot>>,
     mut events: EventWriter<FullStateChangeNotif>,
 ) {
-    let Ok((CurrentPose(pose), ActualMovement(movement), Orientation(quat))) = query.get_single()
+    let Ok((RawPose(pose), ActualMovement(movement), Orientation(quat))) = query.get_single()
     else {
         *state = LearningState::default();
         *last_waterlinked_pose = None;

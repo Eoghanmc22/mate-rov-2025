@@ -1,3 +1,4 @@
+pub mod kalman_filter;
 pub mod learn_compass;
 pub mod learn_reference_frame;
 pub mod trajectory;

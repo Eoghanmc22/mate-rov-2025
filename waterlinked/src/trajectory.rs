@@ -36,7 +36,10 @@ pub struct Pose {
 pub struct TargetPose(pub Pose);
 
 #[derive(Component, Debug)]
-pub struct CurrentPose(pub Pose);
+pub struct RawPose(pub Pose);
+
+#[derive(Component, Debug)]
+pub struct FilteredPose(pub Pose);
 
 // NOTE: Outputs are unscaled
 pub fn move_toward(current_pose: &Pose, target_pose: &Pose) -> MovementGlam {
@@ -60,7 +63,7 @@ fn trajectory_follower(
     mut movement_contributer: Local<Option<Entity>>,
 
     mut cmds: Commands,
-    robot: Query<(&CurrentPose, &TargetPose, &RobotId), With<Robot>>,
+    robot: Query<(&FilteredPose, &TargetPose, &RobotId), With<Robot>>,
 ) {
     let Ok((current_pose, target_pose, robot_id)) = robot.get_single() else {
         if let Some(entity) = *movement_contributer {

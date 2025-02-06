@@ -14,7 +14,7 @@ use common::{
 use tracing::{error, warn};
 
 use crate::{
-    trajectory::{CurrentPose, Pose},
+    trajectory::{Pose, RawPose},
     waterlinked_api::{wl_to_mate_coords, Location, WaterLinked},
 };
 
@@ -80,7 +80,7 @@ pub fn pose_updater(
         let (x, y, z) = wl_to_mate_coords(x, y, z);
 
         if position_valid {
-            cmds.entity(robot).insert(CurrentPose(Pose {
+            cmds.entity(robot).insert(RawPose(Pose {
                 position: vec3a(x, y, z),
                 rotation: orientation.map(|it| it.0).unwrap_or_default(),
             }));
