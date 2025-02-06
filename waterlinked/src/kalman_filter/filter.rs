@@ -4,7 +4,7 @@ use minikalman::extended::builder::{KalmanFilterObservationType, KalmanFilterTyp
 use minikalman::prelude::*;
 
 // Constants for state indices
-// X, Y, Z are world space axis
+// X, Y, Z are world space axes
 pub mod constants {
     pub const NUM_STATES: usize = 22;
     pub const POS_X: usize = 0;
@@ -54,6 +54,7 @@ pub mod meas_constants {
     pub const QUAT_Z: usize = 13;
 }
 
+#[derive(Debug, Default)]
 pub struct Measurement {
     depth: Option<f32>,
     upos: Option<Vec3A>,
@@ -89,7 +90,7 @@ pub struct EkfManager {
 
 impl EkfManager {
     /// Creates a new EKF manager with the given configuration.
-    pub fn new(config: RovConfig) -> Self {
+    pub fn new(config: RovConfig, initial_guess: Measurement) -> Self {
         let builder = KalmanFilterBuilder::<{ constants::NUM_STATES }, f32>::default();
         let mut filter = builder.build();
         let mut measurement = builder
@@ -97,16 +98,16 @@ impl EkfManager {
             .build::<{ meas_constants::NUM_OBSERVATIONS }>();
 
         // Initialize state vector
-        initialize_state_vector(&mut filter);
+        initialize_state_vector(&mut filter, &initial_guess);
 
         // Initialize covariance matrix with appropriate uncertainties
-        initialize_estimate_covariance(&mut filter);
+        initialize_estimate_covariance(&mut filter, &initial_guess);
 
         // Initialize process noise with different variances per state variable
         initialize_process_noise(&mut filter, &config);
 
         // Initialize measurement noise with different variances per measurement
-        initialize_measurement_noise(&mut measurement, &config);
+        initialize_measurement_noise(&mut measurement);
 
         Self {
             filter,
@@ -174,13 +175,6 @@ impl EkfManager {
             next.set_row(constants::QUAT_Y, new_q.y);
             next.set_row(constants::QUAT_Z, new_q.z);
 
-            // Normalize the quaternion to prevent drift
-            let normalized_q = new_q.normalize();
-            next.set_row(constants::QUAT_W, normalized_q.w);
-            next.set_row(constants::QUAT_X, normalized_q.x);
-            next.set_row(constants::QUAT_Y, normalized_q.y);
-            next.set_row(constants::QUAT_Z, normalized_q.z);
-
             // Assume angular velocity is unchanged
             next.set_row(constants::ANGVEL_X, state.get_row(constants::ANGVEL_X));
             next.set_row(constants::ANGVEL_Y, state.get_row(constants::ANGVEL_Y));
@@ -208,7 +202,7 @@ impl EkfManager {
     /// Updates the state transition Jacobian matrix.
     fn update_state_transition_jacobian(&mut self, delta_t: f32) {
         // Orientation (quaternion) derivatives
-        // Using quaternion dynamics: q_dot = 0.5 * q * omega
+        // Using quaternion dynamics: q_dot = 0.5 * q * omega * delta_t
         let omega_x = self.filter.state_vector().get_row(constants::ANGVEL_X);
         let omega_y = self.filter.state_vector().get_row(constants::ANGVEL_Y);
         let omega_z = self.filter.state_vector().get_row(constants::ANGVEL_Z);
@@ -235,7 +229,6 @@ impl EkfManager {
             }
 
             // Compute the Jacobian for quaternion dynamics
-            // Partial derivatives based on q_dot = 0.5 * q * omega * delta_t
             let half_dt = 0.5 * delta_t;
             mat.set(constants::QUAT_W, constants::QUAT_W, 1.0);
             mat.set(constants::QUAT_W, constants::QUAT_X, -half_dt * omega_x);
@@ -323,6 +316,7 @@ impl EkfManager {
                 // Reset measurement vector to zero before applying new measurements
                 measurement.clear();
 
+                // Update available measurements
                 if let Some(d) = observation_input.depth {
                     measurement.set_row(meas_constants::DEPTH, d);
                 }
@@ -348,143 +342,14 @@ impl EkfManager {
                     measurement.set_row(meas_constants::QUAT_Z, o.z);
                 }
             });
+
+        // Adjust measurement noise covariance for available and unavailable measurements
+        self.adjust_measurement_noise(&observation_input);
+
         self.correct();
     }
 
-    //     /// Updates the observation Jacobian matrix.
-    //     fn update_observation_jacobian(&mut self, observation_input: &Measurement) {
-    //         self.measurement
-    //             .observation_jacobian_matrix_mut()
-    //             .apply(|mat| {
-    //                 mat.clear();
-    //
-    //                 // Depth measurement (z position)
-    //                 if observation_input.depth.is_some() {
-    //                     mat.set(meas_constants::DEPTH, constants::POS_Z, 1.0);
-    //                 }
-    //
-    //                 // UPOS measurement (position)
-    //                 if observation_input.upos.is_some() {
-    //                     mat.set(meas_constants::UPOS_X, constants::POS_X, 1.0);
-    //                     mat.set(meas_constants::UPOS_Y, constants::POS_Y, 1.0);
-    //                     mat.set(meas_constants::UPOS_Z, constants::POS_Z, 1.0);
-    //                 }
-    //
-    //                 // Accelerometer measurement
-    //                 if observation_input.acc.is_some() {
-    //                     // Accelerometer measures: acc = true_acc + bias_acc + gravity_body
-    //                     mat.set(meas_constants::ACC_X, constants::ACC_X, 1.0);
-    //                     mat.set(meas_constants::ACC_Y, constants::ACC_Y, 1.0);
-    //                     mat.set(meas_constants::ACC_Z, constants::ACC_Z, 1.0);
-    //
-    //                     mat.set(meas_constants::ACC_X, constants::BIAS_ACC_X, 1.0);
-    //                     mat.set(meas_constants::ACC_Y, constants::BIAS_ACC_Y, 1.0);
-    //                     mat.set(meas_constants::ACC_Z, constants::BIAS_ACC_Z, 1.0);
-    //
-    //                     // Compute partial derivatives of gravity_body with respect to quaternion
-    //                     // gravity_body = q.inverse() * gravity_world
-    //                     // Partial derivatives are complex; for simplicity, they are approximated here
-    //                     // A more accurate implementation should derive these based on the rotation conventions
-    //                     let q = Quat::from_xyzw(
-    //                         self.filter.state_vector().get_row(constants::QUAT_X),
-    //                         self.filter.state_vector().get_row(constants::QUAT_Y),
-    //                         self.filter.state_vector().get_row(constants::QUAT_Z),
-    //                         self.filter.state_vector().get_row(constants::QUAT_W),
-    //                     )
-    //                     .normalize();
-    //
-    //                     let gravity_world = Vec3A::new(0.0, 0.0, 9.81);
-    //                     // Partial derivatives of gravity_body w.r. to quaternion components
-    //                     // Using numerical approximation or analytical derivatives
-    //                     // Here, an approximate linear relationship is assumed
-    //                     // Consider implementing exact derivatives for better accuracy
-    //
-    //                     // Example partial derivatives (refined)
-    //                     let q_w = q.w;
-    //                     let q_x = q.x;
-    //                     let q_y = q.y;
-    //                     let q_z = q.z;
-    //
-    //                     // Partial derivatives of gravity_body with respect to quaternion components
-    //                     // Using the formula for quaternion inverse and multiplication
-    //                     // gravity_body = q.inverse() * gravity_world * q
-    //                     // Simplified partial derivatives based on standard quaternion derivative formulas
-    //
-    //                     let dg_dqw = Vec3A::new(
-    //                         -2.0 * gravity_world.x * q_y + 2.0 * gravity_world.y * q_x,
-    //                         -2.0 * gravity_world.x * q_z + 2.0 * gravity_world.z * q_x,
-    //                         2.0 * gravity_world.x * q_y - 2.0 * gravity_world.y * q_x,
-    //                     );
-    //
-    //                     let dg_dqx = Vec3A::new(
-    //                         2.0 * gravity_world.x * q_w + 2.0 * gravity_world.y * q_z
-    //                             - 2.0 * gravity_world.z * q_y,
-    //                         2.0 * gravity_world.x * q_z
-    //                             - 2.0 * gravity_world.y * q_w
-    //                             - 2.0 * gravity_world.z * q_x,
-    //                         2.0 * gravity_world.y * q_w + 2.0 * gravity_world.z * q_x
-    //                             - 2.0 * gravity_world.x * q_y,
-    //                     );
-    //
-    //                     let dg_dqy = Vec3A::new(
-    //                         2.0 * gravity_world.x * q_z
-    //                             - 2.0 * gravity_world.w * q_x
-    //                             - 2.0 * gravity_world.z * q_w,
-    //                         2.0 * gravity_world.x * q_w + 2.0 * gravity_world.z * q_x
-    //                             - 2.0 * gravity_world.y * q_z,
-    //                         2.0 * gravity_world.w * q_x - 2.0 * gravity_world.y * q_z
-    //                             + 2.0 * gravity_world.z * q_w,
-    //                     );
-    //
-    //                     let dg_dqz = Vec3A::new(
-    //                         2.0 * gravity_world.x * q_y - 2.0 * gravity_world.w * q_x
-    //                             + 2.0 * gravity_world.z * q_w,
-    //                         -2.0 * gravity_world.x * q_x
-    //                             + 2.0 * gravity_world.w * q_z
-    //                             + 2.0 * gravity_world.y * q_w,
-    //                         2.0 * gravity_world.w * q_z
-    //                             - 2.0 * gravity_world.y * q_x
-    //                             - 2.0 * gravity_world.x * q_w,
-    //                     );
-    //
-    //                     // Set partial derivatives in the Jacobian matrix
-    //                     mat.set(meas_constants::ACC_X, constants::QUAT_W, dg_dqw.x);
-    //                     mat.set(meas_constants::ACC_X, constants::QUAT_X, dg_dqx.x);
-    //                     mat.set(meas_constants::ACC_X, constants::QUAT_Y, dg_dqy.x);
-    //                     mat.set(meas_constants::ACC_X, constants::QUAT_Z, dg_dqz.x);
-    //
-    //                     mat.set(meas_constants::ACC_Y, constants::QUAT_W, dg_dqw.y);
-    //                     mat.set(meas_constants::ACC_Y, constants::QUAT_X, dg_dqx.y);
-    //                     mat.set(meas_constants::ACC_Y, constants::QUAT_Y, dg_dqy.y);
-    //                     mat.set(meas_constants::ACC_Y, constants::QUAT_Z, dg_dqz.y);
-    //
-    //                     mat.set(meas_constants::ACC_Z, constants::QUAT_W, dg_dqw.z);
-    //                     mat.set(meas_constants::ACC_Z, constants::QUAT_X, dg_dqx.z);
-    //                     mat.set(meas_constants::ACC_Z, constants::QUAT_Y, dg_dqy.z);
-    //                     mat.set(meas_constants::ACC_Z, constants::QUAT_Z, dg_dqz.z);
-    //                 }
-    //
-    //                 // Gyro measurement
-    //                 if observation_input.gyro_raw.is_some() {
-    //                     mat.set(meas_constants::GYRO_X, constants::ANGVEL_X, 1.0);
-    //                     mat.set(meas_constants::GYRO_Y, constants::ANGVEL_Y, 1.0);
-    //                     mat.set(meas_constants::GYRO_Z, constants::ANGVEL_Z, 1.0);
-    //
-    //                     mat.set(meas_constants::GYRO_X, constants::BIAS_GYRO_X, 1.0);
-    //                     mat.set(meas_constants::GYRO_Y, constants::BIAS_GYRO_Y, 1.0);
-    //                     mat.set(meas_constants::GYRO_Z, constants::BIAS_GYRO_Z, 1.0);
-    //                 }
-    //
-    //                 // Orientation measurement (quaternion)
-    //                 if observation_input.orientation.is_some() {
-    //                     mat.set(meas_constants::QUAT_W, constants::QUAT_W, 1.0);
-    //                     mat.set(meas_constants::QUAT_X, constants::QUAT_X, 1.0);
-    //                     mat.set(meas_constants::QUAT_Y, constants::QUAT_Y, 1.0);
-    //                     mat.set(meas_constants::QUAT_Z, constants::QUAT_Z, 1.0);
-    //                 }
-    //             });
-    //     }
-    // }
+    /// Updates the observation Jacobian matrix.
     fn update_observation_jacobian(&mut self, observation_input: &Measurement) {
         self.measurement
             .observation_jacobian_matrix_mut()
@@ -530,11 +395,15 @@ impl EkfManager {
                     let q_y = q.y;
                     let q_z = q.z;
 
-                    // Partial derivatives
-                    let dg_dqw = Vec3A::new(2.0 * g * q_y, -2.0 * g * q_x, 0.0);
-                    let dg_dqx = Vec3A::new(-2.0 * g * q_y, -2.0 * g * q_z, -2.0 * g * q_w);
-                    let dg_dqy = Vec3A::new(2.0 * g * q_w, 0.0, -2.0 * g * q_z);
-                    let dg_dqz = Vec3A::new(0.0, 2.0 * g * q_w, -2.0 * g * q_y);
+                    // Analytical partial derivatives based on quaternion rotation
+                    // gravity_body = q.inverse() * gravity_world * q
+                    // Compute partial derivatives of gravity_body with respect to each quaternion component
+
+                    // FIXME: This is sus
+                    let dg_dqw = Vec3A::new(-2.0 * g * q_y, 2.0 * g * q_x, 0.0);
+                    let dg_dqx = Vec3A::new(2.0 * g * q_y, 2.0 * g * q_z, -2.0 * g * q_w);
+                    let dg_dqy = Vec3A::new(-2.0 * g * q_w, 0.0, 2.0 * g * q_z);
+                    let dg_dqz = Vec3A::new(0.0, -2.0 * g * q_x, 2.0 * g * q_y);
 
                     // Set partial derivatives in the Jacobian matrix
                     mat.set(meas_constants::ACC_X, constants::QUAT_W, dg_dqw.x);
@@ -573,30 +442,78 @@ impl EkfManager {
                 }
             });
     }
+
+    /// Adjusts the measurement noise covariance matrix based on available measurements.
+    /// Unavailable measurements are set to a high variance to effectively ignore them.
+    fn adjust_measurement_noise(&mut self, observation_input: &Measurement) {
+        self.measurement
+            .measurement_noise_covariance_mut()
+            .apply(|noise_vec| {
+                // Set high variance for all measurements initially
+                for i in 0..meas_constants::NUM_OBSERVATIONS {
+                    noise_vec[i] = 1e9; // Represents infinity
+                }
+
+                // Assign actual noise values to available measurements
+                if observation_input.depth.is_some() {
+                    noise_vec[meas_constants::DEPTH] = self.config.depth_noise;
+                }
+                if observation_input.upos.is_some() {
+                    noise_vec[meas_constants::UPOS_X] = self.config.upos_noise;
+                    noise_vec[meas_constants::UPOS_Y] = self.config.upos_noise;
+                    noise_vec[meas_constants::UPOS_Z] = self.config.upos_noise;
+                }
+                if observation_input.acc.is_some() {
+                    noise_vec[meas_constants::ACC_X] = self.config.acc_noise;
+                    noise_vec[meas_constants::ACC_Y] = self.config.acc_noise;
+                    noise_vec[meas_constants::ACC_Z] = self.config.acc_noise;
+                }
+                if observation_input.gyro_raw.is_some() {
+                    noise_vec[meas_constants::GYRO_X] = self.config.gyro_noise;
+                    noise_vec[meas_constants::GYRO_Y] = self.config.gyro_noise;
+                    noise_vec[meas_constants::GYRO_Z] = self.config.gyro_noise;
+                }
+                if observation_input.orientation.is_some() {
+                    noise_vec[meas_constants::QUAT_W] = self.config.orientation_noise;
+                    noise_vec[meas_constants::QUAT_X] = self.config.orientation_noise;
+                    noise_vec[meas_constants::QUAT_Y] = self.config.orientation_noise;
+                    noise_vec[meas_constants::QUAT_Z] = self.config.orientation_noise;
+                }
+            });
+    }
 }
 
 /// Initializes the state vector with default values.
-pub fn initialize_state_vector(filter: &mut Filter) {
+/// If initial measurements are available, they can be used here for better initialization.
+pub fn initialize_state_vector(filter: &mut Filter, initial_guess: &Measurement) {
     filter.state_vector_mut().apply(|state| {
-        state[constants::POS_X] = 0.0;
-        state[constants::POS_Y] = 0.0;
-        state[constants::POS_Z] = 0.0;
+        state[constants::POS_X] = initial_guess.upos.map(|it| it.x).unwrap_or(0.0);
+        state[constants::POS_Y] = initial_guess.upos.map(|it| it.y).unwrap_or(0.0);
+        state[constants::POS_Z] = initial_guess
+            .depth
+            .or(initial_guess.upos.map(|it| it.z))
+            .unwrap_or(0.0);
+
         state[constants::VEL_X] = 0.0;
         state[constants::VEL_Y] = 0.0;
         state[constants::VEL_Z] = 0.0;
-        state[constants::ACC_X] = 0.0;
-        state[constants::ACC_Y] = 0.0;
-        state[constants::ACC_Z] = 0.0;
-        state[constants::QUAT_W] = 1.0;
-        state[constants::QUAT_X] = 0.0;
-        state[constants::QUAT_Y] = 0.0;
-        state[constants::QUAT_Z] = 0.0;
-        state[constants::ANGVEL_X] = 0.0;
-        state[constants::ANGVEL_Y] = 0.0;
-        state[constants::ANGVEL_Z] = 0.0;
+
+        state[constants::ACC_X] = initial_guess.acc.map(|it| it.x).unwrap_or(0.0);
+        state[constants::ACC_Y] = initial_guess.acc.map(|it| it.y).unwrap_or(0.0);
+        state[constants::ACC_Z] = initial_guess.acc.map(|it| it.z).unwrap_or(0.0);
+
+        state[constants::QUAT_W] = initial_guess.orientation.map(|it| it.w).unwrap_or(0.0);
+        state[constants::QUAT_X] = initial_guess.orientation.map(|it| it.x).unwrap_or(0.0);
+        state[constants::QUAT_Y] = initial_guess.orientation.map(|it| it.y).unwrap_or(0.0);
+        state[constants::QUAT_Z] = initial_guess.orientation.map(|it| it.z).unwrap_or(0.0);
+        state[constants::ANGVEL_X] = initial_guess.gyro_raw.map(|it| it.x).unwrap_or(0.0);
+        state[constants::ANGVEL_Y] = initial_guess.gyro_raw.map(|it| it.y).unwrap_or(0.0);
+        state[constants::ANGVEL_Z] = initial_guess.gyro_raw.map(|it| it.z).unwrap_or(0.0);
+
         state[constants::BIAS_ACC_X] = 0.0;
         state[constants::BIAS_ACC_Y] = 0.0;
         state[constants::BIAS_ACC_Z] = 0.0;
+
         state[constants::BIAS_GYRO_X] = 0.0;
         state[constants::BIAS_GYRO_Y] = 0.0;
         state[constants::BIAS_GYRO_Z] = 0.0;
@@ -604,13 +521,20 @@ pub fn initialize_state_vector(filter: &mut Filter) {
 }
 
 /// Initializes the estimate covariance matrix with different uncertainties.
-pub fn initialize_estimate_covariance(filter: &mut Filter) {
+pub fn initialize_estimate_covariance(filter: &mut Filter, initial_guess: &Measurement) {
     filter.estimate_covariance_mut().apply(|mat| {
         mat.clear();
-        // Set high uncertainty for positions
-        mat.set(constants::POS_X, constants::POS_X, 10.0);
-        mat.set(constants::POS_Y, constants::POS_Y, 10.0);
-        mat.set(constants::POS_Z, constants::POS_Z, 10.0);
+        if initial_guess.upos.is_some() {
+            // Set moderate uncertainty for positions
+            mat.set(constants::POS_X, constants::POS_X, 1.0);
+            mat.set(constants::POS_Y, constants::POS_Y, 1.0);
+            mat.set(constants::POS_Z, constants::POS_Z, 1.0);
+        } else {
+            // Set high uncertainty for positions
+            mat.set(constants::POS_X, constants::POS_X, 10.0);
+            mat.set(constants::POS_Y, constants::POS_Y, 10.0);
+            mat.set(constants::POS_Z, constants::POS_Z, 10.0);
+        }
         // Moderate uncertainty for velocities
         mat.set(constants::VEL_X, constants::VEL_X, 1.0);
         mat.set(constants::VEL_Y, constants::VEL_Y, 1.0);
@@ -675,6 +599,7 @@ pub fn initialize_process_noise(filter: &mut Filter, config: &RovConfig) {
             constants::ANGVEL_Z,
             config.process_noise,
         );
+
         // Bias process noise (assuming small random walk)
         mat.set(
             constants::BIAS_ACC_X,
@@ -710,24 +635,14 @@ pub fn initialize_process_noise(filter: &mut Filter, config: &RovConfig) {
 }
 
 /// Initializes the measurement noise covariance matrix with different variances.
-pub fn initialize_measurement_noise(measurement: &mut Observation, config: &RovConfig) {
+pub fn initialize_measurement_noise(measurement: &mut Observation) {
     measurement
         .measurement_noise_covariance_mut()
         .apply(|noise_vec| {
-            noise_vec[meas_constants::DEPTH] = config.depth_noise;
-            noise_vec[meas_constants::UPOS_X] = config.upos_noise;
-            noise_vec[meas_constants::UPOS_Y] = config.upos_noise;
-            noise_vec[meas_constants::UPOS_Z] = config.upos_noise;
-            noise_vec[meas_constants::ACC_X] = config.acc_noise;
-            noise_vec[meas_constants::ACC_Y] = config.acc_noise;
-            noise_vec[meas_constants::ACC_Z] = config.acc_noise;
-            noise_vec[meas_constants::GYRO_X] = config.gyro_noise;
-            noise_vec[meas_constants::GYRO_Y] = config.gyro_noise;
-            noise_vec[meas_constants::GYRO_Z] = config.gyro_noise;
-            noise_vec[meas_constants::QUAT_W] = config.orientation_noise;
-            noise_vec[meas_constants::QUAT_X] = config.orientation_noise;
-            noise_vec[meas_constants::QUAT_Y] = config.orientation_noise;
-            noise_vec[meas_constants::QUAT_Z] = config.orientation_noise;
+            // Initially set high variances, will be adjusted based on available measurements
+            for i in 0..meas_constants::NUM_OBSERVATIONS {
+                noise_vec[i] = 1e9;
+            }
         });
 }
 
@@ -768,7 +683,7 @@ pub fn main() {
         gyro_noise: 0.2,
         orientation_noise: 0.1,
     };
-    let mut ekf = EkfManager::new(config);
+    let mut ekf = EkfManager::new(config, Default::default());
     // Simulation loop
     let mut time = 0.0;
     const STEP_DURATION: f32 = 0.1;
