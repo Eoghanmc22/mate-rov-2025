@@ -35,30 +35,35 @@ pub mod constants {
 
 // Constants for measurement indices
 pub mod meas_constants {
-    pub const NUM_OBSERVATIONS: usize = 14;
+    pub const NUM_OBSERVATIONS: usize = 17;
     // World space
     pub const DEPTH: usize = 0;
-    pub const UPOS_X: usize = 1;
-    pub const UPOS_Y: usize = 2;
-    pub const UPOS_Z: usize = 3;
+    pub const POS_X: usize = 1;
+    pub const POS_Y: usize = 2;
+    pub const POS_Z: usize = 3;
+
     // These are in local space
-    pub const ACC_X: usize = 4;
-    pub const ACC_Y: usize = 5;
-    pub const ACC_Z: usize = 6;
-    pub const GYRO_X: usize = 7;
-    pub const GYRO_Y: usize = 8;
-    pub const GYRO_Z: usize = 9;
-    pub const QUAT_W: usize = 10;
-    pub const QUAT_X: usize = 11;
-    pub const QUAT_Y: usize = 12;
-    pub const QUAT_Z: usize = 13;
+    pub const VEL_X: usize = 4;
+    pub const VEL_Y: usize = 5;
+    pub const VEL_Z: usize = 6;
+    pub const ACC_X: usize = 7;
+    pub const ACC_Y: usize = 8;
+    pub const ACC_Z: usize = 9;
+    pub const GYRO_X: usize = 10;
+    pub const GYRO_Y: usize = 11;
+    pub const GYRO_Z: usize = 12;
+    pub const QUAT_W: usize = 13;
+    pub const QUAT_X: usize = 14;
+    pub const QUAT_Y: usize = 15;
+    pub const QUAT_Z: usize = 16;
 }
 
 #[derive(Debug, Default)]
 pub struct Measurement {
     depth: Option<f32>,
-    upos: Option<Vec3A>,
-    acc: Option<Vec3A>,
+    pos: Option<Vec3A>,
+    velo: Option<Vec3A>,
+    accel: Option<Vec3A>,
     gyro_raw: Option<Vec3A>,
     orientation: Option<Quat>,
 }
@@ -68,8 +73,9 @@ pub struct Measurement {
 pub struct RovConfig {
     pub process_noise: f32,
     pub depth_noise: f32,
-    pub upos_noise: f32,
-    pub acc_noise: f32,
+    pub pos_noise: f32,
+    pub velo_noise: f32,
+    pub accel_noise: f32,
     pub gyro_noise: f32,
     pub orientation_noise: f32,
 }
@@ -197,6 +203,21 @@ impl EkfManager {
                 state.get_row(constants::BIAS_GYRO_Z),
             );
         });
+
+        self.filter.state_vector_mut().apply(|state| {
+            let q = Quat::from_xyzw(
+                state.get_row(constants::QUAT_X),
+                state.get_row(constants::QUAT_Y),
+                state.get_row(constants::QUAT_Z),
+                state.get_row(constants::QUAT_W),
+            )
+            .normalize();
+
+            state.set_row(constants::QUAT_W, q.w);
+            state.set_row(constants::QUAT_X, q.x);
+            state.set_row(constants::QUAT_Y, q.y);
+            state.set_row(constants::QUAT_Z, q.z);
+        });
     }
 
     /// Updates the state transition Jacobian matrix.
@@ -272,24 +293,37 @@ impl EkfManager {
                 )
                 .normalize();
                 let gravity_world = Vec3A::new(0.0, 0.0, 9.81);
-                let gravity_body = q.inverse() * gravity_world;
+                let accel_world = Vec3A::new(
+                    state.get_row(constants::ACC_X),
+                    state.get_row(constants::ACC_Y),
+                    state.get_row(constants::ACC_Z),
+                );
+                let accel_total_body = q.inverse() * (accel_world + gravity_world);
+
+                let velo_world = Vec3A::new(
+                    state.get_row(constants::VEL_X),
+                    state.get_row(constants::VEL_Y),
+                    state.get_row(constants::VEL_Z),
+                );
+                let velo_body = q.inverse() * velo_world;
 
                 // Transform the state into an observation.
                 observation[meas_constants::DEPTH] = state.get_row(constants::POS_Z);
-                observation[meas_constants::UPOS_X] = state.get_row(constants::POS_X);
-                observation[meas_constants::UPOS_Y] = state.get_row(constants::POS_Y);
-                observation[meas_constants::UPOS_Z] = state.get_row(constants::POS_Z);
+                observation[meas_constants::POS_X] = state.get_row(constants::POS_X);
+                observation[meas_constants::POS_Y] = state.get_row(constants::POS_Y);
+                observation[meas_constants::POS_Z] = state.get_row(constants::POS_Z);
+
+                observation[meas_constants::VEL_X] = velo_body.x;
+                observation[meas_constants::VEL_Y] = velo_body.y;
+                observation[meas_constants::VEL_Z] = velo_body.z;
 
                 // Accelerometer measures: acc = true_acc + bias_acc + gravity_body
-                observation[meas_constants::ACC_X] = state.get_row(constants::ACC_X)
-                    + state.get_row(constants::BIAS_ACC_X)
-                    + gravity_body.x;
-                observation[meas_constants::ACC_Y] = state.get_row(constants::ACC_Y)
-                    + state.get_row(constants::BIAS_ACC_Y)
-                    + gravity_body.y;
-                observation[meas_constants::ACC_Z] = state.get_row(constants::ACC_Z)
-                    + state.get_row(constants::BIAS_ACC_Z)
-                    + gravity_body.z;
+                observation[meas_constants::ACC_X] =
+                    state.get_row(constants::BIAS_ACC_X) + accel_total_body.x;
+                observation[meas_constants::ACC_Y] =
+                    state.get_row(constants::BIAS_ACC_Y) + accel_total_body.y;
+                observation[meas_constants::ACC_Z] =
+                    state.get_row(constants::BIAS_ACC_Z) + accel_total_body.z;
 
                 // Gyroscope measures: gyro = angular_velocity + bias_gyro
                 observation[meas_constants::GYRO_X] =
@@ -305,6 +339,21 @@ impl EkfManager {
                 observation[meas_constants::QUAT_Y] = q.y;
                 observation[meas_constants::QUAT_Z] = q.z;
             });
+
+        self.filter.state_vector_mut().apply(|state| {
+            let q = Quat::from_xyzw(
+                state.get_row(constants::QUAT_X),
+                state.get_row(constants::QUAT_Y),
+                state.get_row(constants::QUAT_Z),
+                state.get_row(constants::QUAT_W),
+            )
+            .normalize();
+
+            state.set_row(constants::QUAT_W, q.w);
+            state.set_row(constants::QUAT_X, q.x);
+            state.set_row(constants::QUAT_Y, q.y);
+            state.set_row(constants::QUAT_Z, q.z);
+        });
     }
 
     /// Handles partial measurements by updating only the available measurements.
@@ -317,29 +366,34 @@ impl EkfManager {
                 measurement.clear();
 
                 // Update available measurements
-                if let Some(d) = observation_input.depth {
-                    measurement.set_row(meas_constants::DEPTH, d);
+                if let Some(depth) = observation_input.depth {
+                    measurement.set_row(meas_constants::DEPTH, depth);
                 }
-                if let Some(p) = observation_input.upos {
-                    measurement.set_row(meas_constants::UPOS_X, p.x);
-                    measurement.set_row(meas_constants::UPOS_Y, p.y);
-                    measurement.set_row(meas_constants::UPOS_Z, p.z);
+                if let Some(pos) = observation_input.pos {
+                    measurement.set_row(meas_constants::POS_X, pos.x);
+                    measurement.set_row(meas_constants::POS_Y, pos.y);
+                    measurement.set_row(meas_constants::POS_Z, pos.z);
                 }
-                if let Some(a) = observation_input.acc {
-                    measurement.set_row(meas_constants::ACC_X, a.x);
-                    measurement.set_row(meas_constants::ACC_Y, a.y);
-                    measurement.set_row(meas_constants::ACC_Z, a.z);
+                if let Some(velo) = observation_input.velo {
+                    measurement.set_row(meas_constants::VEL_X, velo.x);
+                    measurement.set_row(meas_constants::VEL_Y, velo.y);
+                    measurement.set_row(meas_constants::VEL_Z, velo.z);
                 }
-                if let Some(g) = observation_input.gyro_raw {
-                    measurement.set_row(meas_constants::GYRO_X, g.x);
-                    measurement.set_row(meas_constants::GYRO_Y, g.y);
-                    measurement.set_row(meas_constants::GYRO_Z, g.z);
+                if let Some(accel) = observation_input.accel {
+                    measurement.set_row(meas_constants::ACC_X, accel.x);
+                    measurement.set_row(meas_constants::ACC_Y, accel.y);
+                    measurement.set_row(meas_constants::ACC_Z, accel.z);
                 }
-                if let Some(o) = observation_input.orientation {
-                    measurement.set_row(meas_constants::QUAT_W, o.w);
-                    measurement.set_row(meas_constants::QUAT_X, o.x);
-                    measurement.set_row(meas_constants::QUAT_Y, o.y);
-                    measurement.set_row(meas_constants::QUAT_Z, o.z);
+                if let Some(gyro) = observation_input.gyro_raw {
+                    measurement.set_row(meas_constants::GYRO_X, gyro.x);
+                    measurement.set_row(meas_constants::GYRO_Y, gyro.y);
+                    measurement.set_row(meas_constants::GYRO_Z, gyro.z);
+                }
+                if let Some(quat) = observation_input.orientation {
+                    measurement.set_row(meas_constants::QUAT_W, quat.w);
+                    measurement.set_row(meas_constants::QUAT_X, quat.x);
+                    measurement.set_row(meas_constants::QUAT_Y, quat.y);
+                    measurement.set_row(meas_constants::QUAT_Z, quat.z);
                 }
             });
 
@@ -361,15 +415,24 @@ impl EkfManager {
                     mat.set(meas_constants::DEPTH, constants::POS_Z, 1.0);
                 }
 
-                // UPOS measurement (position)
-                if observation_input.upos.is_some() {
-                    mat.set(meas_constants::UPOS_X, constants::POS_X, 1.0);
-                    mat.set(meas_constants::UPOS_Y, constants::POS_Y, 1.0);
-                    mat.set(meas_constants::UPOS_Z, constants::POS_Z, 1.0);
+                // Position measurement
+                if observation_input.pos.is_some() {
+                    mat.set(meas_constants::POS_X, constants::POS_X, 1.0);
+                    mat.set(meas_constants::POS_Y, constants::POS_Y, 1.0);
+                    mat.set(meas_constants::POS_Z, constants::POS_Z, 1.0);
+                }
+
+                // Velocity measurement
+                // FIXME: Doesnt account for quat rotation
+                if observation_input.velo.is_some() {
+                    mat.set(meas_constants::VEL_X, constants::VEL_X, 1.0);
+                    mat.set(meas_constants::VEL_Y, constants::VEL_Y, 1.0);
+                    mat.set(meas_constants::VEL_Z, constants::VEL_Z, 1.0);
                 }
 
                 // Accelerometer measurement
-                if observation_input.acc.is_some() {
+                // FIXME: Only accounts for quat rotation of gravity, not of ACC_{X,Y,Z} state
+                if observation_input.accel.is_some() {
                     // Accelerometer measures: acc = true_acc + bias_acc + gravity_body
                     mat.set(meas_constants::ACC_X, constants::ACC_X, 1.0);
                     mat.set(meas_constants::ACC_Y, constants::ACC_Y, 1.0);
@@ -399,7 +462,7 @@ impl EkfManager {
                     // gravity_body = q.inverse() * gravity_world * q
                     // Compute partial derivatives of gravity_body with respect to each quaternion component
 
-                    // FIXME: This is sus
+                    // FIXME: This is a little sus, please carefully validate
                     let dg_dqw = Vec3A::new(-2.0 * g * q_y, 2.0 * g * q_x, 0.0);
                     let dg_dqx = Vec3A::new(2.0 * g * q_y, 2.0 * g * q_z, -2.0 * g * q_w);
                     let dg_dqy = Vec3A::new(-2.0 * g * q_w, 0.0, 2.0 * g * q_z);
@@ -458,15 +521,20 @@ impl EkfManager {
                 if observation_input.depth.is_some() {
                     noise_vec[meas_constants::DEPTH] = self.config.depth_noise;
                 }
-                if observation_input.upos.is_some() {
-                    noise_vec[meas_constants::UPOS_X] = self.config.upos_noise;
-                    noise_vec[meas_constants::UPOS_Y] = self.config.upos_noise;
-                    noise_vec[meas_constants::UPOS_Z] = self.config.upos_noise;
+                if observation_input.pos.is_some() {
+                    noise_vec[meas_constants::POS_X] = self.config.pos_noise;
+                    noise_vec[meas_constants::POS_Y] = self.config.pos_noise;
+                    noise_vec[meas_constants::POS_Z] = self.config.pos_noise;
                 }
-                if observation_input.acc.is_some() {
-                    noise_vec[meas_constants::ACC_X] = self.config.acc_noise;
-                    noise_vec[meas_constants::ACC_Y] = self.config.acc_noise;
-                    noise_vec[meas_constants::ACC_Z] = self.config.acc_noise;
+                if observation_input.velo.is_some() {
+                    noise_vec[meas_constants::VEL_X] = self.config.velo_noise;
+                    noise_vec[meas_constants::VEL_Y] = self.config.velo_noise;
+                    noise_vec[meas_constants::VEL_Z] = self.config.velo_noise;
+                }
+                if observation_input.accel.is_some() {
+                    noise_vec[meas_constants::ACC_X] = self.config.accel_noise;
+                    noise_vec[meas_constants::ACC_Y] = self.config.accel_noise;
+                    noise_vec[meas_constants::ACC_Z] = self.config.accel_noise;
                 }
                 if observation_input.gyro_raw.is_some() {
                     noise_vec[meas_constants::GYRO_X] = self.config.gyro_noise;
@@ -487,25 +555,26 @@ impl EkfManager {
 /// If initial measurements are available, they can be used here for better initialization.
 pub fn initialize_state_vector(filter: &mut Filter, initial_guess: &Measurement) {
     filter.state_vector_mut().apply(|state| {
-        state[constants::POS_X] = initial_guess.upos.map(|it| it.x).unwrap_or(0.0);
-        state[constants::POS_Y] = initial_guess.upos.map(|it| it.y).unwrap_or(0.0);
+        state[constants::POS_X] = initial_guess.pos.map(|it| it.x).unwrap_or(0.0);
+        state[constants::POS_Y] = initial_guess.pos.map(|it| it.y).unwrap_or(0.0);
         state[constants::POS_Z] = initial_guess
             .depth
-            .or(initial_guess.upos.map(|it| it.z))
+            .or(initial_guess.pos.map(|it| it.z))
             .unwrap_or(0.0);
 
-        state[constants::VEL_X] = 0.0;
-        state[constants::VEL_Y] = 0.0;
-        state[constants::VEL_Z] = 0.0;
+        state[constants::VEL_X] = initial_guess.velo.map(|it| it.x).unwrap_or(0.0);
+        state[constants::VEL_Y] = initial_guess.velo.map(|it| it.y).unwrap_or(0.0);
+        state[constants::VEL_Z] = initial_guess.velo.map(|it| it.z).unwrap_or(0.0);
 
-        state[constants::ACC_X] = initial_guess.acc.map(|it| it.x).unwrap_or(0.0);
-        state[constants::ACC_Y] = initial_guess.acc.map(|it| it.y).unwrap_or(0.0);
-        state[constants::ACC_Z] = initial_guess.acc.map(|it| it.z).unwrap_or(0.0);
+        state[constants::ACC_X] = initial_guess.accel.map(|it| it.x).unwrap_or(0.0);
+        state[constants::ACC_Y] = initial_guess.accel.map(|it| it.y).unwrap_or(0.0);
+        state[constants::ACC_Z] = initial_guess.accel.map(|it| it.z).unwrap_or(0.0);
 
-        state[constants::QUAT_W] = initial_guess.orientation.map(|it| it.w).unwrap_or(0.0);
+        state[constants::QUAT_W] = initial_guess.orientation.map(|it| it.w).unwrap_or(1.0);
         state[constants::QUAT_X] = initial_guess.orientation.map(|it| it.x).unwrap_or(0.0);
         state[constants::QUAT_Y] = initial_guess.orientation.map(|it| it.y).unwrap_or(0.0);
         state[constants::QUAT_Z] = initial_guess.orientation.map(|it| it.z).unwrap_or(0.0);
+
         state[constants::ANGVEL_X] = initial_guess.gyro_raw.map(|it| it.x).unwrap_or(0.0);
         state[constants::ANGVEL_Y] = initial_guess.gyro_raw.map(|it| it.y).unwrap_or(0.0);
         state[constants::ANGVEL_Z] = initial_guess.gyro_raw.map(|it| it.z).unwrap_or(0.0);
@@ -524,7 +593,7 @@ pub fn initialize_state_vector(filter: &mut Filter, initial_guess: &Measurement)
 pub fn initialize_estimate_covariance(filter: &mut Filter, initial_guess: &Measurement) {
     filter.estimate_covariance_mut().apply(|mat| {
         mat.clear();
-        if initial_guess.upos.is_some() {
+        if initial_guess.pos.is_some() {
             // Set moderate uncertainty for positions
             mat.set(constants::POS_X, constants::POS_X, 1.0);
             mat.set(constants::POS_Y, constants::POS_Y, 1.0);
@@ -652,8 +721,13 @@ pub fn get_depth() -> Option<f32> {
     Some(0.0)
 }
 
-pub fn get_upos() -> Option<Vec3A> {
+pub fn get_pos() -> Option<Vec3A> {
     // Replace with actual UGPS position
+    Some(Vec3A::new(0.0, 0.0, 0.0))
+}
+
+pub fn get_velo() -> Option<Vec3A> {
+    // Replace with actual DVL velocity
     Some(Vec3A::new(0.0, 0.0, 0.0))
 }
 
@@ -678,8 +752,9 @@ pub fn main() {
     let config = RovConfig {
         process_noise: 0.1,
         depth_noise: 0.03,
-        upos_noise: 0.5,
-        acc_noise: 0.3,
+        pos_noise: 0.5,
+        velo_noise: 0.1,
+        accel_noise: 0.3,
         gyro_noise: 0.2,
         orientation_noise: 0.1,
     };
@@ -692,15 +767,17 @@ pub fn main() {
         ekf.predict(STEP_DURATION);
         // Get measurements using dummy functions
         let depth = get_depth();
-        let upos = get_upos();
-        let acc = get_accel();
+        let pos = get_pos();
+        let velo = get_velo();
+        let accel = get_accel();
         let gyro_raw = get_gyro_raw();
         let orientation = get_orientation();
         // Update measurements
         ekf.update_measurements(Measurement {
             depth,
-            upos,
-            acc,
+            pos,
+            velo,
+            accel,
             gyro_raw,
             orientation,
         });
