@@ -3,6 +3,9 @@ use minikalman::extended::builder::KalmanFilterBuilder;
 use minikalman::extended::builder::{KalmanFilterObservationType, KalmanFilterType};
 use minikalman::prelude::*;
 
+// TODO: try to get rid of everything thats in local space
+// TODO: Consider not traking orientation
+
 // Constants for state indices
 // X, Y, Z are world space axes
 pub mod constants {
@@ -233,21 +236,25 @@ impl EkfManager {
             mat.clear();
 
             // Position derivatives with respect to position and velocity
-            for i in 0..3 {
-                mat.set(constants::POS_X + i, constants::POS_X + i, 1.0);
-                mat.set(constants::POS_X + i, constants::VEL_X + i, delta_t);
-            }
+            mat.set(constants::POS_X, constants::POS_X, 1.0);
+            mat.set(constants::POS_X, constants::VEL_X, delta_t);
+            mat.set(constants::POS_Y, constants::POS_Y, 1.0);
+            mat.set(constants::POS_Y, constants::VEL_Y, delta_t);
+            mat.set(constants::POS_Z, constants::POS_Z, 1.0);
+            mat.set(constants::POS_Z, constants::VEL_Z, delta_t);
 
             // Velocity derivatives with respect to velocity and acceleration
-            for i in 0..3 {
-                mat.set(constants::VEL_X + i, constants::VEL_X + i, 1.0);
-                mat.set(constants::VEL_X + i, constants::ACC_X + i, delta_t);
-            }
+            mat.set(constants::VEL_X, constants::VEL_X, 1.0);
+            mat.set(constants::VEL_X, constants::ACC_X, delta_t);
+            mat.set(constants::VEL_Y, constants::VEL_Y, 1.0);
+            mat.set(constants::VEL_Y, constants::ACC_Y, delta_t);
+            mat.set(constants::VEL_Z, constants::VEL_Z, 1.0);
+            mat.set(constants::VEL_Z, constants::ACC_Z, delta_t);
 
             // Acceleration derivatives (assuming constant acceleration)
-            for i in 0..3 {
-                mat.set(constants::ACC_X + i, constants::ACC_X + i, 1.0);
-            }
+            mat.set(constants::ACC_X, constants::ACC_X, 1.0);
+            mat.set(constants::ACC_Y, constants::ACC_Y, 1.0);
+            mat.set(constants::ACC_Z, constants::ACC_Z, 1.0);
 
             // Compute the Jacobian for quaternion dynamics
             let half_dt = 0.5 * delta_t;
@@ -257,27 +264,29 @@ impl EkfManager {
             mat.set(constants::QUAT_W, constants::QUAT_Z, -half_dt * omega_z);
             mat.set(constants::QUAT_X, constants::QUAT_W, half_dt * omega_x);
             mat.set(constants::QUAT_X, constants::QUAT_X, 1.0);
-            mat.set(constants::QUAT_X, constants::QUAT_Y, half_dt * omega_z);
-            mat.set(constants::QUAT_X, constants::QUAT_Z, -half_dt * omega_y);
+            mat.set(constants::QUAT_X, constants::QUAT_Y, -half_dt * omega_z);
+            mat.set(constants::QUAT_X, constants::QUAT_Z, half_dt * omega_y);
             mat.set(constants::QUAT_Y, constants::QUAT_W, half_dt * omega_y);
-            mat.set(constants::QUAT_Y, constants::QUAT_X, -half_dt * omega_z);
+            mat.set(constants::QUAT_Y, constants::QUAT_X, half_dt * omega_z);
             mat.set(constants::QUAT_Y, constants::QUAT_Y, 1.0);
-            mat.set(constants::QUAT_Y, constants::QUAT_Z, half_dt * omega_x);
+            mat.set(constants::QUAT_Y, constants::QUAT_Z, -half_dt * omega_x);
             mat.set(constants::QUAT_Z, constants::QUAT_W, half_dt * omega_z);
-            mat.set(constants::QUAT_Z, constants::QUAT_X, half_dt * omega_y);
-            mat.set(constants::QUAT_Z, constants::QUAT_Y, -half_dt * omega_x);
+            mat.set(constants::QUAT_Z, constants::QUAT_X, -half_dt * omega_y);
+            mat.set(constants::QUAT_Z, constants::QUAT_Y, half_dt * omega_x);
             mat.set(constants::QUAT_Z, constants::QUAT_Z, 1.0);
 
             // Angular velocity derivatives (assuming constant angular velocity)
-            for i in 0..3 {
-                mat.set(constants::ANGVEL_X + i, constants::ANGVEL_X + i, 1.0);
-            }
+            mat.set(constants::ANGVEL_X, constants::ANGVEL_X, 1.0);
+            mat.set(constants::ANGVEL_Y, constants::ANGVEL_Y, 1.0);
+            mat.set(constants::ANGVEL_Z, constants::ANGVEL_Z, 1.0);
 
             // Bias terms Jacobian (assuming constant biases)
-            for i in 0..3 {
-                mat.set(constants::BIAS_ACC_X + i, constants::BIAS_ACC_X + i, 1.0);
-                mat.set(constants::BIAS_GYRO_X + i, constants::BIAS_GYRO_X + i, 1.0);
-            }
+            mat.set(constants::BIAS_ACC_X, constants::BIAS_ACC_X, 1.0);
+            mat.set(constants::BIAS_ACC_Y, constants::BIAS_ACC_Y, 1.0);
+            mat.set(constants::BIAS_ACC_Z, constants::BIAS_ACC_Z, 1.0);
+            mat.set(constants::BIAS_GYRO_X, constants::BIAS_GYRO_X, 1.0);
+            mat.set(constants::BIAS_GYRO_Y, constants::BIAS_GYRO_Y, 1.0);
+            mat.set(constants::BIAS_GYRO_Z, constants::BIAS_GYRO_Z, 1.0);
         });
     }
 
@@ -423,66 +432,74 @@ impl EkfManager {
                 }
 
                 // Velocity measurement
-                // FIXME: Doesnt account for quat rotation
                 if observation_input.velo.is_some() {
                     mat.set(meas_constants::VEL_X, constants::VEL_X, 1.0);
                     mat.set(meas_constants::VEL_Y, constants::VEL_Y, 1.0);
                     mat.set(meas_constants::VEL_Z, constants::VEL_Z, 1.0);
+
+                    let q_w = self.filter.state_vector().get_row(constants::QUAT_W);
+                    let q_x = self.filter.state_vector().get_row(constants::QUAT_X);
+                    let q_y = self.filter.state_vector().get_row(constants::QUAT_Y);
+                    let q_z = self.filter.state_vector().get_row(constants::QUAT_Z);
+
+                    // Derivatives of velocity observation w.r. to quaternion
+                    mat.set(meas_constants::VEL_X, constants::QUAT_W, -q_y);
+                    mat.set(meas_constants::VEL_X, constants::QUAT_X, q_w);
+                    mat.set(meas_constants::VEL_X, constants::QUAT_Y, -q_z);
+                    mat.set(meas_constants::VEL_X, constants::QUAT_Z, q_x);
+
+                    mat.set(meas_constants::VEL_Y, constants::QUAT_W, q_x);
+                    mat.set(meas_constants::VEL_Y, constants::QUAT_X, q_z);
+                    mat.set(meas_constants::VEL_Y, constants::QUAT_Y, q_w);
+                    mat.set(meas_constants::VEL_Y, constants::QUAT_Z, -q_x);
+
+                    mat.set(meas_constants::VEL_Z, constants::QUAT_W, -q_x);
+                    mat.set(meas_constants::VEL_Z, constants::QUAT_X, q_y);
+                    mat.set(meas_constants::VEL_Z, constants::QUAT_Y, q_z);
+                    mat.set(meas_constants::VEL_Z, constants::QUAT_Z, q_w);
                 }
 
                 // Accelerometer measurement
-                // FIXME: Only accounts for quat rotation of gravity, not of ACC_{X,Y,Z} state
                 if observation_input.accel.is_some() {
-                    // Accelerometer measures: acc = true_acc + bias_acc + gravity_body
-                    mat.set(meas_constants::ACC_X, constants::ACC_X, 1.0);
-                    mat.set(meas_constants::ACC_Y, constants::ACC_Y, 1.0);
-                    mat.set(meas_constants::ACC_Z, constants::ACC_Z, 1.0);
+                    let q_w = self.filter.state_vector().get_row(constants::QUAT_W);
+                    let q_x = self.filter.state_vector().get_row(constants::QUAT_X);
+                    let q_y = self.filter.state_vector().get_row(constants::QUAT_Y);
+                    let q_z = self.filter.state_vector().get_row(constants::QUAT_Z);
 
+                    // Jacobian for acceleration observation
+                    // Includes derivatives w.r. to acceleration, bias, and quaternion
+                    let g = 9.81;
+
+                    // For each axis, compute the Jacobian entries
+                    // Using the chain rule and quaternion derivatives
+
+                    // X-axis acceleration
+                    mat.set(meas_constants::ACC_X, constants::ACC_X, 1.0);
                     mat.set(meas_constants::ACC_X, constants::BIAS_ACC_X, 1.0);
+
+                    // Derivatives w.r. to quaternion elements
+                    mat.set(meas_constants::ACC_X, constants::QUAT_W, -2.0 * g * q_y);
+                    mat.set(meas_constants::ACC_X, constants::QUAT_X, 2.0 * g * q_w);
+                    mat.set(meas_constants::ACC_X, constants::QUAT_Y, -2.0 * g * q_z);
+                    mat.set(meas_constants::ACC_X, constants::QUAT_Z, 2.0 * g * q_x);
+
+                    // Y-axis acceleration
+                    mat.set(meas_constants::ACC_Y, constants::ACC_Y, 1.0);
                     mat.set(meas_constants::ACC_Y, constants::BIAS_ACC_Y, 1.0);
+
+                    mat.set(meas_constants::ACC_Y, constants::QUAT_W, 2.0 * g * q_x);
+                    mat.set(meas_constants::ACC_Y, constants::QUAT_X, 2.0 * g * q_z);
+                    mat.set(meas_constants::ACC_Y, constants::QUAT_Y, 2.0 * g * q_w);
+                    mat.set(meas_constants::ACC_Y, constants::QUAT_Z, -2.0 * g * q_x);
+
+                    // Z-axis acceleration
+                    mat.set(meas_constants::ACC_Z, constants::ACC_Z, 1.0);
                     mat.set(meas_constants::ACC_Z, constants::BIAS_ACC_Z, 1.0);
 
-                    // Compute partial derivatives of gravity_body with respect to quaternion
-                    let q = Quat::from_xyzw(
-                        self.filter.state_vector().get_row(constants::QUAT_X),
-                        self.filter.state_vector().get_row(constants::QUAT_Y),
-                        self.filter.state_vector().get_row(constants::QUAT_Z),
-                        self.filter.state_vector().get_row(constants::QUAT_W),
-                    )
-                    .normalize();
-
-                    let gravity_world = Vec3A::new(0.0, 0.0, 9.81);
-                    let g = gravity_world.z; // 9.81
-                    let q_w = q.w;
-                    let q_x = q.x;
-                    let q_y = q.y;
-                    let q_z = q.z;
-
-                    // Analytical partial derivatives based on quaternion rotation
-                    // gravity_body = q.inverse() * gravity_world * q
-                    // Compute partial derivatives of gravity_body with respect to each quaternion component
-
-                    // FIXME: This is a little sus, please carefully validate
-                    let dg_dqw = Vec3A::new(-2.0 * g * q_y, 2.0 * g * q_x, 0.0);
-                    let dg_dqx = Vec3A::new(2.0 * g * q_y, 2.0 * g * q_z, -2.0 * g * q_w);
-                    let dg_dqy = Vec3A::new(-2.0 * g * q_w, 0.0, 2.0 * g * q_z);
-                    let dg_dqz = Vec3A::new(0.0, -2.0 * g * q_x, 2.0 * g * q_y);
-
-                    // Set partial derivatives in the Jacobian matrix
-                    mat.set(meas_constants::ACC_X, constants::QUAT_W, dg_dqw.x);
-                    mat.set(meas_constants::ACC_X, constants::QUAT_X, dg_dqx.x);
-                    mat.set(meas_constants::ACC_X, constants::QUAT_Y, dg_dqy.x);
-                    mat.set(meas_constants::ACC_X, constants::QUAT_Z, dg_dqz.x);
-
-                    mat.set(meas_constants::ACC_Y, constants::QUAT_W, dg_dqw.y);
-                    mat.set(meas_constants::ACC_Y, constants::QUAT_X, dg_dqx.y);
-                    mat.set(meas_constants::ACC_Y, constants::QUAT_Y, dg_dqy.y);
-                    mat.set(meas_constants::ACC_Y, constants::QUAT_Z, dg_dqz.y);
-
-                    mat.set(meas_constants::ACC_Z, constants::QUAT_W, dg_dqw.z);
-                    mat.set(meas_constants::ACC_Z, constants::QUAT_X, dg_dqx.z);
-                    mat.set(meas_constants::ACC_Z, constants::QUAT_Y, dg_dqy.z);
-                    mat.set(meas_constants::ACC_Z, constants::QUAT_Z, dg_dqz.z);
+                    mat.set(meas_constants::ACC_Z, constants::QUAT_W, -2.0 * g * q_x);
+                    mat.set(meas_constants::ACC_Z, constants::QUAT_X, 2.0 * g * q_y);
+                    mat.set(meas_constants::ACC_Z, constants::QUAT_Y, -2.0 * g * q_z);
+                    mat.set(meas_constants::ACC_Z, constants::QUAT_Z, 2.0 * g * q_w);
                 }
 
                 // Gyro measurement

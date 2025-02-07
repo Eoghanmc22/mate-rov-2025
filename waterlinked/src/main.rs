@@ -1,3 +1,5 @@
+#![feature(coroutines, iter_from_coroutine)]
+
 pub mod kalman_filter;
 pub mod learn_compass;
 pub mod learn_reference_frame;

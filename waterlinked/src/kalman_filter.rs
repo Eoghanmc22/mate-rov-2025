@@ -1,4 +1,5 @@
 pub mod filter;
+pub mod simple_filter;
 
 use bevy::prelude::*;
 use common::components::{Robot, RobotId};
@@ -27,25 +28,25 @@ use crate::trajectory::RawPose;
 // Orientation Quat: (w, x, y, z)
 // Angular Velocity: (x, y, z)
 // Accelerometer Bias: (x, y, z)
-const NUM_STATES: usize = 16;
+// const NUM_STATES: usize = 16;
 
 // Thruster Force: (x, y, z)
 // Thruster Torque: (x, y, z)
-const NUM_CONTROLS: usize = 6;
+// const NUM_CONTROLS: usize = 6;
 
 // IMU Accel: (x, y, z)
 // Depth: (z)
 // UGPS: (x, y, z)
 // Orientation: (w, x, y, z)
-const NUM_OBSERVATIONS: usize = 11;
+// const NUM_OBSERVATIONS: usize = 11;
 
 pub struct KalmanPlugin;
 
 impl Plugin for KalmanPlugin {
     fn build(&self, app: &mut App) {
-        let builder = KalmanFilterBuilder::<NUM_STATES, f32>::default();
-        let mut filter = builder.build();
-        let mut measurement = builder.observations().build::<NUM_OBSERVATIONS>();
+        // let builder = KalmanFilterBuilder::<NUM_STATES, f32>::default();
+        // let mut filter = builder.build();
+        // let mut measurement = builder.observations().build::<NUM_OBSERVATIONS>();
 
         //
     }
