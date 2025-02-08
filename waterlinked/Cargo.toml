@@ -30,6 +30,8 @@ egui_plot = { workspace = true }
 bevy_egui = { workspace = true }
 bevy-inspector-egui = { workspace = true }
 minikalman = { version = "0.6", features = ["std"] }
+nalgebra = { version = "0.33", features = ["convert-glam027"] }
+adskalman = "0.16"
 rand_distr = { version = "0.5" }
 
 [dev-dependencies]

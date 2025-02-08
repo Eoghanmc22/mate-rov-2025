@@ -1,7 +1,6 @@
+use adskalman::{KalmanFilterNoControl, ObservationModel, TransitionModelLinearNoControl};
 use bevy::math::Vec3A;
-use minikalman::prelude::*;
-use minikalman::regular::builder::{KalmanFilterBuilder, KalmanFilterControlType};
-use minikalman::regular::builder::{KalmanFilterObservationType, KalmanFilterType};
+use nalgebra::{Const, Matrix, OMatrix, OVector, Owned};
 
 // Constants for state indices
 // X, Y, Z are world space axes
@@ -81,399 +80,202 @@ impl Default for KalmanConfig {
     }
 }
 
-type Filter = KalmanFilterType<{ state_constants::NUM_STATES }, f32>;
-type Observation = KalmanFilterObservationType<
-    { state_constants::NUM_STATES },
-    { meas_constants::NUM_OBSERVATIONS },
-    f32,
->;
-type ControlInput =
-    KalmanFilterControlType<{ state_constants::NUM_STATES }, { ctrl_constants::NUM_CONTROLS }, f32>;
+type R = f32;
+type SS = Const<{ state_constants::NUM_STATES }>;
+type OS = Const<{ meas_constants::NUM_OBSERVATIONS }>;
 
-/// Manager for the Extended Kalman Filter.
-pub struct EkfManager {
-    filter: Filter,
-    measurement: Observation,
-    input: ControlInput,
-    config: KalmanConfig,
+struct ROVTransitionModel {
+    transition: Matrix<R, SS, SS, Owned<R, SS, SS>>,
+    transition_transpose: Matrix<R, SS, SS, Owned<R, SS, SS>>,
+    process_covariance: Matrix<R, SS, SS, Owned<R, SS, SS>>,
 }
 
-impl EkfManager {
-    /// Creates a new EKF manager with the given configuration.
-    pub fn new(config: KalmanConfig, initial_guess: Measurement) -> Self {
-        let builder = KalmanFilterBuilder::<{ state_constants::NUM_STATES }, f32>::default();
-        let mut filter = builder.build();
-        let measurement = builder
-            .observations()
-            .build::<{ meas_constants::NUM_OBSERVATIONS }>();
-        let input = builder
-            .controls()
-            .build::<{ ctrl_constants::NUM_CONTROLS }>();
+impl ROVTransitionModel {
+    pub fn new(config: &KalmanConfig, delta_t: R) -> Self {
+        let mut transition = OMatrix::<R, SS, SS>::zeros();
 
-        // Initialize state vector
-        initialize_state_vector(&mut filter, &initial_guess);
+        // Position with respect to position, velocity, and accel
+        transition[(state_constants::POS_X, state_constants::POS_X)] = 1.0;
+        transition[(state_constants::POS_X, state_constants::VEL_X)] = delta_t;
+        transition[(state_constants::POS_X, state_constants::ACC_X)] = delta_t * delta_t / 2.0;
+        transition[(state_constants::POS_Y, state_constants::POS_Y)] = 1.0;
+        transition[(state_constants::POS_Y, state_constants::VEL_Y)] = delta_t;
+        transition[(state_constants::POS_Y, state_constants::ACC_Y)] = delta_t * delta_t / 2.0;
+        transition[(state_constants::POS_Z, state_constants::POS_Z)] = 1.0;
+        transition[(state_constants::POS_Z, state_constants::VEL_Z)] = delta_t;
+        transition[(state_constants::POS_Z, state_constants::ACC_Z)] = delta_t * delta_t / 2.0;
 
-        // Initialize covariance matrix with appropriate uncertainties
-        initialize_estimate_covariance(&mut filter, &initial_guess);
+        // Velocity with respect to velocity and acceleration
+        transition[(state_constants::VEL_X, state_constants::VEL_X)] = 1.0;
+        transition[(state_constants::VEL_X, state_constants::ACC_X)] = delta_t;
+        transition[(state_constants::VEL_Y, state_constants::VEL_Y)] = 1.0;
+        transition[(state_constants::VEL_Y, state_constants::ACC_Y)] = delta_t;
+        transition[(state_constants::VEL_Z, state_constants::VEL_Z)] = 1.0;
+        transition[(state_constants::VEL_Z, state_constants::ACC_Z)] = delta_t;
 
-        // Initialize process noise with different variances per state variable
-        initialize_process_noise(&mut filter, &config);
+        // Acceleration (assuming constant acceleration)
+        transition[(state_constants::ACC_X, state_constants::ACC_X)] = 1.0;
+        transition[(state_constants::ACC_Y, state_constants::ACC_Y)] = 1.0;
+        transition[(state_constants::ACC_Z, state_constants::ACC_Z)] = 1.0;
 
-        Self {
-            filter,
-            measurement,
-            input,
-            config,
-        }
-    }
+        // Bias terms (assuming constant biases)
+        transition[(state_constants::BIAS_ACC_X, state_constants::BIAS_ACC_X)] = 1.0;
+        transition[(state_constants::BIAS_ACC_Y, state_constants::BIAS_ACC_Y)] = 1.0;
+        transition[(state_constants::BIAS_ACC_Z, state_constants::BIAS_ACC_Z)] = 1.0;
 
-    /// Predicts the state at the next time step.
-    pub fn predict(&mut self, delta_t: f32) {
-        self.compute_transition_matrix(delta_t);
+        let transition_transpose = transition.transpose();
 
-        self.filter.predict_tuned(1.0);
-    }
-
-    fn compute_transition_matrix(&mut self, delta_t: f32) {
-        self.filter.state_transition_mut().apply(|mat| {
-            // Clear the matrix
-            mat.clear();
-
-            // Position with respect to position, velocity, and accel
-            mat.set(state_constants::POS_X, state_constants::POS_X, 1.0);
-            mat.set(state_constants::POS_X, state_constants::VEL_X, delta_t);
-            mat.set(
-                state_constants::POS_X,
-                state_constants::ACC_X,
-                delta_t * delta_t / 2.0,
-            );
-            mat.set(state_constants::POS_Y, state_constants::POS_Y, 1.0);
-            mat.set(state_constants::POS_Y, state_constants::VEL_Y, delta_t);
-            mat.set(
-                state_constants::POS_Y,
-                state_constants::ACC_Y,
-                delta_t * delta_t / 2.0,
-            );
-            mat.set(state_constants::POS_Z, state_constants::POS_Z, 1.0);
-            mat.set(state_constants::POS_Z, state_constants::VEL_Z, delta_t);
-            mat.set(
-                state_constants::POS_Z,
-                state_constants::ACC_Z,
-                delta_t * delta_t / 2.0,
-            );
-
-            // Velocity with respect to velocity and acceleration
-            mat.set(state_constants::VEL_X, state_constants::VEL_X, 1.0);
-            mat.set(state_constants::VEL_X, state_constants::ACC_X, delta_t);
-            mat.set(state_constants::VEL_Y, state_constants::VEL_Y, 1.0);
-            mat.set(state_constants::VEL_Y, state_constants::ACC_Y, delta_t);
-            mat.set(state_constants::VEL_Z, state_constants::VEL_Z, 1.0);
-            mat.set(state_constants::VEL_Z, state_constants::ACC_Z, delta_t);
-
-            // Acceleration (assuming constant acceleration)
-            mat.set(state_constants::ACC_X, state_constants::ACC_X, 1.0);
-            mat.set(state_constants::ACC_Y, state_constants::ACC_Y, 1.0);
-            mat.set(state_constants::ACC_Z, state_constants::ACC_Z, 1.0);
-
-            // Bias terms (assuming constant biases)
-            mat.set(
-                state_constants::BIAS_ACC_X,
-                state_constants::BIAS_ACC_X,
-                1.0,
-            );
-            mat.set(
-                state_constants::BIAS_ACC_Y,
-                state_constants::BIAS_ACC_Y,
-                1.0,
-            );
-            mat.set(
-                state_constants::BIAS_ACC_Z,
-                state_constants::BIAS_ACC_Z,
-                1.0,
-            );
-        })
-    }
-
-    /// Handles partial measurements by updating only the available measurements.
-    pub fn update_measurements(&mut self, observation_input: Measurement) {
-        self.measurement
-            .measurement_vector_mut()
-            .apply(|measurement| {
-                // Reset measurement vector to zero before applying new measurements
-                measurement.clear();
-
-                // Update available measurements
-                if let Some(depth) = observation_input.depth {
-                    measurement.set_row(meas_constants::DEPTH, depth);
-                }
-                if let Some(pos) = observation_input.pos {
-                    measurement.set_row(meas_constants::POS_X, pos.x);
-                    measurement.set_row(meas_constants::POS_Y, pos.y);
-                    measurement.set_row(meas_constants::POS_Z, pos.z);
-                }
-                if let Some(velo) = observation_input.velo {
-                    measurement.set_row(meas_constants::VEL_X, velo.x);
-                    measurement.set_row(meas_constants::VEL_Y, velo.y);
-                    measurement.set_row(meas_constants::VEL_Z, velo.z);
-                }
-                if let Some(accel) = observation_input.accel {
-                    measurement.set_row(meas_constants::ACC_X, accel.x);
-                    measurement.set_row(meas_constants::ACC_Y, accel.y);
-                    measurement.set_row(meas_constants::ACC_Z, accel.z);
-                }
-            });
-
-        // Adjust measurement noise covariance for available and unavailable measurements
-        self.adjust_measurement_noise(&observation_input);
-
-        // Adjust measurement observation matrix for available and unavailable measurements
-        self.adjust_observation_matrix(&observation_input);
-
-        // Corrects the state based on the current measurement.
-        self.filter.correct(&mut self.measurement);
-    }
-
-    /// Adjusts the measurement noise covariance matrix based on available measurements.
-    /// Unavailable measurements are set to a high variance to effectively ignore them.
-    fn adjust_measurement_noise(&mut self, observation_input: &Measurement) {
-        self.measurement
-            .measurement_noise_covariance_mut()
-            .apply(|noise_vec| {
-                // Set high variance for all measurements initially
-                for i in 0..meas_constants::NUM_OBSERVATIONS {
-                    noise_vec[i] = 1e9; // Represents infinity
-                }
-
-                // Assign actual noise values to available measurements
-                if observation_input.depth.is_some() {
-                    noise_vec[meas_constants::DEPTH] = self.config.depth_noise;
-                }
-                if observation_input.pos.is_some() {
-                    noise_vec[meas_constants::POS_X] = self.config.pos_noise;
-                    noise_vec[meas_constants::POS_Y] = self.config.pos_noise;
-                    noise_vec[meas_constants::POS_Z] = self.config.pos_noise;
-                }
-                if observation_input.velo.is_some() {
-                    noise_vec[meas_constants::VEL_X] = self.config.velo_noise;
-                    noise_vec[meas_constants::VEL_Y] = self.config.velo_noise;
-                    noise_vec[meas_constants::VEL_Z] = self.config.velo_noise;
-                }
-                if observation_input.accel.is_some() {
-                    noise_vec[meas_constants::ACC_X] = self.config.accel_noise;
-                    noise_vec[meas_constants::ACC_Y] = self.config.accel_noise;
-                    noise_vec[meas_constants::ACC_Z] = self.config.accel_noise;
-                }
-            });
-    }
-
-    /// Initializes the observation matrtix to map the state vector into observation space
-    fn adjust_observation_matrix(&mut self, observation_input: &Measurement) {
-        self.measurement.observation_matrix_mut().apply(|mat| {
-            mat.clear();
-
-            if observation_input.depth.is_some() {
-                mat.set(meas_constants::DEPTH, state_constants::POS_Z, 1.0);
-            }
-
-            if observation_input.pos.is_some() {
-                mat.set(meas_constants::POS_X, state_constants::POS_X, 1.0);
-                mat.set(meas_constants::POS_Y, state_constants::POS_Y, 1.0);
-                mat.set(meas_constants::POS_Z, state_constants::POS_Z, 1.0);
-            }
-
-            if observation_input.velo.is_some() {
-                mat.set(meas_constants::VEL_X, state_constants::VEL_X, 1.0);
-                mat.set(meas_constants::VEL_Y, state_constants::VEL_Y, 1.0);
-                mat.set(meas_constants::VEL_Z, state_constants::VEL_Z, 1.0);
-            }
-
-            if observation_input.accel.is_some() {
-                mat.set(meas_constants::ACC_X, state_constants::ACC_X, 1.0);
-                mat.set(meas_constants::ACC_Y, state_constants::ACC_Y, 1.0);
-                mat.set(meas_constants::ACC_Z, state_constants::ACC_Z, 1.0);
-
-                mat.set(meas_constants::ACC_X, state_constants::BIAS_ACC_X, 1.0);
-                mat.set(meas_constants::ACC_Y, state_constants::BIAS_ACC_Y, 1.0);
-                mat.set(meas_constants::ACC_Z, state_constants::BIAS_ACC_Z, 1.0);
-            }
-        });
-    }
-
-    pub fn assume_state(&mut self, guess: Measurement) {
-        // Initialize state vector
-        initialize_state_vector(&mut self.filter, &guess);
-
-        // Initialize covariance matrix with appropriate uncertainties
-        initialize_estimate_covariance(&mut self.filter, &guess);
-    }
-}
-
-/// Initializes the state vector with default values.
-/// If initial measurements are available, they can be used here for better initialization.
-fn initialize_state_vector(filter: &mut Filter, initial_guess: &Measurement) {
-    filter.state_vector_mut().apply(|state| {
-        state[state_constants::POS_X] = initial_guess.pos.map(|it| it.x).unwrap_or(0.0);
-        state[state_constants::POS_Y] = initial_guess.pos.map(|it| it.y).unwrap_or(0.0);
-        state[state_constants::POS_Z] = initial_guess
-            .depth
-            .or(initial_guess.pos.map(|it| it.z))
-            .unwrap_or(0.0);
-
-        state[state_constants::VEL_X] = initial_guess.velo.map(|it| it.x).unwrap_or(0.0);
-        state[state_constants::VEL_Y] = initial_guess.velo.map(|it| it.y).unwrap_or(0.0);
-        state[state_constants::VEL_Z] = initial_guess.velo.map(|it| it.z).unwrap_or(0.0);
-
-        state[state_constants::ACC_X] = initial_guess.accel.map(|it| it.x).unwrap_or(0.0);
-        state[state_constants::ACC_Y] = initial_guess.accel.map(|it| it.y).unwrap_or(0.0);
-        state[state_constants::ACC_Z] = initial_guess.accel.map(|it| it.z).unwrap_or(0.0);
-
-        state[state_constants::BIAS_ACC_X] = 0.0;
-        state[state_constants::BIAS_ACC_Y] = 0.0;
-        state[state_constants::BIAS_ACC_Z] = 0.0;
-    });
-}
-
-/// Initializes the estimate covariance matrix with different uncertainties.
-fn initialize_estimate_covariance(filter: &mut Filter, initial_guess: &Measurement) {
-    filter.estimate_covariance_mut().apply(|mat| {
-        mat.clear();
-        if initial_guess.pos.is_some() {
-            // Set moderate uncertainty for positions
-            mat.set(state_constants::POS_X, state_constants::POS_X, 1.0);
-            mat.set(state_constants::POS_Y, state_constants::POS_Y, 1.0);
-            mat.set(state_constants::POS_Z, state_constants::POS_Z, 1.0);
-        } else {
-            // Set high uncertainty for positions
-            mat.set(state_constants::POS_X, state_constants::POS_X, 10.0);
-            mat.set(state_constants::POS_Y, state_constants::POS_Y, 10.0);
-            mat.set(state_constants::POS_Z, state_constants::POS_Z, 10.0);
-        }
-        // Moderate uncertainty for velocities
-        mat.set(state_constants::VEL_X, state_constants::VEL_X, 1.0);
-        mat.set(state_constants::VEL_Y, state_constants::VEL_Y, 1.0);
-        mat.set(state_constants::VEL_Z, state_constants::VEL_Z, 1.0);
-        // High uncertainty for accelerations
-        mat.set(state_constants::ACC_X, state_constants::ACC_X, 5.0);
-        mat.set(state_constants::ACC_Y, state_constants::ACC_Y, 5.0);
-        mat.set(state_constants::ACC_Z, state_constants::ACC_Z, 5.0);
-        // Low uncertainty for biases
-        mat.set(
-            state_constants::BIAS_ACC_X,
-            state_constants::BIAS_ACC_X,
-            0.1,
-        );
-        mat.set(
-            state_constants::BIAS_ACC_Y,
-            state_constants::BIAS_ACC_Y,
-            0.1,
-        );
-        mat.set(
-            state_constants::BIAS_ACC_Z,
-            state_constants::BIAS_ACC_Z,
-            0.1,
-        );
-    });
-}
-
-/// Initializes the process noise covariance matrix with different variances.
-fn initialize_process_noise(filter: &mut Filter, config: &KalmanConfig) {
-    filter.direct_process_noise_mut().apply(|mat| {
-        mat.clear();
-
+        let mut process_covariance = OMatrix::<R, SS, SS>::zeros();
         // Position process noise (e.g., due to external forces)
-        mat.set(
-            state_constants::POS_X,
-            state_constants::POS_X,
-            config.pos_process_noise,
-        );
-        mat.set(
-            state_constants::POS_Y,
-            state_constants::POS_Y,
-            config.pos_process_noise,
-        );
-        mat.set(
-            state_constants::POS_Z,
-            state_constants::POS_Z,
-            config.pos_process_noise,
-        );
+        process_covariance[(state_constants::POS_X, state_constants::POS_X)] =
+            config.pos_process_noise;
+        process_covariance[(state_constants::POS_Y, state_constants::POS_Y)] =
+            config.pos_process_noise;
+        process_covariance[(state_constants::POS_Z, state_constants::POS_Z)] =
+            config.pos_process_noise;
 
         // Velocity process noise
-        mat.set(
-            state_constants::VEL_X,
-            state_constants::VEL_X,
-            config.velo_process_noise,
-        );
-        mat.set(
-            state_constants::VEL_Y,
-            state_constants::VEL_Y,
-            config.velo_process_noise,
-        );
-        mat.set(
-            state_constants::VEL_Z,
-            state_constants::VEL_Z,
-            config.velo_process_noise,
-        );
+        process_covariance[(state_constants::VEL_X, state_constants::VEL_X)] =
+            config.velo_process_noise;
+        process_covariance[(state_constants::VEL_Y, state_constants::VEL_Y)] =
+            config.velo_process_noise;
+        process_covariance[(state_constants::VEL_Z, state_constants::VEL_Z)] =
+            config.velo_process_noise;
 
         // Acceleration process noise
-        mat.set(
-            state_constants::ACC_X,
-            state_constants::ACC_X,
-            config.accel_process_noise,
-        );
-        mat.set(
-            state_constants::ACC_Y,
-            state_constants::ACC_Y,
-            config.accel_process_noise,
-        );
-        mat.set(
-            state_constants::ACC_Z,
-            state_constants::ACC_Z,
-            config.accel_process_noise,
-        );
+        process_covariance[(state_constants::ACC_X, state_constants::ACC_X)] =
+            config.accel_process_noise;
+        process_covariance[(state_constants::ACC_Y, state_constants::ACC_Y)] =
+            config.accel_process_noise;
+        process_covariance[(state_constants::ACC_Z, state_constants::ACC_Z)] =
+            config.accel_process_noise;
 
         // Bias process noise (assuming small random walk)
-        mat.set(
-            state_constants::BIAS_ACC_X,
-            state_constants::BIAS_ACC_X,
-            config.accel_bias_process_noise,
-        );
-        mat.set(
-            state_constants::BIAS_ACC_Y,
-            state_constants::BIAS_ACC_Y,
-            config.accel_bias_process_noise,
-        );
-        mat.set(
-            state_constants::BIAS_ACC_Z,
-            state_constants::BIAS_ACC_Z,
-            config.accel_bias_process_noise,
-        );
-    });
+        process_covariance[(state_constants::BIAS_ACC_X, state_constants::BIAS_ACC_X)] =
+            config.accel_bias_process_noise;
+        process_covariance[(state_constants::BIAS_ACC_Y, state_constants::BIAS_ACC_Y)] =
+            config.accel_bias_process_noise;
+        process_covariance[(state_constants::BIAS_ACC_Z, state_constants::BIAS_ACC_Z)] =
+            config.accel_bias_process_noise;
+
+        Self {
+            transition,
+            transition_transpose,
+            process_covariance,
+        }
+    }
+}
+
+impl TransitionModelLinearNoControl<R, SS> for ROVTransitionModel {
+    fn F(&self) -> &Matrix<R, SS, SS, Owned<R, SS, SS>> {
+        &self.transition
+    }
+
+    fn FT(&self) -> &Matrix<R, SS, SS, Owned<R, SS, SS>> {
+        &self.transition_transpose
+    }
+
+    fn Q(&self) -> &Matrix<R, SS, SS, Owned<R, SS, SS>> {
+        &self.process_covariance
+    }
+}
+
+struct ROVObservationModel {
+    observation: Matrix<R, OS, SS, Owned<R, OS, SS>>,
+    observation_transpose: Matrix<R, SS, OS, Owned<R, SS, OS>>,
+    observation_covariance: Matrix<R, OS, OS, Owned<R, OS, OS>>,
+}
+
+impl ROVObservationModel {
+    pub fn new(config: &KalmanConfig) -> Self {
+        let mut observation = OMatrix::<R, OS, SS>::zeros();
+
+        observation[(meas_constants::DEPTH, state_constants::POS_Z)] = 1.0;
+
+        observation[(meas_constants::POS_X, state_constants::POS_X)] = 1.0;
+        observation[(meas_constants::POS_Y, state_constants::POS_Y)] = 1.0;
+        observation[(meas_constants::POS_Z, state_constants::POS_Z)] = 1.0;
+
+        observation[(meas_constants::VEL_X, state_constants::VEL_X)] = 1.0;
+        observation[(meas_constants::VEL_Y, state_constants::VEL_Y)] = 1.0;
+        observation[(meas_constants::VEL_Z, state_constants::VEL_Z)] = 1.0;
+
+        observation[(meas_constants::ACC_X, state_constants::ACC_X)] = 1.0;
+        observation[(meas_constants::ACC_Y, state_constants::ACC_Y)] = 1.0;
+        observation[(meas_constants::ACC_Z, state_constants::ACC_Z)] = 1.0;
+
+        observation[(meas_constants::ACC_X, state_constants::BIAS_ACC_X)] = 1.0;
+        observation[(meas_constants::ACC_Y, state_constants::BIAS_ACC_Y)] = 1.0;
+        observation[(meas_constants::ACC_Z, state_constants::BIAS_ACC_Z)] = 1.0;
+
+        let observation_transpose = observation.transpose();
+
+        let mut observation_noise = OVector::<R, OS>::zeros();
+        observation_noise[meas_constants::DEPTH] = config.depth_noise;
+        observation_noise[meas_constants::POS_X] = config.pos_noise;
+        observation_noise[meas_constants::POS_Y] = config.pos_noise;
+        observation_noise[meas_constants::POS_Z] = config.pos_noise;
+        observation_noise[meas_constants::VEL_X] = config.velo_noise;
+        observation_noise[meas_constants::VEL_Y] = config.velo_noise;
+        observation_noise[meas_constants::VEL_Z] = config.velo_noise;
+        observation_noise[meas_constants::ACC_X] = config.accel_noise;
+        observation_noise[meas_constants::ACC_Y] = config.accel_noise;
+        observation_noise[meas_constants::ACC_Z] = config.accel_noise;
+
+        let observation_covariance = OMatrix::<R, OS, OS>::from_diagonal(&observation_noise);
+
+        Self {
+            observation,
+            observation_transpose,
+            observation_covariance,
+        }
+    }
+}
+
+impl ObservationModel<R, SS, OS> for ROVObservationModel {
+    fn H(&self) -> &Matrix<R, OS, SS, Owned<R, OS, SS>> {
+        &self.observation
+    }
+
+    fn HT(&self) -> &Matrix<R, SS, OS, Owned<R, SS, OS>> {
+        &self.observation_transpose
+    }
+
+    fn R(&self) -> &Matrix<R, OS, OS, Owned<R, OS, OS>> {
+        &self.observation_covariance
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use core::f32;
 
+    use adskalman::{KalmanFilterNoControl, StateAndCovariance};
     use bevy::math::Vec3A;
-    use minikalman::matrix::{RowMajorSequentialData, RowVector};
+    use nalgebra::{OMatrix, OVector};
     use rand::random;
     use rand_distr::{Distribution, Normal};
 
     use crate::{
-        kalman_filter::simple_filter::{EkfManager, KalmanConfig, Measurement},
+        kalman_filter::simple_filter::{
+            KalmanConfig, Measurement, ROVObservationModel, ROVTransitionModel, OS,
+        },
         trajectory,
     };
 
-    use super::{state_constants, Filter};
+    use super::{state_constants, R, SS};
 
     #[test]
     fn simple_kalman_filter() {
-        // Example configuration
+        const STEP_DURATION: f32 = 0.1;
+
         let config = KalmanConfig::default();
-        let mut ekf = EkfManager::new(config, Default::default());
+        let transition_model = ROVTransitionModel::new(&config, STEP_DURATION);
+        let observation_model = ROVObservationModel::new(&config);
+        let filter = KalmanFilterNoControl::new(&transition_model, &observation_model);
+
         // Simulation loop
         let mut time = 0.0;
-        const STEP_DURATION: f32 = 0.1;
 
         let trajectory = std::iter::from_coroutine(
             #[coroutine]
@@ -493,7 +295,7 @@ mod tests {
                 let starting_y = random::<f32>() * 20.0;
                 let starting_z = random::<f32>() * 20.0;
 
-                for time_step in 0..3 {
+                for time_step in 0..1000 {
                     let time = STEP_DURATION * time_step as f32;
 
                     let x = (time * freq).cos() * radius + starting_x;
@@ -535,17 +337,48 @@ mod tests {
             },
         );
 
+        let mut cov_diag = OVector::<R, SS>::zeros();
+        // Set high uncertainty for positions
+        cov_diag[state_constants::POS_X] = 10.0;
+        cov_diag[state_constants::POS_Y] = 10.0;
+        cov_diag[state_constants::POS_Z] = 10.0;
+        // Moderate uncertainty for velocities
+        cov_diag[state_constants::VEL_X] = 1.0;
+        cov_diag[state_constants::VEL_Y] = 1.0;
+        cov_diag[state_constants::VEL_Z] = 1.0;
+        // High uncertainty for accelerations
+        cov_diag[state_constants::ACC_X] = 5.0;
+        cov_diag[state_constants::ACC_Y] = 5.0;
+        cov_diag[state_constants::ACC_Z] = 5.0;
+        // Low uncertainty for biases
+        cov_diag[state_constants::BIAS_ACC_X] = 0.1;
+        cov_diag[state_constants::BIAS_ACC_Y] = 0.1;
+        cov_diag[state_constants::BIAS_ACC_Z] = 0.1;
+
+        let mut state = StateAndCovariance::new(
+            OVector::<R, SS>::zeros(),
+            OMatrix::<R, SS, SS>::from_diagonal(&cov_diag),
+        );
         for measurement in trajectory {
-            print_state(&ekf.filter, time);
+            print_state(&state, time);
+
+            let observation = OVector::<R, OS>::from_vec(vec![
+                measurement.depth.unwrap(),
+                measurement.pos.unwrap().x,
+                measurement.pos.unwrap().y,
+                measurement.pos.unwrap().z,
+                measurement.velo.unwrap().x,
+                measurement.velo.unwrap().y,
+                measurement.velo.unwrap().z,
+                measurement.accel.unwrap().x,
+                measurement.accel.unwrap().y,
+                measurement.accel.unwrap().z,
+            ]);
 
             // Predict step
-            ekf.predict(STEP_DURATION);
-            print_state(&ekf.filter, time);
+            state = filter.step(&state, &observation).unwrap();
+            print_state(&state, time);
 
-            // Update measurements
-            ekf.update_measurements(measurement);
-            // Print state
-            print_state(&ekf.filter, time);
             time += STEP_DURATION;
         }
 
@@ -553,48 +386,33 @@ mod tests {
     }
 
     /// Prints the current state and covariance.
-    pub fn print_state(filter: &Filter, time: f32) {
-        let state = filter.state_vector();
-        let cov = filter.estimate_covariance();
-        let std_x = cov
-            .get_at(state_constants::POS_X, state_constants::POS_X)
-            .sqrt();
-        let std_y = cov
-            .get_at(state_constants::POS_Y, state_constants::POS_Y)
-            .sqrt();
-        let std_z = cov
-            .get_at(state_constants::POS_Z, state_constants::POS_Z)
-            .sqrt();
-        let std_vx = cov
-            .get_at(state_constants::VEL_X, state_constants::VEL_X)
-            .sqrt();
-        let std_vy = cov
-            .get_at(state_constants::VEL_Y, state_constants::VEL_Y)
-            .sqrt();
-        let std_vz = cov
-            .get_at(state_constants::VEL_Z, state_constants::VEL_Z)
-            .sqrt();
-        let std_ax = cov
-            .get_at(state_constants::ACC_X, state_constants::ACC_X)
-            .sqrt();
-        let std_ay = cov
-            .get_at(state_constants::ACC_Y, state_constants::ACC_Y)
-            .sqrt();
-        let std_az = cov
-            .get_at(state_constants::ACC_Z, state_constants::ACC_Z)
-            .sqrt();
+    pub fn print_state(state_cov: &StateAndCovariance<R, SS>, time: f32) {
+        let state = state_cov.state();
+        let cov = state_cov.covariance();
+        let std_x = cov[(state_constants::POS_X, state_constants::POS_X)].sqrt();
+        let std_y = cov[(state_constants::POS_Y, state_constants::POS_Y)].sqrt();
+        let std_z = cov[(state_constants::POS_Z, state_constants::POS_Z)].sqrt();
+        let std_vx = cov[(state_constants::VEL_X, state_constants::VEL_X)].sqrt();
+        let std_vy = cov[(state_constants::VEL_Y, state_constants::VEL_Y)].sqrt();
+        let std_vz = cov[(state_constants::VEL_Z, state_constants::VEL_Z)].sqrt();
+        let std_ax = cov[(state_constants::ACC_X, state_constants::ACC_X)].sqrt();
+        let std_ay = cov[(state_constants::ACC_Y, state_constants::ACC_Y)].sqrt();
+        let std_az = cov[(state_constants::ACC_Z, state_constants::ACC_Z)].sqrt();
         println!(
         "t={:.2} s\n      x={:.2} ± {:.4} m\n      y={:.2} ± {:.4} m\n      z={:.2} ± {:.4} m\n     vx={:.2} ± {:.4} m/s\n     vy={:.2} ± {:.4} m/s\n     vz={:.2} ± {:.4} m/s\n     ax={:.2} ± {:.4} m/s^2\n     ay={:.2} ± {:.4} m/s^2\n     az={:.2} ± {:.4} m/s^2",
         time,
-        state.get_row(state_constants::POS_X), std_x,
-        state.get_row(state_constants::POS_Y), std_y,
-        state.get_row(state_constants::POS_Z), std_z,
-        state.get_row(state_constants::VEL_X), std_vx,
-        state.get_row(state_constants::VEL_Y), std_vy,
-        state.get_row(state_constants::VEL_Z), std_vz,
-        state.get_row(state_constants::ACC_X), std_ax,
-        state.get_row(state_constants::ACC_Y), std_ay,
-        state.get_row(state_constants::ACC_Z), std_az
+        state[state_constants::POS_X], std_x,
+        state[state_constants::POS_Y], std_y,
+        state[state_constants::POS_Z], std_z,
+        state[state_constants::VEL_X], std_vx,
+        state[state_constants::VEL_Y], std_vy,
+        state[state_constants::VEL_Z], std_vz,
+        state[state_constants::ACC_X], std_ax,
+        state[state_constants::ACC_Y], std_ay,
+        state[state_constants::ACC_Z], std_az
     );
+
+        println!("full state: {}", state);
+        println!("full cov: {}", cov);
     }
 }
