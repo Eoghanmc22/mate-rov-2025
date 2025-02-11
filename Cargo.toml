@@ -11,6 +11,77 @@ members = [
     "waterlinked",
 ]
 
+[workspace.dependencies]
+
+# Our crates
+common = { path = "common" }
+networking = { path = "networking" }
+motor_math = { path = "motor_math" }
+stable_hashmap = { path = "stable_hashmap" }
+
+# Bevy
+bevy = { version = "0.14", default-features = false }
+bevy_reflect = "0.14"
+
+# Bevy plugins
+leafwing-input-manager = "0.14"
+bevy_panorbit_camera = "0.19"
+bevy_mod_picking = "0.20"
+bevy-tokio-tasks = { git = "https://github.com/foxzool/bevy-tokio-tasks.git" }
+
+# Egui
+egui = "0.28"
+egui_extras = "0.28"
+egui_plot = "0.28"
+bevy_egui = { version = "0.28", default-features = false }
+bevy-inspector-egui = "0.25"
+
+# Math
+nalgebra = { version = "0.33", features = [
+    "convert-glam027",
+    "serde-serialize",
+] }
+glam = { version = "0.27", features = ["serde"] }
+ahrs = { git = "https://github.com/jmagnuson/ahrs-rs.git" }
+num = "0.4"
+num-dual = { git = "https://github.com/Eoghanmc22/num-dual.git", rev = "62e12f43f24de5eb8c7e22f208436e3be8dc1ea4" }
+num_enum = "0.7"
+
+
+# Errors and Logging
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Data Serialization
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+csv = "1"
+bincode = "1"
+
+#  Networking
+mio = { version = "1.0", features = ["os-poll", "net"] }
+mdns-sd = "0.11"
+flume = "0.11"
+hostname = "0.4"
+reqwest = { version = "0.12", features = ["json"] }
+
+# Miscellaneous
+rppal = { version = "0.18", features = ["hal"] }
+sysinfo = { version = "0.29", default-features = false }
+ctrlc = "3"
+rand = "0.8"
+rgb = "0.8"
+ahash = "0.8"
+time = { version = "0.3", features = ["local-offset", "formatting"] }
+opencv = "0.92"
+itertools = "0.14"
+# *brings in all of tokio for a single function*
+tokio = { version = "1", features = ["full"] }
+crossbeam = "0.8"
+
+
 # Enable a small amount of optimization in debug mode
 [profile.dev]
 opt-level = 1

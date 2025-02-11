@@ -5,23 +5,26 @@ edition = "2021"
 
 
 [dependencies]
-common = { path = "../common" }
-networking = { path = "../networking" }
-motor_math = { path = "../motor_math" }
+common = { workspace = true }
+networking = { workspace = true }
+motor_math = { workspace = true }
 
-bevy = { version = "0.14", features = ["wayland", "dynamic_linking"] }
+bevy = { workspace = true, default-features = true, features = [
+  "wayland",
+  "dynamic_linking",
+] }
 
-tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
-anyhow = "1"
+anyhow = { workspace = true }
 
-tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", features = ["json"] }
-serde = "1"
-bevy-tokio-tasks = { git = "https://github.com/foxzool/bevy-tokio-tasks.git" }
+reqwest = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+bevy-tokio-tasks = { workspace = true }
 
-egui = "0.28"
-egui_plot = "0.28"
-bevy_egui = { version = "0.28", default-features = false }
-bevy-inspector-egui = "0.25"
+egui = { workspace = true }
+egui_plot = { workspace = true }
+bevy_egui = { workspace = true }
+bevy-inspector-egui = { workspace = true }

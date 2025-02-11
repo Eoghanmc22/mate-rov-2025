@@ -3,10 +3,10 @@ name = "stable_hashmap"
 version = "0.1.0"
 edition = "2021"
 
-# TODO: Are all of these needed?
 [dependencies]
-ahash = { version = "0.8" }
-bevy_reflect = { version = "0.14", optional = true }
+bevy_reflect = { workspace = true, optional = true }
+
+ahash = { workspace = true }
 
 [features]
 reflect = ["dep:bevy_reflect"]

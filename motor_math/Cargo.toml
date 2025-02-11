@@ -3,28 +3,24 @@ name = "motor_math"
 version = "0.1.0"
 edition = "2021"
 
-# TODO: Are all of these needed?
 [dependencies]
-stable_hashmap = { path = "../stable_hashmap" }
+stable_hashmap = { workspace = true }
 
-csv = "1"
-serde = { version = "1", features = ["derive"] }
-# ahash = { version = "0.8" }
+bevy_reflect = { workspace = true }
 
-num = "0.4"
-num-dual = { git = "https://github.com/Eoghanmc22/num-dual.git", rev = "62e12f43f24de5eb8c7e22f208436e3be8dc1ea4" }
-# num-dual = { path = "../../num-dual" }
-# num-dual = "0.11"
-nalgebra = { version = "0.33", features = ["serde-serialize"] }
-glam = { version = "0.27", features = ["serde"], optional = true }
-itertools = "0.14"
+serde = { workspace = true }
+csv = { workspace = true }
 
-num_enum = "0.7"
+nalgebra = { workspace = true }
+glam = { workspace = true, optional = true }
+num = { workspace = true }
+num-dual = { workspace = true }
+num_enum = { workspace = true }
 
-anyhow = "1"
-tracing = "0.1"
+itertools = { workspace = true }
 
-bevy_reflect = "0.14"
+anyhow = { workspace = true }
+tracing = { workspace = true }
 
 [features]
 glam = ["dep:glam"]

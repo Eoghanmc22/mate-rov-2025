@@ -4,30 +4,30 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-common = { path = "../common" }
-networking = { path = "../networking" }
-motor_math = { path = "../motor_math" }
+common = { workspace = true }
+networking = { workspace = true }
+motor_math = { workspace = true }
+stable_hashmap = { workspace = true }
 
-bevy = { version = "0.14", default-features = false }
+bevy = { workspace = true }
+nalgebra = { workspace = true }
+glam = { workspace = true }
+ahrs = { workspace = true }
 
-tracing = "0.1"
-tracing-subscriber = "0.3"
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
-rppal = { version = "0.18", features = ["hal"] }
-rgb = "0.8"
+rppal = { workspace = true }
+sysinfo = { workspace = true }
+rgb = { workspace = true }
 
-# Version 30 is avaible
-sysinfo = { version = "0.29", default-features = false }
 
-ahrs = { git = "https://github.com/jmagnuson/ahrs-rs.git" }
-nalgebra = { version = "0.33", features = ["convert-glam027"] }
-glam = { version = "0.27", features = ["serde"] }
+serde = { workspace = true }
+toml = { workspace = true }
 
-anyhow = "1"
-serde = { version = "1", features = ["derive"] }
-toml = "0.8"
-crossbeam = "0.8"
-ahash = "0.8"
+crossbeam = { workspace = true }
+ahash = { workspace = true }
 
 [features]
 tracy = ["bevy/trace_tracy", "common/tracy_frame_mark"]
