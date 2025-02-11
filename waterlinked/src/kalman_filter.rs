@@ -4,6 +4,11 @@ pub mod simple_filter;
 use bevy::prelude::*;
 use common::components::{Robot, RobotId};
 // use minikalman::extended::builder::KalmanFilterBuilder;
+//
+// minikalman: lib seems broken
+// adskalman: works but doesnt support ekf (maybe not needed?)
+// kfilter: need to look into
+// bayes_estimate: need to look into
 
 use crate::trajectory::RawPose;
 

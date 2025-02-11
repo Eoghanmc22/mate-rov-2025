@@ -1,3 +1,4 @@
+// TODO: Consider taking acceleration out of the kalman filter again
 use adskalman::{KalmanFilterNoControl, ObservationModel, TransitionModelLinearNoControl};
 use bevy::math::Vec3A;
 use nalgebra::{Const, Matrix, OMatrix, OVector, Owned};
@@ -67,15 +68,15 @@ pub struct KalmanConfig {
 impl Default for KalmanConfig {
     fn default() -> Self {
         Self {
-            depth_noise: 0.03,
-            pos_noise: 0.5,
-            velo_noise: 0.1,
-            accel_noise: 0.3,
+            depth_noise: 0.02,
+            pos_noise: 0.7,
+            velo_noise: 0.2,
+            accel_noise: 0.4,
 
             pos_process_noise: 0.2,
             velo_process_noise: 0.2,
-            accel_process_noise: 0.7,
-            accel_bias_process_noise: 0.005,
+            accel_process_noise: 2.0,
+            accel_bias_process_noise: 0.001,
         }
     }
 }
@@ -295,6 +296,10 @@ mod tests {
                 let starting_y = random::<f32>() * 20.0;
                 let starting_z = random::<f32>() * 20.0;
 
+                let acc_bias_x = random::<f32>() * 0.3;
+                let acc_bias_y = random::<f32>() * 0.3 + 9.81;
+                let acc_bias_z = random::<f32>() * 0.3;
+
                 for time_step in 0..1000 {
                     let time = STEP_DURATION * time_step as f32;
 
@@ -310,7 +315,7 @@ mod tests {
                     let ay = -(time * freq).sin() * radius * freq * freq;
                     let az = vertical_accel;
 
-                    println!("x: {x:.2}, y: {y:.2}, z: {z:.2}, vx: {vx:.2}, vy: {vy:.2}, vz: {vz:.2}, ax: {ax:.2}, ay: {ay:.2}, az: {az:.2}");
+                    println!("x: {x:.2}, y: {y:.2}, z: {z:.2}, vx: {vx:.2}, vy: {vy:.2}, vz: {vz:.2}, ax: {ax:.2}, ay: {ay:.2}, az: {az:.2}, abx: {acc_bias_x:.2}, aby: {acc_bias_y:.2}, abz: {acc_bias_z:.2}");
                     yield Measurement {
                         depth: Some(z + depth_dist.sample(&mut rng)),
                         // depth: None,
@@ -327,9 +332,9 @@ mod tests {
                         )),
                         // velo: None,
                         accel: Some(Vec3A::new(
-                            ax + acc_dist.sample(&mut rng),
-                            ay + acc_dist.sample(&mut rng),
-                            az + acc_dist.sample(&mut rng),
+                            ax + acc_dist.sample(&mut rng) + acc_bias_x,
+                            ay + acc_dist.sample(&mut rng) + acc_bias_y,
+                            az + acc_dist.sample(&mut rng) + acc_bias_z,
                         )),
                         // accel: None,
                     };
@@ -360,8 +365,6 @@ mod tests {
             OMatrix::<R, SS, SS>::from_diagonal(&cov_diag),
         );
         for measurement in trajectory {
-            print_state(&state, time);
-
             let observation = OVector::<R, OS>::from_vec(vec![
                 measurement.depth.unwrap(),
                 measurement.pos.unwrap().x,
@@ -398,21 +401,24 @@ mod tests {
         let std_ax = cov[(state_constants::ACC_X, state_constants::ACC_X)].sqrt();
         let std_ay = cov[(state_constants::ACC_Y, state_constants::ACC_Y)].sqrt();
         let std_az = cov[(state_constants::ACC_Z, state_constants::ACC_Z)].sqrt();
+        let std_abx = cov[(state_constants::BIAS_ACC_X, state_constants::BIAS_ACC_X)].sqrt();
+        let std_aby = cov[(state_constants::BIAS_ACC_Y, state_constants::BIAS_ACC_Y)].sqrt();
+        let std_abz = cov[(state_constants::BIAS_ACC_Z, state_constants::BIAS_ACC_Z)].sqrt();
         println!(
-        "t={:.2} s\n      x={:.2} ± {:.4} m\n      y={:.2} ± {:.4} m\n      z={:.2} ± {:.4} m\n     vx={:.2} ± {:.4} m/s\n     vy={:.2} ± {:.4} m/s\n     vz={:.2} ± {:.4} m/s\n     ax={:.2} ± {:.4} m/s^2\n     ay={:.2} ± {:.4} m/s^2\n     az={:.2} ± {:.4} m/s^2",
-        time,
-        state[state_constants::POS_X], std_x,
-        state[state_constants::POS_Y], std_y,
-        state[state_constants::POS_Z], std_z,
-        state[state_constants::VEL_X], std_vx,
-        state[state_constants::VEL_Y], std_vy,
-        state[state_constants::VEL_Z], std_vz,
-        state[state_constants::ACC_X], std_ax,
-        state[state_constants::ACC_Y], std_ay,
-        state[state_constants::ACC_Z], std_az
-    );
-
-        println!("full state: {}", state);
-        println!("full cov: {}", cov);
+            "t={:.2} s\n      x={:.2} ± {:.4} m\n      y={:.2} ± {:.4} m\n      z={:.2} ± {:.4} m\n     vx={:.2} ± {:.4} m/s\n     vy={:.2} ± {:.4} m/s\n     vz={:.2} ± {:.4} m/s\n     ax={:.2} ± {:.4} m/s^2\n     ay={:.2} ± {:.4} m/s^2\n     az={:.2} ± {:.4} m/s^2\n     abx={:.2} ± {:.4} m/s^2\n     aby={:.2} ± {:.4} m/s^2\n     abz={:.2} ± {:.4} m/s^2",
+            time,
+            state[state_constants::POS_X], std_x,
+            state[state_constants::POS_Y], std_y,
+            state[state_constants::POS_Z], std_z,
+            state[state_constants::VEL_X], std_vx,
+            state[state_constants::VEL_Y], std_vy,
+            state[state_constants::VEL_Z], std_vz,
+            state[state_constants::ACC_X], std_ax,
+            state[state_constants::ACC_Y], std_ay,
+            state[state_constants::ACC_Z], std_az,
+            state[state_constants::BIAS_ACC_X], std_abx,
+            state[state_constants::BIAS_ACC_Y], std_aby,
+            state[state_constants::BIAS_ACC_Z], std_abz
+        );
     }
 }
