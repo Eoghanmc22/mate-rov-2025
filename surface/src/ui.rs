@@ -46,7 +46,7 @@ impl Plugin for EguiUiPlugin {
                     .run_if(resource_exists::<PwmControl>),
                 cleanup_pwm_control
                     .after(topbar)
-                    .run_if(resource_removed::<PwmControl>()),
+                    .run_if(resource_removed::<PwmControl>),
                 timer.after(topbar).run_if(resource_exists::<TimerUi>),
             ),
         );
@@ -134,7 +134,7 @@ fn topbar(
                 });
 
                 if ui.button("Exit").clicked() {
-                    cmds.add(|world: &mut World| {
+                    cmds.queue(|world: &mut World| {
                         world.send_event(AppExit::Success);
                     })
                 }
@@ -142,19 +142,19 @@ fn topbar(
 
             ui.menu_button("Sensors", |ui| {
                 if ui.button("Calibrate Sea Level").clicked() {
-                    cmds.add(|world: &mut World| {
+                    cmds.queue(|world: &mut World| {
                         world.send_event(CalibrateSeaLevel);
                     })
                 }
 
                 if ui.button("Reset Servos").clicked() {
-                    cmds.add(|world: &mut World| {
+                    cmds.queue(|world: &mut World| {
                         world.send_event(ResetServos);
                     })
                 }
 
                 if ui.button("Reset Yaw").clicked() {
-                    cmds.add(|world: &mut World| {
+                    cmds.queue(|world: &mut World| {
                         world.send_event(ResetYaw);
                     })
                 }
@@ -162,7 +162,7 @@ fn topbar(
 
             ui.menu_button("Cameras", |ui| {
                 if ui.button("Resync Cameras").clicked() {
-                    cmds.add(|world: &mut World| {
+                    cmds.queue(|world: &mut World| {
                         world.send_event(ResyncCameras);
                     })
                 }
@@ -702,7 +702,7 @@ fn hud(
                                     let addrs = *addrs;
 
                                     if ui.button(format!("{}", addrs.ip())).clicked() {
-                                        cmds.add(move |world: &mut World| {
+                                        cmds.queue(move |world: &mut World| {
                                             world.send_event(ConnectToPeer(addrs));
                                         });
                                     }

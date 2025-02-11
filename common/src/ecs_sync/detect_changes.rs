@@ -148,11 +148,15 @@ fn detect_changes(
                     .expect("Archatype has component")
                 {
                     StorageType::Table => {
-                        let column = table
-                            .get_column(component_id)
-                            .expect("Archatype column has component");
-
-                        column.get(entity.table_row()).expect("Column has entity")
+                        let row = entity.table_row();
+                        assert!(row.as_usize() < table.entity_count());
+                        unsafe {
+                            Option::zip(
+                                table.get_component(component_id, row),
+                                table.get_changed_tick(component_id, row),
+                            )
+                            .expect("Archatype column has component")
+                        }
                     }
                     StorageType::SparseSet => {
                         let set = world
@@ -161,12 +165,14 @@ fn detect_changes(
                             .get(component_id)
                             .expect("Set has component");
 
-                        set.get_with_ticks(entity.id()).expect("Set has entity")
+                        let (ptr, ticks, _) =
+                            set.get_with_ticks(entity.id()).expect("Set has entity");
+                        (ptr, ticks.changed)
                     }
                 };
 
                 // SAFETY: Since we have an &World, no one should have mutable access to world
-                let last_changed = unsafe { tick.changed.read() };
+                let last_changed = unsafe { tick.read() };
                 let changed = last_changed.is_newer_than(ticks.last_run(), ticks.this_run());
 
                 if changed || added {

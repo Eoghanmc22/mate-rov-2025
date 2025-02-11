@@ -240,7 +240,7 @@ fn accumulate_motor_forces(
             .iter()
             .map(|(motor, record)| {
                 if let Some(last) = last_movement.get(motor) {
-                    let jerk_limit = jerk_limit * time.delta_seconds();
+                    let jerk_limit = jerk_limit * time.delta_secs();
                     let delta = record.force - last.force;
 
                     if delta.abs() > jerk_limit as _ {

@@ -152,7 +152,7 @@ fn update_leds(
     time: Res<Time<Real>>,
     mut errors: EventReader<ErrorEvent>,
 ) {
-    let now = time.elapsed_seconds_wrapped();
+    let now = time.elapsed_secs_wrapped();
 
     let (status, id) = robot.single();
     let thrusters = thrusters

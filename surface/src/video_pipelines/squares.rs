@@ -402,7 +402,7 @@ impl Pipeline for SquareTrackingPipeline {
             }));
 
             entity.world_scope(|world| {
-                let Some(mut robot) = world.get_entity_mut(robot) else {
+                let Ok(mut robot) = world.get_entity_mut(robot) else {
                     return;
                 };
 
@@ -416,7 +416,7 @@ impl Pipeline for SquareTrackingPipeline {
             InternalState::MoveAboveTarget => {
                 // Set correct depth initial depth
                 cmds.world(move |world| {
-                    let Some(mut robot) = world.get_entity_mut(robot) else {
+                    let Ok(mut robot) = world.get_entity_mut(robot) else {
                         return;
                     };
 
@@ -440,7 +440,7 @@ impl Pipeline for SquareTrackingPipeline {
 
                 // Send new depth target to robot
                 cmds.world(move |world| {
-                    let Some(mut robot) = world.get_entity_mut(robot) else {
+                    let Ok(mut robot) = world.get_entity_mut(robot) else {
                         return;
                     };
 

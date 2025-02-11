@@ -17,8 +17,8 @@ use common::{
 };
 use egui::TextBuffer;
 use leafwing_input_manager::{
-    action_state::ActionState, axislike::SingleAxis, input_map::InputMap,
-    plugin::InputManagerPlugin, Actionlike, InputManagerBundle,
+    action_state::ActionState, input_map::InputMap, plugin::InputManagerPlugin, Actionlike,
+    InputManagerBundle,
 };
 use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
 
@@ -42,7 +42,7 @@ impl Plugin for InputPlugin {
                     trim_depth,
                     servos,
                     robot_mode,
-                    switch_pitch_roll,
+                    // switch_pitch_roll,
                 ),
             );
     }
@@ -140,87 +140,75 @@ fn attach_to_new_robots(mut cmds: Commands, new_robots: Query<(&NetId, &Name), A
     for (robot, name) in &new_robots {
         let mut input_map = InputMap::default();
 
-        input_map.insert(Action::Disarm, GamepadButtonType::Select);
-        input_map.insert(Action::Arm, GamepadButtonType::Start);
+        input_map.insert(Action::Disarm, GamepadButton::Select);
+        input_map.insert(Action::Arm, GamepadButton::Start);
 
         input_map.insert(Action::Disarm, KeyCode::Space);
         input_map.insert(Action::Arm, KeyCode::Enter);
 
         input_map.insert(
             Action::ToggleLeveling(LevelingType::Upright),
-            GamepadButtonType::North,
+            GamepadButton::North,
         );
         input_map.insert(
             Action::ToggleLeveling(LevelingType::Inverted),
-            GamepadButtonType::South,
+            GamepadButton::South,
         );
-        input_map.insert(Action::ToggleDepthHold, GamepadButtonType::East);
-        // input_map.insert(Action::ToggleDepthHold, GamepadButtonType::North);
-        // input_map.insert(Action::ToggleDepthHold, GamepadButtonType::South);
-        input_map.insert(Action::SwitchPitchRoll, GamepadButtonType::West);
+        input_map.insert(Action::ToggleDepthHold, GamepadButton::East);
+        // input_map.insert(Action::ToggleDepthHold, GamepadButton::North);
+        // input_map.insert(Action::ToggleDepthHold, GamepadButton::South);
+        input_map.insert(Action::SwitchPitchRoll, GamepadButton::West);
 
-        input_map.insert(
-            Action::Yaw,
-            SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.05),
-        );
-        input_map.insert(
-            Action::Surge,
-            SingleAxis::symmetric(GamepadAxisType::LeftStickY, 0.05),
-        );
+        input_map.insert_axis(Action::Yaw, GamepadAxis::LeftStickX);
+        input_map.insert_axis(Action::Surge, GamepadAxis::LeftStickY);
 
-        input_map.insert(
-            Action::Sway,
-            SingleAxis::symmetric(GamepadAxisType::RightStickX, 0.05),
-        );
-        input_map.insert(
-            Action::Heave,
-            SingleAxis::symmetric(GamepadAxisType::RightStickY, 0.05),
-        );
+        input_map.insert_axis(Action::Sway, GamepadAxis::RightStickX);
+        input_map.insert_axis(Action::Heave, GamepadAxis::RightStickY);
 
-        input_map.insert(Action::ServoInverted, GamepadButtonType::RightTrigger);
-        input_map.insert(Action::Servo, GamepadButtonType::LeftTrigger);
-        // input_map.insert(Action::Pitch, GamepadButtonType::RightTrigger);
-        // input_map.insert(Action::PitchInverted, GamepadButtonType::LeftTrigger);
+        input_map.insert(Action::ServoInverted, GamepadButton::RightTrigger);
+        input_map.insert(Action::Servo, GamepadButton::LeftTrigger);
+        // input_map.insert(Action::Pitch, GamepadButton::RightTrigger);
+        // input_map.insert(Action::PitchInverted, GamepadButton::LeftTrigger);
 
-        // input_map.insert(Action::Roll, GamepadButtonType::RightTrigger2);
-        // input_map.insert(Action::RollInverted, GamepadButtonType::LeftTrigger2);
-        input_map.insert(Action::Pitch, GamepadButtonType::RightTrigger2);
-        input_map.insert(Action::PitchInverted, GamepadButtonType::LeftTrigger2);
+        // input_map.insert(Action::Roll, GamepadButton::RightTrigger2);
+        // input_map.insert(Action::RollInverted, GamepadButton::LeftTrigger2);
+        input_map.insert(Action::Pitch, GamepadButton::RightTrigger2);
+        input_map.insert(Action::PitchInverted, GamepadButton::LeftTrigger2);
 
-        input_map.insert(Action::ServoCenter, GamepadButtonType::DPadUp);
-        // input_map.insert(Action::Servo, GamepadButtonType::DPadRight);
-        // input_map.insert(Action::ServoInverted, GamepadButtonType::DPadLeft);
-        input_map.insert(Action::SwitchServo, GamepadButtonType::DPadRight);
-        input_map.insert(Action::SwitchServoInverted, GamepadButtonType::DPadLeft);
-        // input_map.insert(Action::SelectImportantServo, GamepadButtonType::DPadDown);
-        input_map.insert(Action::ToggleRobotMode, GamepadButtonType::DPadDown);
+        input_map.insert(Action::ServoCenter, GamepadButton::DPadUp);
+        // input_map.insert(Action::Servo, GamepadButton::DPadRight);
+        // input_map.insert(Action::ServoInverted, GamepadButton::DPadLeft);
+        input_map.insert(Action::SwitchServo, GamepadButton::DPadRight);
+        input_map.insert(Action::SwitchServoInverted, GamepadButton::DPadLeft);
+        // input_map.insert(Action::SelectImportantServo, GamepadButton::DPadDown);
+        input_map.insert(Action::ToggleRobotMode, GamepadButton::DPadDown);
 
-        input_map.insert(Action::ToggleRobotMode, GamepadButtonType::Mode);
-        // input_map.insert(Action::ToggleRobotMode, GamepadButtonType::West);
+        input_map.insert(Action::ToggleRobotMode, GamepadButton::Mode);
+        // input_map.insert(Action::ToggleRobotMode, GamepadButton::West);
 
         // input_map.insert(
         //     Action::Yaw,
-        //     SingleAxis::symmetric(GamepadAxisType::LeftStickX, 0.05),
+        //     SingleAxis::symmetric(GamepadAxis::LeftStickX, 0.05),
         // );
         // input_map.insert(
         //     Action::Pitch,
-        //     SingleAxis::symmetric(GamepadAxisType::LeftStickY, 0.05),
+        //     SingleAxis::symmetric(GamepadAxis::LeftStickY, 0.05),
         // );
         //
         // input_map.insert(
         //     Action::Sway,
-        //     SingleAxis::symmetric(GamepadAxisType::RightStickX, 0.05),
+        //     SingleAxis::symmetric(GamepadAxis::RightStickX, 0.05),
         // );
         // input_map.insert(
         //     Action::Heave,
-        //     SingleAxis::symmetric(GamepadAxisType::RightStickY, 0.05),
+        //     SingleAxis::symmetric(GamepadAxis::RightStickY, 0.05),
         // );
         //
-        // input_map.insert(Action::Roll, GamepadButtonType::RightTrigger);
-        // input_map.insert(Action::RollInverted, GamepadButtonType::LeftTrigger);
+        // input_map.insert(Action::Roll, GamepadButton::RightTrigger);
+        // input_map.insert(Action::RollInverted, GamepadButton::LeftTrigger);
         //
-        // input_map.insert(Action::Surge, GamepadButtonType::RightTrigger2);
-        // input_map.insert(Action::SurgeInverted, GamepadButtonType::LeftTrigger2);
+        // input_map.insert(Action::Surge, GamepadButton::RightTrigger2);
+        // input_map.insert(Action::SurgeInverted, GamepadButton::LeftTrigger2);
 
         cmds.spawn((
             SelectedServo::default(),
@@ -487,17 +475,17 @@ fn trim_orientation(
             };
 
             if pitch.abs() >= 0.05 {
-                let input = pitch * interpolation.trim_dps * time.delta_seconds();
+                let input = pitch * interpolation.trim_dps * time.delta_secs();
                 orientation_target = orientation_target * Quat::from_rotation_x(input.to_radians());
             }
 
             if roll.abs() >= 0.05 {
-                let input = roll * interpolation.trim_dps * time.delta_seconds();
+                let input = roll * interpolation.trim_dps * time.delta_secs();
                 orientation_target = orientation_target * Quat::from_rotation_y(input.to_radians());
             }
 
             if yaw.abs() >= 0.05 {
-                let input = yaw * interpolation.trim_dps * time.delta_seconds();
+                let input = yaw * interpolation.trim_dps * time.delta_secs();
                 orientation_target = Quat::from_rotation_z(input.to_radians()) * orientation_target;
             }
 
@@ -532,7 +520,7 @@ fn trim_depth(
             };
 
             if z != 0.0 {
-                let mut input = z * interpolation.depth_mps * time.delta_seconds();
+                let mut input = z * interpolation.depth_mps * time.delta_secs();
 
                 if let Some(orientation) = orientation {
                     input *= (orientation.0 * Vec3A::Z).z.signum();
@@ -640,47 +628,49 @@ fn robot_mode(
     }
 }
 
-fn switch_pitch_roll(
-    mut inputs: Query<(&ActionState<Action>, &mut InputMap<Action>), With<InputMarker>>,
-) {
-    for (action_state, mut input_map) in &mut inputs {
-        let toggle = action_state.just_pressed(&Action::SwitchPitchRoll);
-
-        if toggle {
-            // Me when no proper remove api
-            let pitch = input_map.get(&Action::Pitch).cloned();
-            let pitch_inverted = input_map.get(&Action::PitchInverted).cloned();
-            let roll = input_map.get(&Action::Roll).cloned();
-            let roll_inverted = input_map.get(&Action::RollInverted).cloned();
-
-            input_map.clear_action(&Action::Pitch);
-            input_map.clear_action(&Action::PitchInverted);
-            input_map.clear_action(&Action::Roll);
-            input_map.clear_action(&Action::RollInverted);
-
-            if let Some(pitch) = pitch {
-                for input in pitch {
-                    input_map.insert(Action::Roll, input);
-                }
-            }
-
-            if let Some(pitch_inverted) = pitch_inverted {
-                for input in pitch_inverted {
-                    input_map.insert(Action::RollInverted, input);
-                }
-            }
-
-            if let Some(roll) = roll {
-                for input in roll {
-                    input_map.insert(Action::Pitch, input);
-                }
-            }
-
-            if let Some(roll_inverted) = roll_inverted {
-                for input in roll_inverted {
-                    input_map.insert(Action::PitchInverted, input);
-                }
-            }
-        }
-    }
-}
+// FIXME: Unclear how to implement with new version
+//
+// fn switch_pitch_roll(
+//     mut inputs: Query<(&ActionState<Action>, &mut InputMap<Action>), With<InputMarker>>,
+// ) {
+//     for (action_state, mut input_map) in &mut inputs {
+//         let toggle = action_state.just_pressed(&Action::SwitchPitchRoll);
+//
+//         if toggle {
+//             // Me when no proper remove api
+//             let pitch = input_map.get(&Action::Pitch).clone();
+//             let pitch_inverted = input_map.get(&Action::PitchInverted).clone();
+//             let roll = input_map.get(&Action::Roll).clone();
+//             let roll_inverted = input_map.get(&Action::RollInverted).clone();
+//
+//             input_map.clear_action(&Action::Pitch);
+//             input_map.clear_action(&Action::PitchInverted);
+//             input_map.clear_action(&Action::Roll);
+//             input_map.clear_action(&Action::RollInverted);
+//
+//             if let Some(pitch) = pitch {
+//                 for input in pitch {
+//                     input_map.insert(Action::Roll, input);
+//                 }
+//             }
+//
+//             if let Some(pitch_inverted) = pitch_inverted {
+//                 for input in pitch_inverted {
+//                     input_map.insert(Action::RollInverted, input);
+//                 }
+//             }
+//
+//             if let Some(roll) = roll {
+//                 for input in roll {
+//                     input_map.insert(Action::Pitch, input);
+//                 }
+//             }
+//
+//             if let Some(roll_inverted) = roll_inverted {
+//                 for input in roll_inverted {
+//                     input_map.insert(Action::PitchInverted, input);
+//                 }
+//             }
+//         }
+//     }
+// }

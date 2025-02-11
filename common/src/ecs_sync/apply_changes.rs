@@ -93,7 +93,7 @@ fn apply_changes(
                 let token = token.clone();
                 let component_id = sync_info.component_id;
 
-                cmds.add(move |world: &mut World| {
+                cmds.queue(move |world: &mut World| {
                     // TODO(mid): Error handling
                     match type_adapter {
                         ComponentTypeAdapter::Serde(adapter) => {
@@ -101,8 +101,10 @@ fn apply_changes(
                                 .deserialize(&serialized, |ptr|
                                     // SAFETY: We used the type adapter associated with this component id
                                     unsafe {
-                                        if let Some(mut entity) = world.get_entity_mut(local) {
+                                        if let Ok(mut entity) = world.get_entity_mut(local) {
                                             entity.insert_by_id(component_id, ptr);
+                                        } else {
+                                            // TODO: Handle
                                         }
                                     })
                                 .expect("Bad update");
@@ -124,8 +126,10 @@ fn apply_changes(
                                     .expect("Bad update")
                                 };
 
-                                if let Some(mut entity) = world.get_entity_mut(local) {
+                                if let Ok(mut entity) = world.get_entity_mut(local) {
                                     component.insert(&mut entity, &*reflect, &registry);
+                                } else {
+                                    // TODO: Handle
                                 }
                             })
                         }
@@ -146,9 +150,11 @@ fn apply_changes(
                 };
 
                 let remover = sync_info.remove_fn;
-                cmds.add(move |world: &mut World| {
-                    if let Some(mut entity) = world.get_entity_mut(local) {
+                cmds.queue(move |world: &mut World| {
+                    if let Ok(mut entity) = world.get_entity_mut(local) {
                         (remover)(&mut entity);
+                    } else {
+                        // TODO: Handle
                     }
                 });
 
@@ -164,7 +170,7 @@ fn apply_changes(
                 let serialized = serialized.clone();
                 let token = token.clone();
 
-                cmds.add(move |world: &mut World| {
+                cmds.queue(move |world: &mut World| {
                     // TODO(mid): Error handling
                     match type_adapter {
                         EventTypeAdapter::Serde(adapter, sender) => {

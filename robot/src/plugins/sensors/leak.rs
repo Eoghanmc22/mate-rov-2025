@@ -1,8 +1,10 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use bevy::{app::AppExit, prelude::*};
 use common::{components::Leak, error};
 use crossbeam::channel::Receiver;
-use rppal::gpio::{Gpio, InputPin, Level, Trigger};
+use rppal::gpio::{Event, Gpio, InputPin, Level, Trigger};
 
 use crate::plugins::core::robot::LocalRobot;
 
@@ -37,16 +39,16 @@ fn setup_leak_interupt(mut cmds: Commands, robot: Res<LocalRobot>) -> anyhow::Re
     cmds.entity(robot.entity).insert(Leak(initial_leak));
 
     leak_pin
-        .set_async_interrupt(Trigger::Both, move |level| {
-            let level = match level {
-                Level::High => true,
-                Level::Low => false,
-            };
+        .set_async_interrupt(
+            Trigger::Both,
+            Some(Duration::from_millis(500)),
+            move |event| {
+                let level = event.trigger == Trigger::RisingEdge;
+                warn!(?level, "Leak interrupt triggered");
 
-            warn!(?level, "Leak interrupt triggered");
-
-            tx.send(level).expect("Peer disconnected");
-        })
+                tx.send(level).expect("Peer disconnected");
+            },
+        )
         .context("Set async leak interrupt")?;
 
     cmds.insert_resource(LeakChannels(rx, leak_pin));

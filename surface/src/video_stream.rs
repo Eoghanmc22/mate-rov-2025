@@ -2,11 +2,9 @@ use std::{borrow::Cow, ffi::c_void, mem, sync::Arc, thread};
 
 use anyhow::{anyhow, Context};
 use bevy::{
+    image::Volume,
     prelude::*,
-    render::{
-        render_resource::{Extent3d, TextureUsages},
-        texture::Volume,
-    },
+    render::render_resource::{Extent3d, TextureUsages},
 };
 use common::{
     components::Camera,
@@ -19,6 +17,9 @@ use opencv::{
     prelude::*,
     videoio::{self, VideoCapture},
 };
+
+#[derive(Component, Clone)]
+pub struct ImageHandle(pub Handle<Image>);
 
 pub struct VideoStreamPlugin;
 
@@ -94,7 +95,7 @@ fn handle_added_camera(
 
         cmds.entity(entity).insert((
             VideoThread(handle.clone(), tx_bevy, rx_cv, tx_proc),
-            images.add(Image::default()),
+            ImageHandle(images.add(Image::default())),
         ));
 
         let camera = camera.clone();
@@ -191,9 +192,9 @@ fn handle_frames(
     cameras: Query<
         (
             &VideoThread,
-            &Handle<Image>,
-            Option<&Handle<StandardMaterial>>,
-            Option<&Handle<ColorMaterial>>,
+            &ImageHandle,
+            Option<&MeshMaterial3d<StandardMaterial>>,
+            Option<&MeshMaterial2d<ColorMaterial>>,
         ),
         With<Camera>,
     >,
@@ -211,7 +212,7 @@ fn handle_frames(
         });
 
         if let Some(latest) = latest {
-            let Some(image) = images.get_mut(handle) else {
+            let Some(image) = images.get_mut(&handle.0) else {
                 warn!("Couldnt get render asset for image");
                 continue;
             };
@@ -257,7 +258,7 @@ fn handle_video_processors(
             let proc_tx = thread.3.clone();
             let factory = processor.factory;
 
-            cmds.add(move |world: &mut World| {
+            cmds.queue(move |world: &mut World| {
                 let processor = (factory)(world, entity);
                 let processor = match processor {
                     Ok(processor) => processor,

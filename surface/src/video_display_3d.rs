@@ -5,6 +5,8 @@ use bevy::{
 use bevy_panorbit_camera::PanOrbitCamera;
 use common::components::Camera;
 
+use crate::video_stream::ImageHandle;
+
 const RENDER_LAYERS: RenderLayers = RenderLayers::layer(3);
 
 pub struct VideoDisplay3DPlugin;
@@ -31,14 +33,12 @@ pub struct VideoDisplay3DSettings {
 
 fn setup(mut cmds: Commands) {
     cmds.spawn((
-        Camera3dBundle {
-            camera: BevyCamera {
-                is_active: false,
-                ..default()
-            },
-            transform: Transform::default().looking_at(Vec3::Z, Vec3::Y),
+        Camera3d::default(),
+        BevyCamera {
+            is_active: false,
             ..default()
         },
+        Transform::default().looking_at(Vec3::Z, Vec3::Y),
         PanOrbitCamera::default(),
         DisplayCamera,
         RENDER_LAYERS,
@@ -55,8 +55,8 @@ fn setup(mut cmds: Commands) {
 fn create_display(
     mut cmds: Commands,
     new_cameras: Query<
-        (Entity, &Handle<Image>, Option<&Transform>),
-        (With<Camera>, Added<Handle<Image>>),
+        (Entity, &ImageHandle, Option<&Transform>),
+        (With<Camera>, Added<ImageHandle>),
     >,
     parent: Query<Entity, With<DisplayParent>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -64,18 +64,15 @@ fn create_display(
     for (entity, handle, transform) in &new_cameras {
         let material = materials.add(StandardMaterial {
             base_color: Color::WHITE,
-            base_color_texture: Some(handle.clone_weak()),
+            base_color_texture: Some(handle.0.clone_weak()),
             unlit: true,
             ..default()
         });
 
         // TODO: I dont really like this but it gets use removal logic for free
         cmds.entity(entity).insert((
-            PbrBundle {
-                transform: transform.cloned().unwrap_or_default(),
-                material,
-                ..default()
-            },
+            MeshMaterial3d(material),
+            transform.cloned().unwrap_or_default(),
             DisplayMarker(UVec2::default()),
             RENDER_LAYERS,
         ));
@@ -87,20 +84,20 @@ fn create_display(
 
 fn update_aspect_ratio(
     mut cmds: Commands,
-    cameras: Query<(Entity, &Handle<Image>, &DisplayMarker)>,
+    cameras: Query<(Entity, &ImageHandle, &DisplayMarker)>,
     mut meshes: ResMut<Assets<Mesh>>,
     images: Res<Assets<Image>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     for (entity, handle, display) in &cameras {
-        let Some(image) = images.get(handle) else {
+        let Some(image) = images.get(&handle.0) else {
             continue;
         };
 
         if image.size() != display.0 {
             let material = materials.add(StandardMaterial {
                 base_color: Color::WHITE,
-                base_color_texture: Some(handle.clone()),
+                base_color_texture: Some(handle.0.clone()),
                 unlit: true,
                 ..default()
             });
@@ -112,8 +109,11 @@ fn update_aspect_ratio(
 
             let mesh = meshes.add(Rectangle::new(mesh_width, mesh_height));
 
-            cmds.entity(entity)
-                .insert((mesh, material, DisplayMarker(image.size())));
+            cmds.entity(entity).insert((
+                Mesh3d(mesh),
+                MeshMaterial3d(material),
+                DisplayMarker(image.size()),
+            ));
         }
     }
 }

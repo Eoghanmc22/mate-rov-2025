@@ -2,21 +2,21 @@ use core::panic;
 
 use bevy::{
     ecs::{event::Event, world::World},
-    reflect::{FromReflect, FromType, Reflect},
+    reflect::{FromReflect, FromType, PartialReflect},
 };
 
 #[derive(Clone)]
 pub struct ReflectEvent {
-    pub send: fn(&mut World, &dyn Reflect),
+    pub send: fn(&mut World, &dyn PartialReflect),
 }
 
 impl ReflectEvent {
-    pub fn send(&self, world: &mut World, event: &dyn Reflect) {
+    pub fn send(&self, world: &mut World, event: &dyn PartialReflect) {
         (self.send)(world, event);
     }
 }
 
-impl<E: Event + Reflect + FromReflect> FromType<E> for ReflectEvent {
+impl<E: Event + PartialReflect + FromReflect> FromType<E> for ReflectEvent {
     fn from_type() -> Self {
         ReflectEvent {
             send: |world, reflected_event| {

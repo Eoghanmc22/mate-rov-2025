@@ -1,7 +1,7 @@
 use anyhow::Context;
 use bevy::reflect::{
     serde::{TypedReflectDeserializer, TypedReflectSerializer},
-    Reflect, TypeRegistration, TypeRegistry,
+    PartialReflect, TypeRegistration, TypeRegistry,
 };
 use bincode::Options;
 use tracing::instrument;
@@ -16,7 +16,7 @@ impl DynamicAdapter {
     /// Serializes the provided object as [Output]
     #[instrument(level = "trace", skip_all)]
     pub fn serialize(
-        obj: &dyn Reflect,
+        obj: &dyn PartialReflect,
         registry: &TypeRegistry,
     ) -> Result<BackingType, AdapterError> {
         let val = TypedReflectSerializer::new(obj, registry);
@@ -34,7 +34,7 @@ impl DynamicAdapter {
         data: &BackingType,
         registration: &TypeRegistration,
         registry: &TypeRegistry,
-    ) -> Result<Box<dyn Reflect>, AdapterError> {
+    ) -> Result<Box<dyn PartialReflect>, AdapterError> {
         let seed = TypedReflectDeserializer::new(registration, registry);
 
         let val = options()

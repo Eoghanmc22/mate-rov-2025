@@ -89,15 +89,12 @@ fn setup(
 
     // light
     commands.spawn((
-        PointLightBundle {
-            point_light: PointLight {
-                shadows_enabled: true,
-                intensity: if DARK_MODE { 1_000_000.0 } else { 4_000_000.0 },
-                ..default()
-            },
-            transform: Transform::from_xyz(4.0, 4.0, 8.0),
+        PointLight {
+            shadows_enabled: true,
+            intensity: if DARK_MODE { 1_000_000.0 } else { 4_000_000.0 },
             ..default()
         },
+        Transform::from_xyz(4.0, 4.0, 8.0),
         RENDER_LAYERS,
     ));
     if !DARK_MODE {
@@ -106,16 +103,14 @@ fn setup(
 
     // camera
     commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_xyz(5.0, -5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Z),
-            camera: Camera {
-                // render before the "main pass" camera
-                order: -1,
-                target: RenderTarget::Image(image_handle.clone()),
-                ..default()
-            },
+        Camera3d::default(),
+        Camera {
+            // render before the "main pass" camera
+            order: -1,
+            target: RenderTarget::Image(image_handle.clone()),
             ..default()
         },
+        Transform::from_xyz(5.0, -5.0, 5.0).looking_at(Vec3::ZERO, Vec3::Z),
         RENDER_LAYERS,
     ));
 
@@ -156,16 +151,13 @@ fn add_motor_conf(
 
     commands
         .spawn((
-            PbrBundle {
-                mesh: meshes.add(Cuboid::new(
-                    frt.position.x * 2.0 * 1.5,
-                    frt.position.y * 2.0 * 1.5,
-                    frt.position.z * 2.0 * 1.5,
-                )),
-                material: materials_pbr.add(Color::srgb(0.8, 0.7, 0.6)),
-                transform: Transform::from_scale(Vec3::splat(3.5)),
-                ..default()
-            },
+            Mesh3d(meshes.add(Cuboid::new(
+                frt.position.x * 2.0 * 1.5,
+                frt.position.y * 2.0 * 1.5,
+                frt.position.z * 2.0 * 1.5,
+            ))),
+            MeshMaterial3d(materials_pbr.add(Color::srgb(0.8, 0.7, 0.6))),
+            Transform::from_scale(Vec3::splat(3.5)),
             OrientationDisplayMarker,
             render_layer,
         ))
@@ -185,35 +177,27 @@ fn add_motor(
     materials_pbr: &mut ResMut<Assets<StandardMaterial>>,
 ) {
     builder.spawn((
-        PbrBundle {
-            mesh: meshes.add(Cylinder {
-                radius: 0.005,
-                half_height: 0.5,
-            }),
-            material: materials_pbr.add(Color::from(css::GREEN)),
-            transform: Transform::from_translation(Vec3::from(
-                motor.position * 1.5 + motor.orientation / 2.0,
-            ))
+        Mesh3d(meshes.add(Cylinder {
+            radius: 0.005,
+            half_height: 0.5,
+        })),
+        MeshMaterial3d(materials_pbr.add(Color::from(css::GREEN))),
+        Transform::from_translation(Vec3::from(motor.position * 1.5 + motor.orientation / 2.0))
             .looking_to(Vec3::from(motor.orientation), Vec3::from(-motor.position))
-                * Transform::from_rotation(Quat::from_rotation_x(90f32.to_radians())),
-            ..default()
-        },
+            * Transform::from_rotation(Quat::from_rotation_x(90f32.to_radians())),
         MotorMarker(motor_id),
         RENDER_LAYERS,
     ));
 
     builder.spawn((
-        PbrBundle {
-            mesh: meshes.add(Cylinder {
-                radius: 0.125,
-                half_height: 0.0625,
-            }),
-            material: materials_pbr.add(Color::from(css::DARK_GRAY)),
-            transform: Transform::from_translation(Vec3::from(motor.position * 1.5))
-                .looking_to(Vec3::from(motor.orientation), Vec3::from(-motor.position))
-                * Transform::from_rotation(Quat::from_rotation_x(90f32.to_radians())),
-            ..default()
-        },
+        Mesh3d(meshes.add(Cylinder {
+            radius: 0.125,
+            half_height: 0.0625,
+        })),
+        MeshMaterial3d(materials_pbr.add(Color::from(css::DARK_GRAY))),
+        Transform::from_translation(Vec3::from(motor.position * 1.5))
+            .looking_to(Vec3::from(motor.orientation), Vec3::from(-motor.position))
+            * Transform::from_rotation(Quat::from_rotation_x(90f32.to_radians())),
         MotorMarker(motor_id),
         RENDER_LAYERS,
     ));
@@ -251,12 +235,7 @@ fn rotator_system(
             transform.rotation = orientation.0;
         }
 
-        gizmos.rect(
-            Vec3::ZERO,
-            orientation.0,
-            Vec2::splat(5.0),
-            Color::from(css::DARK_GRAY),
-        );
+        gizmos.rect(orientation.0, Vec2::splat(5.0), Color::from(css::DARK_GRAY));
 
         for i in 1..=9 {
             let y = i as f32 / 2.0 - 2.5;
@@ -301,9 +280,12 @@ fn rotator_system(
             //     Color::YELLOW,
             // );
 
-            gizmos.circle(Vec3::ZERO, up * Dir3::X, 2.0, Color::from(css::RED));
-            gizmos.circle(Vec3::ZERO, up * Dir3::Y, 2.0, Color::from(css::GREEN));
-            gizmos.circle(Vec3::ZERO, up * Dir3::Z, 2.0, Color::from(css::BLUE));
+            let axis_rotation_x = Quat::from_rotation_arc(Vec3::Z, Vec3::X);
+            let axis_rotation_y = Quat::from_rotation_arc(Vec3::Z, Vec3::Y);
+            let axis_rotation_z = Quat::from_rotation_arc(Vec3::Z, Vec3::Z);
+            gizmos.circle(up * axis_rotation_x, 2.0, Color::from(css::RED));
+            gizmos.circle(up * axis_rotation_y, 2.0, Color::from(css::GREEN));
+            gizmos.circle(up * axis_rotation_z, 2.0, Color::from(css::BLUE));
         }
     }
 }

@@ -261,7 +261,7 @@ impl<P: Pipeline> VideoProcessor for PipelineHandler<P> {
         };
 
         let rst = self.cmds_tx.send(Box::new(move |world: &mut World| {
-            let Some(mut entity_world) = world.get_entity_mut(entity) else {
+            let Ok(mut entity_world) = world.get_entity_mut(entity) else {
                 return;
             };
 
@@ -298,7 +298,7 @@ impl PipelineCallbacks<'_> {
     pub fn pipeline<F: FnOnce(EntityWorldMut) + Send + Sync + 'static>(&mut self, f: F) {
         let entity = self.pipeline_entity;
         let res = self.cmds_tx.send(Box::new(move |world: &mut World| {
-            let Some(entity) = world.get_entity_mut(entity) else {
+            let Ok(entity) = world.get_entity_mut(entity) else {
                 world.send_event(ErrorEvent(anyhow!(
                     "No entity for video pipeline entity callback"
                 )));
@@ -318,7 +318,7 @@ impl PipelineCallbacks<'_> {
     pub fn camera<F: FnOnce(EntityWorldMut) + Send + Sync + 'static>(&mut self, f: F) {
         let entity = self.camera_entity;
         let res = self.cmds_tx.send(Box::new(move |world: &mut World| {
-            let Some(entity) = world.get_entity_mut(entity) else {
+            let Ok(entity) = world.get_entity_mut(entity) else {
                 world.send_event(ErrorEvent(anyhow!(
                     "No entity for video camera entity callback"
                 )));
@@ -370,7 +370,7 @@ struct PipelineDataMarker<P: Pipeline>(Arc<()>, PhantomData<fn(P) -> P>);
 fn schedule_pipeline_callbacks(mut cmds: Commands, channels: Res<VideoCallbackChannels>) {
     // Schedule ECS write callbacks
     for callback in channels.cmd_rx.try_iter() {
-        cmds.add(callback);
+        cmds.queue(callback);
     }
 }
 

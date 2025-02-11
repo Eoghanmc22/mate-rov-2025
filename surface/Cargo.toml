@@ -19,7 +19,6 @@ bevy_egui = { workspace = true }
 bevy-inspector-egui = { workspace = true }
 leafwing-input-manager = { workspace = true }
 bevy_panorbit_camera = { workspace = true }
-bevy_mod_picking = { workspace = true }
 
 anyhow = { workspace = true }
 tracing = { workspace = true }

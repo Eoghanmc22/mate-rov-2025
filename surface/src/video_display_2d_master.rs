@@ -2,10 +2,10 @@ use bevy::{
     math::f32,
     prelude::*,
     render::{camera::Camera as BevyCamera, view::RenderLayers},
-    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
 };
-use bevy_mod_picking::prelude::*;
 use common::components::Camera;
+
+use crate::video_stream::ImageHandle;
 
 const RENDER_LAYERS: RenderLayers = RenderLayers::layer(2);
 
@@ -48,12 +48,6 @@ struct DisplayMarker(u16);
 #[derive(Event, Clone, Copy)]
 struct MakeMaster(Entity);
 
-impl From<ListenerInput<Pointer<Click>>> for MakeMaster {
-    fn from(value: ListenerInput<Pointer<Click>>) -> Self {
-        MakeMaster(value.listener())
-    }
-}
-
 #[derive(Resource, Default)]
 pub struct VideoDisplay2DSettings {
     pub enabled: bool,
@@ -62,11 +56,9 @@ pub struct VideoDisplay2DSettings {
 fn setup(mut cmds: Commands, mut meshes: ResMut<Assets<Mesh>>) {
     let camera = cmds
         .spawn((
-            Camera2dBundle {
-                camera: BevyCamera {
-                    is_active: false,
-                    ..default()
-                },
+            Camera2d,
+            BevyCamera {
+                is_active: false,
                 ..default()
             },
             DisplayCamera,
@@ -79,7 +71,8 @@ fn setup(mut cmds: Commands, mut meshes: ResMut<Assets<Mesh>>) {
         Name::new("Cameras 2D"),
         TargetCamera(camera),
         Video::default(),
-        SpatialBundle::default(),
+        Transform::default(),
+        Visibility::default(),
         DisplayParent,
     ));
 
@@ -93,10 +86,10 @@ fn create_display(
     mesh: Res<MeshResource>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 
-    new_cameras: Query<Entity, (With<Camera>, Added<Handle<Image>>)>,
+    new_cameras: Query<Entity, (With<Camera>, Added<ImageHandle>)>,
     mut lost_cameras: RemovedComponents<Camera>,
 
-    cameras: Query<&Handle<Image>>,
+    cameras: Query<&ImageHandle>,
     mut parent: Query<(Entity, &mut Video), With<DisplayParent>>,
 ) {
     let (parent, mut tree) = parent.single_mut();
@@ -122,29 +115,29 @@ fn create_display(
         for (idx, &camera) in tree.cameras.iter().enumerate() {
             let weak_texture = cameras
                 .get(camera)
-                .map(|it| it.clone_weak())
+                .map(|it| it.0.clone_weak())
                 .unwrap_or_else(|_| Default::default());
             let material = materials.add(weak_texture);
 
-            cmds.entity(camera).insert((
-                MaterialMesh2dBundle {
-                    mesh: Mesh2dHandle(mesh.0.clone()),
-                    material,
-                    transform: Transform::default(),
-                    ..default()
-                },
-                DisplayMarker(idx as _),
-                PickableBundle::default(),
-                On::<Pointer<Click>>::send_event::<MakeMaster>(),
-                RENDER_LAYERS,
-            ));
+            cmds.entity(camera)
+                .insert((
+                    Mesh2d(mesh.0.clone()),
+                    MeshMaterial2d(material),
+                    DisplayMarker(idx as _),
+                    RENDER_LAYERS,
+                ))
+                .observe(
+                    |event: Trigger<Pointer<Click>>, mut events: EventWriter<MakeMaster>| {
+                        events.send(MakeMaster(event.entity()));
+                    },
+                );
             cmds.entity(parent).add_child(camera);
         }
     }
 }
 
 fn update_aspect_ratio(
-    mut displays: Query<(&Handle<Image>, &DisplayMarker, &mut Transform)>,
+    mut displays: Query<(&ImageHandle, &DisplayMarker, &mut Transform)>,
     images: Res<Assets<Image>>,
 
     camera: Query<&BevyCamera, With<DisplayCamera>>,
@@ -162,7 +155,7 @@ fn update_aspect_ratio(
     let mut count = 0;
 
     for (handle, display, _transform) in &displays {
-        let Some(image) = images.get(handle) else {
+        let Some(image) = images.get(&handle.0) else {
             continue;
         };
 
@@ -200,7 +193,7 @@ fn update_aspect_ratio(
     };
 
     for (handle, display, mut transform) in &mut displays {
-        let Some(image) = images.get(handle) else {
+        let Some(image) = images.get(&handle.0) else {
             continue;
         };
 

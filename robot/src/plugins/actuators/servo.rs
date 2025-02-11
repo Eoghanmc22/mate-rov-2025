@@ -133,7 +133,7 @@ fn handle_servo_input(
                 };
                 Some((
                     id,
-                    (last_position + input * time.delta_seconds()).clamp(-1.0, 1.0),
+                    (last_position + input * time.delta_secs()).clamp(-1.0, 1.0),
                 ))
             }
         }

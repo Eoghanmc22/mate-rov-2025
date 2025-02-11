@@ -6,12 +6,13 @@ use std::sync::Arc;
 use std::{any::TypeId, borrow::Cow, marker::PhantomData};
 
 use ahash::{HashMap, HashSet};
+use bevy::ecs::event::EventCursor;
 use bevy::{
     app::App,
     ecs::{
         component::{Component, ComponentId, Tick},
         entity::Entity,
-        event::{Event, Events, ManualEventReader},
+        event::{Event, Events},
         reflect::ReflectComponent,
         system::Resource,
         world::{EntityWorldMut, FromWorld, World},
@@ -114,7 +115,7 @@ pub struct Ignore<T>(PhantomData<fn(T)>);
 
 impl FromWorld for SerializationSettings {
     fn from_world(world: &mut World) -> Self {
-        let marker_id = world.init_component::<Replicate>();
+        let marker_id = world.register_component::<Replicate>();
 
         Self {
             marker_id,
@@ -211,8 +212,8 @@ where
 {
     app.register_type::<C>();
 
-    let component_id = app.world_mut().init_component::<C>();
-    let ignored_id = app.world_mut().init_component::<Ignore<C>>();
+    let component_id = app.world_mut().register_component::<C>();
+    let ignored_id = app.world_mut().register_component::<Ignore<C>>();
 
     let component_info = Arc::new(ComponentInfo {
         type_name: C::type_path(),
@@ -271,8 +272,8 @@ impl ErasedManualEventReader {
             read_event: |world, reader| {
                 let events = world.get_resource::<Events<E>>()?;
                 let reader = reader
-                    .get_or_insert_with(|| Box::new(events.get_reader()))
-                    .downcast_mut::<ManualEventReader<E>>()
+                    .get_or_insert_with(|| Box::new(events.get_cursor()))
+                    .downcast_mut::<EventCursor<E>>()
                     .unwrap();
 
                 reader.read(events).next().map(Into::into)
@@ -282,12 +283,6 @@ impl ErasedManualEventReader {
 
     pub fn read_event<'a>(&'a mut self, world: &'a World) -> Option<Ptr<'a>> {
         (self.read_event)(world, &mut self.reader)
-    }
-}
-
-impl Clone for ErasedManualEventReader {
-    fn clone(&self) -> Self {
-        todo!()
     }
 }
 

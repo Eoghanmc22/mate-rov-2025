@@ -19,7 +19,6 @@ use bevy::{
     prelude::*,
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_mod_picking::{highlight::DefaultHighlightingPlugin, DefaultPickingPlugins};
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
 use bevy_tokio_tasks::TokioTasksPlugin;
 use common::{over_run::OverRunSettings, sync::SyncRole, CommonPlugins};
@@ -97,9 +96,6 @@ fn main() -> anyhow::Result<()> {
             ),
             // 3rd Party
             (
-                DefaultPickingPlugins
-                    .build()
-                    .disable::<DefaultHighlightingPlugin>(),
                 TokioTasksPlugin::default(),
                 // TODO(high): Way to close and re open
                 WorldInspectorPlugin::default().run_if(resource_exists::<ShowInspector>),

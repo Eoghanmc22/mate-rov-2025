@@ -213,7 +213,7 @@ fn main_pane(
                                 let addrs = *addrs;
 
                                 if ui.button(format!("{}", addrs.ip())).clicked() {
-                                    cmds.add(move |world: &mut World| {
+                                    cmds.queue(move |world: &mut World| {
                                         world.send_event(ConnectToPeer(addrs));
                                     });
                                 }
