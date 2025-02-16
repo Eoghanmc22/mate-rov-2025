@@ -8,15 +8,12 @@ use bevy::{
 };
 use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
-    components::{Orientation, Robot},
+    components::{Orientation, Pose, RawPose, Robot},
     types::units::Radians,
 };
 use tracing::{error, warn};
 
-use crate::{
-    trajectory::{Pose, RawPose},
-    waterlinked_api::{wl_to_mate_coords, Location, WaterLinked},
-};
+use crate::waterlinked_api::{wl_to_mate_coords, Location, WaterLinked};
 
 pub struct WaterlinkedPlugin;
 

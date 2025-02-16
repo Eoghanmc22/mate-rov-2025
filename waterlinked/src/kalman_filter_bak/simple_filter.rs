@@ -25,17 +25,16 @@ pub mod state_constants {
 // Constants for measurement indices
 // X, Y, Z are world space axes
 pub mod meas_constants {
-    pub const NUM_OBSERVATIONS: usize = 10;
-    pub const DEPTH: usize = 0;
-    pub const POS_X: usize = 1;
-    pub const POS_Y: usize = 2;
-    pub const POS_Z: usize = 3;
-    pub const VEL_X: usize = 4;
-    pub const VEL_Y: usize = 5;
-    pub const VEL_Z: usize = 6;
-    pub const ACC_X: usize = 7;
-    pub const ACC_Y: usize = 8;
-    pub const ACC_Z: usize = 9;
+    pub const NUM_OBSERVATIONS: usize = 6;
+    pub const POS_X: usize = 0;
+    pub const POS_Y: usize = 1;
+    pub const POS_Z: usize = 2;
+    // pub const VEL_X: usize = 3;
+    // pub const VEL_Y: usize = 4;
+    // pub const VEL_Z: usize = 5;
+    pub const ACC_X: usize = 3;
+    pub const ACC_Y: usize = 4;
+    pub const ACC_Z: usize = 5;
 }
 
 // Constants for control indices
@@ -61,7 +60,7 @@ pub struct KalmanConfig {
 
     pub depth_noise: f32,
     pub pos_noise: f32,
-    pub velo_noise: f32,
+    // pub velo_noise: f32,
     pub accel_noise: f32,
 }
 
@@ -70,12 +69,12 @@ impl Default for KalmanConfig {
         Self {
             depth_noise: 0.02,
             pos_noise: 0.7,
-            velo_noise: 0.2,
+            // velo_noise: 0.2,
             accel_noise: 0.4,
 
             pos_process_noise: 0.2,
             velo_process_noise: 0.2,
-            accel_process_noise: 2.0,
+            accel_process_noise: 5.0,
             accel_bias_process_noise: 0.001,
         }
     }
@@ -191,15 +190,15 @@ impl ROVObservationModel {
     pub fn new(config: &KalmanConfig) -> Self {
         let mut observation = OMatrix::<R, OS, SS>::zeros();
 
-        observation[(meas_constants::DEPTH, state_constants::POS_Z)] = 1.0;
+        // observation[(meas_constants::DEPTH, state_constants::POS_Z)] = 1.0;
 
         observation[(meas_constants::POS_X, state_constants::POS_X)] = 1.0;
         observation[(meas_constants::POS_Y, state_constants::POS_Y)] = 1.0;
         observation[(meas_constants::POS_Z, state_constants::POS_Z)] = 1.0;
 
-        observation[(meas_constants::VEL_X, state_constants::VEL_X)] = 1.0;
-        observation[(meas_constants::VEL_Y, state_constants::VEL_Y)] = 1.0;
-        observation[(meas_constants::VEL_Z, state_constants::VEL_Z)] = 1.0;
+        // observation[(meas_constants::VEL_X, state_constants::VEL_X)] = 1.0;
+        // observation[(meas_constants::VEL_Y, state_constants::VEL_Y)] = 1.0;
+        // observation[(meas_constants::VEL_Z, state_constants::VEL_Z)] = 1.0;
 
         observation[(meas_constants::ACC_X, state_constants::ACC_X)] = 1.0;
         observation[(meas_constants::ACC_Y, state_constants::ACC_Y)] = 1.0;
@@ -212,13 +211,13 @@ impl ROVObservationModel {
         let observation_transpose = observation.transpose();
 
         let mut observation_noise = OVector::<R, OS>::zeros();
-        observation_noise[meas_constants::DEPTH] = config.depth_noise;
+        // observation_noise[meas_constants::DEPTH] = config.depth_noise;
         observation_noise[meas_constants::POS_X] = config.pos_noise;
         observation_noise[meas_constants::POS_Y] = config.pos_noise;
         observation_noise[meas_constants::POS_Z] = config.pos_noise;
-        observation_noise[meas_constants::VEL_X] = config.velo_noise;
-        observation_noise[meas_constants::VEL_Y] = config.velo_noise;
-        observation_noise[meas_constants::VEL_Z] = config.velo_noise;
+        // observation_noise[meas_constants::VEL_X] = config.velo_noise;
+        // observation_noise[meas_constants::VEL_Y] = config.velo_noise;
+        // observation_noise[meas_constants::VEL_Z] = config.velo_noise;
         observation_noise[meas_constants::ACC_X] = config.accel_noise;
         observation_noise[meas_constants::ACC_Y] = config.accel_noise;
         observation_noise[meas_constants::ACC_Z] = config.accel_noise;
@@ -316,28 +315,31 @@ mod tests {
                     let az = vertical_accel;
 
                     println!("x: {x:.2}, y: {y:.2}, z: {z:.2}, vx: {vx:.2}, vy: {vy:.2}, vz: {vz:.2}, ax: {ax:.2}, ay: {ay:.2}, az: {az:.2}, abx: {acc_bias_x:.2}, aby: {acc_bias_y:.2}, abz: {acc_bias_z:.2}");
-                    yield Measurement {
-                        depth: Some(z + depth_dist.sample(&mut rng)),
-                        // depth: None,
-                        pos: Some(Vec3A::new(
-                            x + pos_dist.sample(&mut rng),
-                            y + pos_dist.sample(&mut rng),
-                            z + pos_dist.sample(&mut rng),
-                        )),
-                        // pos: None,
-                        velo: Some(Vec3A::new(
-                            vx + vel_dist.sample(&mut rng),
-                            vy + vel_dist.sample(&mut rng),
-                            vz + vel_dist.sample(&mut rng),
-                        )),
-                        // velo: None,
-                        accel: Some(Vec3A::new(
-                            ax + acc_dist.sample(&mut rng) + acc_bias_x,
-                            ay + acc_dist.sample(&mut rng) + acc_bias_y,
-                            az + acc_dist.sample(&mut rng) + acc_bias_z,
-                        )),
-                        // accel: None,
-                    };
+                    yield (
+                        Measurement {
+                            // depth: Some(z + depth_dist.sample(&mut rng)),
+                            depth: None,
+                            pos: Some(Vec3A::new(
+                                x + pos_dist.sample(&mut rng),
+                                y + pos_dist.sample(&mut rng),
+                                z + pos_dist.sample(&mut rng),
+                            )),
+                            // pos: None,
+                            // velo: Some(Vec3A::new(
+                            //     vx + vel_dist.sample(&mut rng),
+                            //     vy + vel_dist.sample(&mut rng),
+                            //     vz + vel_dist.sample(&mut rng),
+                            // )),
+                            velo: None,
+                            accel: Some(Vec3A::new(
+                                ax + acc_dist.sample(&mut rng) + acc_bias_x,
+                                ay + acc_dist.sample(&mut rng) + acc_bias_y,
+                                az + acc_dist.sample(&mut rng) + acc_bias_z,
+                            )),
+                            // accel: None,
+                        },
+                        Vec3A::new(x, y, z),
+                    );
                 }
             },
         );
@@ -364,15 +366,12 @@ mod tests {
             OVector::<R, SS>::zeros(),
             OMatrix::<R, SS, SS>::from_diagonal(&cov_diag),
         );
-        for measurement in trajectory {
+        let mut norm_acc = 0.0;
+        for (measurement, ground_truth) in trajectory {
             let observation = OVector::<R, OS>::from_vec(vec![
-                measurement.depth.unwrap(),
                 measurement.pos.unwrap().x,
                 measurement.pos.unwrap().y,
                 measurement.pos.unwrap().z,
-                measurement.velo.unwrap().x,
-                measurement.velo.unwrap().y,
-                measurement.velo.unwrap().z,
                 measurement.accel.unwrap().x,
                 measurement.accel.unwrap().y,
                 measurement.accel.unwrap().z,
@@ -382,10 +381,18 @@ mod tests {
             state = filter.step(&state, &observation).unwrap();
             print_state(&state, time);
 
+            let pos = Vec3A::new(
+                state.state()[state_constants::POS_X],
+                state.state()[state_constants::POS_Y],
+                state.state()[state_constants::POS_Z],
+            );
+            let error = (pos - ground_truth).length();
+            norm_acc += error;
+
             time += STEP_DURATION;
         }
 
-        panic!();
+        panic!("{:?}", norm_acc);
     }
 
     /// Prints the current state and covariance.

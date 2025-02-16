@@ -42,6 +42,7 @@ nalgebra = { version = "0.33", features = [
 ] }
 glam = { version = "0.29", features = ["serde"] }
 ahrs = "0.7"
+adskalman = "0.16"
 num = "0.4"
 num-dual = { git = "https://github.com/Eoghanmc22/num-dual.git", rev = "62e12f43f24de5eb8c7e22f208436e3be8dc1ea4" }
 num_enum = "0.7"
@@ -72,6 +73,7 @@ sysinfo = { version = "0.29", default-features = false }
 rppal = { version = "0.22", features = ["hal"] }
 ctrlc = "3"
 rand = "0.9"
+rand_distr = "0.5"
 rgb = "0.8"
 ahash = "0.8"
 time = { version = "0.3", features = ["local-offset", "formatting"] }

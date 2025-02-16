@@ -1,3 +1,5 @@
+mod kalman_filter;
+
 use std::{
     iter, thread,
     time::{Duration, Instant},
@@ -7,13 +9,18 @@ use ahrs::{Ahrs, Madgwick};
 use anyhow::{anyhow, Context};
 use bevy::{app::AppExit, prelude::*};
 use common::{
-    components::{Inertial, Magnetic, Orientation},
+    components::{FilteredPose, Inertial, Magnetic, Orientation, Pose, RawPose},
     error::{self, ErrorEvent, Errors},
     events::ResetYaw,
     types::hw::{InertialFrame, MagneticFrame},
 };
 use crossbeam::channel::{self, Receiver, Sender};
-use nalgebra::Vector3;
+use glam::Vec3A;
+use kalman_filter::{
+    accel, create_initial_state, observation_from_measurement, position, state_constants,
+    KalmanConfig, KalmanFilter, KalmanState, Measurement, ROVTransitionModel,
+};
+use nalgebra::{OVector, Vector3};
 use tracing::{span, Level};
 
 use crate::{
@@ -39,6 +46,7 @@ impl Plugin for OrientationPlugin {
 
         app.insert_resource(OrientationOffset(orientation_offset));
         app.insert_resource(MadgwickFilter(madgwick));
+        app.insert_resource(KalmanStateRes(create_initial_state()));
 
         app.add_systems(Startup, start_inertial_thread.pipe(error::handle_errors));
         app.add_systems(
@@ -60,6 +68,9 @@ struct InertialChannels(
 
 #[derive(Resource)]
 struct MadgwickFilter(Madgwick<f32>);
+
+#[derive(Resource)]
+struct KalmanStateRes(KalmanState);
 
 #[derive(Resource)]
 struct OrientationOffset(Quat);
@@ -157,10 +168,36 @@ fn read_new_data(
     mut cmds: Commands,
     channels: Res<InertialChannels>,
     mut madgwick_filter: ResMut<MadgwickFilter>,
+    mut kalman_state: ResMut<KalmanStateRes>,
     orientation_offset: Res<OrientationOffset>,
     robot: Res<LocalRobot>,
+    query: Query<Ref<RawPose>>,
     mut errors: EventWriter<ErrorEvent>,
 ) {
+    let config = KalmanConfig::default();
+    let transition_model = ROVTransitionModel::new(&config, 1.0 / 1000.0);
+    let kalman_state = &mut kalman_state.0;
+
+    if let Ok(raw_pose) = query.get(robot.entity) {
+        if raw_pose.is_changed() {
+            let observation_model = position::ROVObservationModel::new(&config);
+            let kalman_filter = KalmanFilter::new(&transition_model, &observation_model);
+
+            if let Ok(new_state) = kalman_filter.step(
+                kalman_state,
+                &observation_from_measurement(Measurement {
+                    accel: Vec3A::ZERO,
+                    pos: raw_pose.0.position,
+                }),
+            ) {
+                *kalman_state = new_state;
+            }
+        }
+    }
+
+    let observation_model = accel::ROVObservationModel::new(&config);
+    let kalman_filter = KalmanFilter::new(&transition_model, &observation_model);
+
     for (inertial, magnetic) in channels.0.try_iter() {
         for (inertial, mut magnetic) in inertial.into_iter().zip(
             magnetic
@@ -187,6 +224,25 @@ fn read_new_data(
             if let Err(msg) = rst {
                 errors.send(anyhow!("Process IMU frame: {msg:?}").into());
             }
+
+            // Step kalman filter
+            let quat: glam::Quat = madgwick_filter.0.quat.into();
+            let accel = quat.inverse()
+                * Vec3A::new(
+                    inertial.accel_x.0 * 9.81,
+                    inertial.accel_y.0 * 9.81,
+                    inertial.accel_z.0 * 9.81,
+                )
+                - Vec3A::new(0.0, 0.0, 9.81);
+            if let Ok(new_state) = kalman_filter.step(
+                kalman_state,
+                &observation_from_measurement(Measurement {
+                    pos: Vec3A::ZERO,
+                    accel,
+                }),
+            ) {
+                *kalman_state = new_state;
+            }
         }
 
         let quat: glam::Quat = madgwick_filter.0.quat.into();
@@ -198,8 +254,27 @@ fn read_new_data(
         let magnetic = magnetic.last().unwrap();
         let magnetic = Magnetic(*magnetic);
 
+        let state = kalman_state.state();
+        let pos = Vec3A::new(
+            state[state_constants::POS_X],
+            state[state_constants::POS_Y],
+            state[state_constants::POS_Z],
+        );
+        let velo = Vec3A::new(
+            state[state_constants::VEL_X],
+            state[state_constants::VEL_Y],
+            state[state_constants::VEL_Z],
+        );
+        let filtered = FilteredPose {
+            pose: Pose {
+                position: pos,
+                rotation: quat,
+            },
+            velo,
+        };
+
         cmds.entity(robot.entity)
-            .insert((orientation, inertial, magnetic));
+            .insert((orientation, inertial, magnetic, filtered));
     }
 }
 

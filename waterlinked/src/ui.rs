@@ -10,7 +10,7 @@ use bevy::{
 use bevy_egui::{EguiContexts, EguiPlugin};
 use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
-    components::{Robot, RobotId},
+    components::{Pose, RawPose, Robot, RobotId, TargetPose},
     sync::{ConnectToPeer, DisconnectPeer, MdnsPeers, Peer},
 };
 use egui::{CentralPanel, Color32, PointerButton, Slider, Visuals};
@@ -19,7 +19,6 @@ use tracing::{error, info, warn};
 
 use crate::{
     learn_compass::{MagneticData, ResetMagneticLog},
-    trajectory::{RawPose, Pose, TargetPose},
     waterlinked::WaterlinkedAngleOffset,
     DARK_MODE,
 };
@@ -175,7 +174,7 @@ fn main_pane(
 
             ui.label(format!("{mag_data:.04?}"));
             if ui.button("Reset Mag Log").clicked() {
-                cmds.add(|world: &mut World| {
+                cmds.queue(|world: &mut World| {
                     world.send_event(ResetMagneticLog);
                 });
             }

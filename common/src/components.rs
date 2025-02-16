@@ -82,7 +82,46 @@ components! {
     PwmSignal,
     PwmManualControl,
     PidConfig,
-    PidResult
+    PidResult,
+
+    TargetPose,
+    RawPose,
+    FilteredPose
+}
+
+// Components specific to this branch
+pub use research::*;
+mod research {
+    use bevy::{
+        ecs::component::Component,
+        reflect::{Reflect, ReflectDeserialize, ReflectSerialize},
+    };
+    use glam::{Quat, Vec3A};
+    use serde::{Deserialize, Serialize};
+
+    use crate::adapters::serde::ReflectSerdeAdapter;
+
+    // Consider using Isometry3d in bevy 15
+    #[derive(Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
+    pub struct Pose {
+        pub position: Vec3A,
+        pub rotation: Quat,
+    }
+
+    #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
+    #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+    pub struct TargetPose(pub Pose);
+
+    #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
+    #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+    pub struct RawPose(pub Pose);
+
+    #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
+    #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+    pub struct FilteredPose {
+        pub pose: Pose,
+        pub velo: Vec3A,
+    }
 }
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]

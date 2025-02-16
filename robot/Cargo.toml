@@ -13,6 +13,7 @@ bevy = { workspace = true }
 nalgebra = { workspace = true }
 glam = { workspace = true }
 ahrs = { workspace = true }
+adskalman = { workspace = true }
 
 anyhow = { workspace = true }
 tracing = { workspace = true }

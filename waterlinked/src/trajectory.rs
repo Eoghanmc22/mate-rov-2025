@@ -6,7 +6,7 @@ use bevy::{
 };
 use common::{
     bundles::MovementContributionBundle,
-    components::{MovementContribution, Robot, RobotId},
+    components::{FilteredPose, MovementContribution, Pose, Robot, RobotId, TargetPose},
     ecs_sync::Replicate,
 };
 use motor_math::glam::MovementGlam;
@@ -24,22 +24,6 @@ impl Plugin for TrajectoryPlugin {
         app.add_systems(Update, trajectory_follower);
     }
 }
-
-// Consider using Isometry3d in bevy 15
-#[derive(Debug, Clone, Copy)]
-pub struct Pose {
-    pub position: Vec3A,
-    pub rotation: Quat,
-}
-
-#[derive(Component, Debug)]
-pub struct TargetPose(pub Pose);
-
-#[derive(Component, Debug)]
-pub struct RawPose(pub Pose);
-
-#[derive(Component, Debug)]
-pub struct FilteredPose(pub Pose);
 
 // NOTE: Outputs are unscaled
 pub fn move_toward(current_pose: &Pose, target_pose: &Pose) -> MovementGlam {
@@ -74,7 +58,7 @@ fn trajectory_follower(
         return;
     };
 
-    let mut movement = move_toward(&current_pose.0, &target_pose.0);
+    let mut movement = move_toward(&current_pose.pose, &target_pose.0);
     movement.force = offset.0 * movement.force;
     movement.force *= FORCE_GAIN;
     movement.torque *= TORQUE_GAIN;
