@@ -382,7 +382,7 @@ pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
             + actual_movement.torque.dot(&movement.torque).re().sqrt();
 
         // TODO: Isnt this always true???
-        let has_axis_epsilon = 0.01;
+        let has_axis_epsilon = (0.05 as FloatType).max(epsilon);
         if (actual_magnitude - guess_magnitude).abs() < has_axis_epsilon {
             let cmds = forces_to_cmds_extrapolated(forces, motor_config, motor_data);
             let scale =
