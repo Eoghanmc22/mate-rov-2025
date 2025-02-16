@@ -20,7 +20,7 @@ motor_math = { path = "motor_math" }
 stable_hashmap = { path = "stable_hashmap" }
 
 # Bevy
-bevy = { version = "0.15", default-features = false }
+bevy = { version = "0.15", default-features = false, features = ["serialize"] }
 bevy_reflect = "0.15"
 
 # Bevy plugins
