@@ -121,6 +121,8 @@ mod research {
     pub struct FilteredPose {
         pub pose: Pose,
         pub velo: Vec3A,
+        pub acc: Vec3A,
+        pub acc_bias: Vec3A,
     }
 }
 

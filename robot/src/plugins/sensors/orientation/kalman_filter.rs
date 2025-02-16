@@ -226,6 +226,39 @@ pub fn observation_from_measurement(measurement: Measurement) -> Observation {
     ])
 }
 
+/// Prints the current state and covariance.
+pub fn print_state(state_cov: &StateAndCovariance<R, SS>) {
+    let state = state_cov.state();
+    let cov = state_cov.covariance();
+    let std_x = cov[(state_constants::POS_X, state_constants::POS_X)].sqrt();
+    let std_y = cov[(state_constants::POS_Y, state_constants::POS_Y)].sqrt();
+    let std_z = cov[(state_constants::POS_Z, state_constants::POS_Z)].sqrt();
+    let std_vx = cov[(state_constants::VEL_X, state_constants::VEL_X)].sqrt();
+    let std_vy = cov[(state_constants::VEL_Y, state_constants::VEL_Y)].sqrt();
+    let std_vz = cov[(state_constants::VEL_Z, state_constants::VEL_Z)].sqrt();
+    let std_ax = cov[(state_constants::ACC_X, state_constants::ACC_X)].sqrt();
+    let std_ay = cov[(state_constants::ACC_Y, state_constants::ACC_Y)].sqrt();
+    let std_az = cov[(state_constants::ACC_Z, state_constants::ACC_Z)].sqrt();
+    let std_abx = cov[(state_constants::BIAS_ACC_X, state_constants::BIAS_ACC_X)].sqrt();
+    let std_aby = cov[(state_constants::BIAS_ACC_Y, state_constants::BIAS_ACC_Y)].sqrt();
+    let std_abz = cov[(state_constants::BIAS_ACC_Z, state_constants::BIAS_ACC_Z)].sqrt();
+    println!(
+            "Kalman Filter position Update\n      x={:.2} ± {:.4} m\n      y={:.2} ± {:.4} m\n      z={:.2} ± {:.4} m\n     vx={:.2} ± {:.4} m/s\n     vy={:.2} ± {:.4} m/s\n     vz={:.2} ± {:.4} m/s\n     ax={:.2} ± {:.4} m/s^2\n     ay={:.2} ± {:.4} m/s^2\n     az={:.2} ± {:.4} m/s^2\n     abx={:.2} ± {:.4} m/s^2\n     aby={:.2} ± {:.4} m/s^2\n     abz={:.2} ± {:.4} m/s^2",
+            state[state_constants::POS_X], std_x,
+            state[state_constants::POS_Y], std_y,
+            state[state_constants::POS_Z], std_z,
+            state[state_constants::VEL_X], std_vx,
+            state[state_constants::VEL_Y], std_vy,
+            state[state_constants::VEL_Z], std_vz,
+            state[state_constants::ACC_X], std_ax,
+            state[state_constants::ACC_Y], std_ay,
+            state[state_constants::ACC_Z], std_az,
+            state[state_constants::BIAS_ACC_X], std_abx,
+            state[state_constants::BIAS_ACC_Y], std_aby,
+            state[state_constants::BIAS_ACC_Z], std_abz
+        );
+}
+
 // #[cfg(test)]
 // mod tests {
 //     use core::f32;

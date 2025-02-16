@@ -17,8 +17,8 @@ use common::{
 use crossbeam::channel::{self, Receiver, Sender};
 use glam::Vec3A;
 use kalman_filter::{
-    accel, create_initial_state, observation_from_measurement, position, state_constants,
-    KalmanConfig, KalmanFilter, KalmanState, Measurement, ROVTransitionModel,
+    accel, accel_position, create_initial_state, observation_from_measurement, position,
+    state_constants, KalmanConfig, KalmanFilter, KalmanState, Measurement, ROVTransitionModel,
 };
 use nalgebra::{OVector, Vector3};
 use tracing::{span, Level};
@@ -37,11 +37,11 @@ impl Plugin for OrientationPlugin {
         let orientation_offset = Quat::from_euler(
             EulerRot::YXZ,
             90.0f32.to_radians(),
-            -90.0f32.to_radians(),
-            0.0,
+            0.0f32.to_radians(),
+            0.0f32.to_radians(),
         );
-        // let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.041);
-        let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.41);
+        let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.041);
+        // let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.41);
         madgwick.quat = orientation_offset.into();
 
         app.insert_resource(OrientationOffset(orientation_offset));
@@ -174,29 +174,8 @@ fn read_new_data(
     query: Query<Ref<RawPose>>,
     mut errors: EventWriter<ErrorEvent>,
 ) {
-    let config = KalmanConfig::default();
-    let transition_model = ROVTransitionModel::new(&config, 1.0 / 1000.0);
-    let kalman_state = &mut kalman_state.0;
-
-    if let Ok(raw_pose) = query.get(robot.entity) {
-        if raw_pose.is_changed() {
-            let observation_model = position::ROVObservationModel::new(&config);
-            let kalman_filter = KalmanFilter::new(&transition_model, &observation_model);
-
-            if let Ok(new_state) = kalman_filter.step(
-                kalman_state,
-                &observation_from_measurement(Measurement {
-                    accel: Vec3A::ZERO,
-                    pos: raw_pose.0.position,
-                }),
-            ) {
-                *kalman_state = new_state;
-            }
-        }
-    }
-
-    let observation_model = accel::ROVObservationModel::new(&config);
-    let kalman_filter = KalmanFilter::new(&transition_model, &observation_model);
+    let mut total_accel = Vec3A::ZERO;
+    let mut sample_count = 0;
 
     for (inertial, magnetic) in channels.0.try_iter() {
         for (inertial, mut magnetic) in inertial.into_iter().zip(
@@ -227,21 +206,54 @@ fn read_new_data(
 
             // Step kalman filter
             let quat: glam::Quat = madgwick_filter.0.quat.into();
-            let accel = quat.inverse()
-                * Vec3A::new(
+            let accel =
+                quat * Vec3A::new(
                     inertial.accel_x.0 * 9.81,
                     inertial.accel_y.0 * 9.81,
                     inertial.accel_z.0 * 9.81,
-                )
-                - Vec3A::new(0.0, 0.0, 9.81);
-            if let Ok(new_state) = kalman_filter.step(
-                kalman_state,
-                &observation_from_measurement(Measurement {
-                    pos: Vec3A::ZERO,
-                    accel,
-                }),
-            ) {
-                *kalman_state = new_state;
+                ) - Vec3A::new(0.0, 0.0, 9.81);
+
+            total_accel += accel;
+            sample_count += 1;
+        }
+
+        if sample_count != 0 {
+            let accel = total_accel / sample_count as f32;
+
+            let config = KalmanConfig::default();
+            let transition_model = ROVTransitionModel::new(&config, 1.0 / 100.0);
+            let kalman_state = &mut kalman_state.0;
+
+            match query.get(robot.entity) {
+                Ok(raw_pose) if raw_pose.is_changed() => {
+                    let observation_model = accel_position::ROVObservationModel::new(&config);
+                    let kalman_filter = KalmanFilter::new(&transition_model, &observation_model);
+
+                    if let Ok(new_state) = kalman_filter.step(
+                        kalman_state,
+                        &observation_from_measurement(Measurement {
+                            accel,
+                            pos: raw_pose.0.position,
+                        }),
+                    ) {
+                        kalman_filter::print_state(&new_state);
+                        *kalman_state = new_state;
+                    }
+                }
+                _ => {
+                    let observation_model = accel::ROVObservationModel::new(&config);
+                    let kalman_filter = KalmanFilter::new(&transition_model, &observation_model);
+
+                    if let Ok(new_state) = kalman_filter.step(
+                        kalman_state,
+                        &observation_from_measurement(Measurement {
+                            accel,
+                            pos: Vec3A::ZERO,
+                        }),
+                    ) {
+                        *kalman_state = new_state;
+                    }
+                }
             }
         }
 
@@ -254,7 +266,7 @@ fn read_new_data(
         let magnetic = magnetic.last().unwrap();
         let magnetic = Magnetic(*magnetic);
 
-        let state = kalman_state.state();
+        let state = kalman_state.0.state();
         let pos = Vec3A::new(
             state[state_constants::POS_X],
             state[state_constants::POS_Y],
@@ -265,12 +277,24 @@ fn read_new_data(
             state[state_constants::VEL_Y],
             state[state_constants::VEL_Z],
         );
+        let acc = Vec3A::new(
+            state[state_constants::ACC_X],
+            state[state_constants::ACC_Y],
+            state[state_constants::ACC_Z],
+        );
+        let acc_bias = Vec3A::new(
+            state[state_constants::BIAS_ACC_X],
+            state[state_constants::BIAS_ACC_Y],
+            state[state_constants::BIAS_ACC_Z],
+        );
         let filtered = FilteredPose {
             pose: Pose {
                 position: pos,
                 rotation: quat,
             },
             velo,
+            acc,
+            acc_bias,
         };
 
         cmds.entity(robot.entity)

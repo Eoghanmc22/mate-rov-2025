@@ -10,7 +10,7 @@ use bevy::{
 use bevy_egui::{EguiContexts, EguiPlugin};
 use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
-    components::{Pose, RawPose, Robot, RobotId, TargetPose},
+    components::{FilteredPose, Pose, RawPose, Robot, RobotId, TargetPose},
     sync::{ConnectToPeer, DisconnectPeer, MdnsPeers, Peer},
 };
 use egui::{CentralPanel, Color32, PointerButton, Slider, Visuals};
@@ -42,7 +42,7 @@ fn set_style(mut contexts: EguiContexts) {
 
 fn main_pane(
     mut host: Local<String>,
-    mut position_history: Local<Vec<[f64; 2]>>,
+    mut position_history: Local<(Vec<[f64; 2]>, Vec<[f64; 2]>)>,
 
     mut cmds: Commands,
     mut contexts: EguiContexts,
@@ -56,6 +56,7 @@ fn main_pane(
             Entity,
             &Name,
             Option<&RawPose>,
+            Option<&FilteredPose>,
             Option<&TargetPose>,
             &RobotId,
         ),
@@ -67,7 +68,9 @@ fn main_pane(
     mut disconnect: EventWriter<DisconnectPeer>,
 ) {
     CentralPanel::default().show(contexts.ctx_mut(), |ui| {
-        if let Ok((robot, name, current_pose, target_pose, robot_id)) = robots.get_single() {
+        if let Ok((robot, name, current_pose, filtered_pose, target_pose, robot_id)) =
+            robots.get_single()
+        {
             ui.horizontal(|ui| {
                 ui.label(format!("Connected to {}", name.as_str()));
                 if ui.button("Disconnect").clicked() {
@@ -124,7 +127,16 @@ fn main_pane(
             // Position plot
             if let Some(current_pose) = current_pose {
                 let current_pos = current_pose.0.position;
-                position_history.push([current_pos.x as f64, current_pos.y as f64]);
+                position_history
+                    .0
+                    .push([current_pos.x as f64, current_pos.y as f64]);
+                if let Some(filtered_pose) = filtered_pose {
+                    let filtered_pose = filtered_pose.pose.position;
+
+                    position_history
+                        .1
+                        .push([filtered_pose.x as f64, filtered_pose.y as f64]);
+                }
 
                 let response = Plot::new("Position Track")
                     .data_aspect(1.0)
@@ -133,7 +145,8 @@ fn main_pane(
                     .width(500.0)
                     .height(500.0)
                     .show(ui, |ui| {
-                        ui.line(Line::new((*position_history).clone()).name("Track"));
+                        ui.line(Line::new((position_history.0).clone()).name("Raw Track"));
+                        ui.line(Line::new((position_history.1).clone()).name("Filtered Track"));
                         ui.points(
                             Points::new([current_pos.x as f64, current_pos.y as f64])
                                 .name("Current Position")
@@ -169,7 +182,8 @@ fn main_pane(
                     }
                 }
             } else {
-                position_history.clear();
+                position_history.0.clear();
+                position_history.1.clear();
             }
 
             ui.label(format!("{mag_data:.04?}"));
