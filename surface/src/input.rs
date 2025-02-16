@@ -102,18 +102,30 @@ pub enum Action {
 
     ToggleRobotMode,
 
+    #[actionlike(Axis)]
     Surge,
+    #[actionlike(Axis)]
     SurgeInverted,
+    #[actionlike(Axis)]
     Heave,
+    #[actionlike(Axis)]
     HeaveInverted,
+    #[actionlike(Axis)]
     Sway,
+    #[actionlike(Axis)]
     SwayInverted,
 
+    #[actionlike(Axis)]
     Pitch,
+    #[actionlike(Axis)]
     PitchInverted,
+    #[actionlike(Axis)]
     Roll,
+    #[actionlike(Axis)]
     RollInverted,
+    #[actionlike(Axis)]
     Yaw,
+    #[actionlike(Axis)]
     YawInverted,
     // HoldAxis,
     Servo,
