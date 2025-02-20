@@ -43,7 +43,6 @@ pub fn move_toward(current_pose: &Pose, target_pose: &Pose) -> MovementGlam {
 
 // FIXME: Ideally, this would run on the rov
 fn trajectory_follower(
-    offset: Res<WaterlinkedAngleOffset>,
     mut movement_contributer: Local<Option<Entity>>,
 
     mut cmds: Commands,
@@ -59,7 +58,7 @@ fn trajectory_follower(
     };
 
     let mut movement = move_toward(&current_pose.pose, &target_pose.0);
-    movement.force = offset.0 * movement.force;
+    movement.force = movement.force;
     movement.force *= FORCE_GAIN;
     movement.torque *= TORQUE_GAIN;
 

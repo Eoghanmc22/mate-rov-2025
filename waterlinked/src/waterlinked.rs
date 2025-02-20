@@ -59,6 +59,7 @@ fn start_task(runtime: Res<TokioTasksRuntime>) {
 pub fn pose_updater(
     mut cmds: Commands,
     robot: Query<(Entity, Option<&Orientation>), With<Robot>>,
+    offset: Res<WaterlinkedAngleOffset>,
     mut reader: EventReader<WaterlinkedLocationEvent>,
 ) {
     let Ok((robot, orientation)) = robot.get_single() else {
@@ -78,7 +79,7 @@ pub fn pose_updater(
 
         if position_valid {
             cmds.entity(robot).insert(RawPose(Pose {
-                position: vec3a(x, y, z),
+                position: offset.0 * vec3a(x, y, z),
                 rotation: orientation.map(|it| it.0).unwrap_or_default(),
             }));
         } else {

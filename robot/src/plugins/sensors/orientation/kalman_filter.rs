@@ -74,12 +74,12 @@ impl Default for KalmanConfig {
     fn default() -> Self {
         Self {
             depth_noise: 0.02,
-            pos_noise: 0.7,
+            pos_noise: 50.0,
             // velo_noise: 0.2,
             accel_noise: 0.4,
 
-            pos_process_noise: 0.2,
-            velo_process_noise: 0.2,
+            pos_process_noise: 0.001,
+            velo_process_noise: 0.02,
             accel_process_noise: 5.0,
             accel_bias_process_noise: 0.001,
         }

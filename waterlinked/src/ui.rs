@@ -186,6 +186,11 @@ fn main_pane(
                 position_history.1.clear();
             }
 
+            if ui.button("Clear Map").clicked() {
+                position_history.0.clear();
+                position_history.1.clear();
+            }
+
             ui.label(format!("{mag_data:.04?}"));
             if ui.button("Reset Mag Log").clicked() {
                 cmds.queue(|world: &mut World| {
