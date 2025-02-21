@@ -6324,6 +6324,7 @@ dependencies = [
  "bevy-tokio-tasks",
  "bevy_egui",
  "common",
+ "csv",
  "egui",
  "egui_plot",
  "kfilter",

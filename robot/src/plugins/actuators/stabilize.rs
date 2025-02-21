@@ -48,7 +48,7 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
             PidConfig {
                 kp: 0.5,
                 ki: 0.25,
-                kd: 0.15,
+                kd: 0.0,
                 kt: 5.0,
                 max_integral: 60.0,
             },
@@ -68,7 +68,7 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
             PidConfig {
                 kp: 0.3,
                 ki: 0.15,
-                kd: 0.1,
+                kd: 0.0,
                 kt: 3.5,
                 max_integral: 30.0,
             },
@@ -88,7 +88,7 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
             PidConfig {
                 kp: 0.15,
                 ki: 0.07,
-                kd: 0.12,
+                kd: 0.0,
                 kt: 5.0,
                 max_integral: 20.0,
             },

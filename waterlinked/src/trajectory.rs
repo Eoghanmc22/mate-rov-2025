@@ -58,7 +58,7 @@ fn trajectory_follower(
     };
 
     let mut movement = move_toward(&current_pose.pose, &target_pose.0);
-    movement.force = movement.force;
+    // movement.force = movement.force;
     movement.force *= FORCE_GAIN;
     movement.torque *= TORQUE_GAIN;
 

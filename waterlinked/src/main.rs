@@ -1,6 +1,7 @@
 #![feature(coroutines, iter_from_coroutine)]
 
 pub mod learn_compass;
+pub mod orientation;
 pub mod trajectory;
 pub mod ui;
 pub mod waterlinked;
@@ -14,6 +15,7 @@ use bevy_tokio_tasks::TokioTasksPlugin;
 use common::sync::SyncRole;
 use common::CommonPlugins;
 use learn_compass::LearnCompassPlugin;
+use orientation::SpinPlugin;
 use std::time::Duration;
 use trajectory::TrajectoryPlugin;
 use ui::EguiUiPlugin;
@@ -62,6 +64,7 @@ fn main() {
                 WaterlinkedPlugin,
                 TrajectoryPlugin,
                 LearnCompassPlugin,
+                SpinPlugin,
                 // LearnReferenceFramePlugin,
             ),
             // 3rd Party

@@ -3,14 +3,20 @@ use core::f32;
 use bevy::{
     app::{App, Plugin, Startup, Update},
     core::Name,
-    math::{vec3a, EulerRot, Quat},
+    ecs::{
+        entity,
+        world::{EntityWorldMut, FromWorld},
+    },
+    math::{vec3a, EulerRot, Quat, Vec3},
     prelude::{Commands, Entity, EventWriter, Local, Query, Res, ResMut, With, World},
-    reflect::List,
+    time::{Real, Time},
 };
 use bevy_egui::{EguiContexts, EguiPlugin};
 use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
-    components::{FilteredPose, Pose, RawPose, Robot, RobotId, TargetPose},
+    components::{
+        FilteredPose, Orientation, OrientationTarget, Pose, RawPose, Robot, RobotId, TargetPose,
+    },
     sync::{ConnectToPeer, DisconnectPeer, MdnsPeers, Peer},
 };
 use egui::{CentralPanel, Color32, PointerButton, Slider, Visuals};
@@ -19,6 +25,7 @@ use tracing::{error, info, warn};
 
 use crate::{
     learn_compass::{MagneticData, ResetMagneticLog},
+    orientation::OrientationState,
     waterlinked::WaterlinkedAngleOffset,
     DARK_MODE,
 };
@@ -43,6 +50,7 @@ fn set_style(mut contexts: EguiContexts) {
 fn main_pane(
     mut host: Local<String>,
     mut position_history: Local<(Vec<[f64; 2]>, Vec<[f64; 2]>)>,
+    mut orientation_norm_history: Local<Vec<(f32, Vec3)>>,
 
     mut cmds: Commands,
     mut contexts: EguiContexts,
@@ -58,6 +66,9 @@ fn main_pane(
             Option<&RawPose>,
             Option<&FilteredPose>,
             Option<&TargetPose>,
+            &Orientation,
+            Option<&OrientationTarget>,
+            Option<&OrientationState>,
             &RobotId,
         ),
         With<Robot>,
@@ -65,11 +76,22 @@ fn main_pane(
     mdns_peers: Option<Res<MdnsPeers>>,
     peers: Query<&Peer>,
 
+    time: Res<Time<Real>>,
+
     mut disconnect: EventWriter<DisconnectPeer>,
 ) {
     CentralPanel::default().show(contexts.ctx_mut(), |ui| {
-        if let Ok((robot, name, current_pose, filtered_pose, target_pose, robot_id)) =
-            robots.get_single()
+        if let Ok((
+            robot,
+            name,
+            current_pose,
+            filtered_pose,
+            target_pose,
+            orientation,
+            orientation_target,
+            orientation_state,
+            robot_id,
+        )) = robots.get_single()
         {
             ui.horizontal(|ui| {
                 ui.label(format!("Connected to {}", name.as_str()));
@@ -196,6 +218,101 @@ fn main_pane(
                 cmds.queue(|world: &mut World| {
                     world.send_event(ResetMagneticLog);
                 });
+            }
+
+            if orientation_state.is_some() {
+                if let Some(orientation_target) = orientation_target {
+                    let error = orientation_target.0 * orientation.0.inverse();
+                    let error = error.to_scaled_axis();
+
+                    fn normalize_angle(angle: f32) -> f32 {
+                        let wrapped_angle = modf(angle, f32::consts::TAU);
+                        if wrapped_angle > f32::consts::PI {
+                            wrapped_angle - f32::consts::TAU
+                        } else {
+                            wrapped_angle
+                        }
+                    }
+
+                    fn modf(a: f32, b: f32) -> f32 {
+                        (a % b + b) % b
+                    }
+
+                    let error = error.normalize_or_zero() * normalize_angle(error.length());
+
+                    orientation_norm_history.push((time.elapsed_secs(), error));
+                }
+
+                Plot::new("Orientation error norm")
+                    .width(ui.available_width())
+                    .height(500.0)
+                    .show(ui, |ui| {
+                        ui.line(
+                            Line::new(
+                                orientation_norm_history
+                                    .iter()
+                                    .map(|(time, pos)| [*time as _, pos.x as _])
+                                    .collect::<Vec<[f64; 2]>>(),
+                            )
+                            .name("X rot norm"),
+                        );
+                        ui.line(
+                            Line::new(
+                                orientation_norm_history
+                                    .iter()
+                                    .map(|(time, pos)| [*time as _, pos.y as _])
+                                    .collect::<Vec<[f64; 2]>>(),
+                            )
+                            .name("Y rot norm"),
+                        );
+                        ui.line(
+                            Line::new(
+                                orientation_norm_history
+                                    .iter()
+                                    .map(|(time, pos)| [*time as _, pos.z as _])
+                                    .collect::<Vec<[f64; 2]>>(),
+                            )
+                            .name("Z rot norm"),
+                        );
+                    });
+
+                if ui.button("Save").clicked() {
+                    let mut writer = csv::Writer::from_path("quat_norm.csv").unwrap();
+
+                    #[derive(serde::Serialize)]
+                    struct Data {
+                        time: f32,
+                        x: f32,
+                        y: f32,
+                        z: f32,
+                    }
+
+                    for entry in &orientation_norm_history {
+                        let data = Data {
+                            time: entry.0,
+                            x: entry.1.x,
+                            y: entry.1.y,
+                            z: entry.1.z,
+                        };
+                        writer.serialize(&data).unwrap();
+                    }
+
+                    writer.flush().unwrap();
+                }
+
+                if ui.button("Stop").clicked() {
+                    cmds.entity(robot).remove::<OrientationState>();
+                    cmds.entity(robot).remove::<OrientationTarget>();
+                }
+            } else if ui.button("Spin!").clicked() {
+                orientation_norm_history.clear();
+
+                cmds.entity(robot)
+                    .queue(|mut entity_world_mut: EntityWorldMut| {
+                        let orientation_state =
+                            entity_world_mut.world_scope(OrientationState::from_world);
+                        entity_world_mut.insert(orientation_state);
+                    });
             }
         } else {
             ui.horizontal(|ui| {
