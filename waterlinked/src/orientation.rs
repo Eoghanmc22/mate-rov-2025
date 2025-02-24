@@ -1,3 +1,4 @@
+use core::f32;
 use std::time::Duration;
 
 use bevy::prelude::*;
@@ -36,8 +37,22 @@ fn orientation_controller(
     }
 }
 
+// fn get_quat_after(time: Duration) -> Quat {
+//     // Quat::from_axis_angle(Vec3::new(1.0, 1.0, 1.0).normalize(), time.as_secs_f32())
+//     Quat::from_euler(EulerRot::ZYX, time.as_secs_f32(), 0.0, 0.0)
+//     // Quat::from_euler(EulerRot::YZX, time.as_secs_f32(), 0.0, 0.0)
+// }
+
 fn get_quat_after(time: Duration) -> Quat {
-    // Quat::from_axis_angle(Vec3::new(1.0, 1.0, 1.0).normalize(), time.as_secs_f32())
-    Quat::from_euler(EulerRot::ZYX, time.as_secs_f32(), 0.0, 0.0)
-    // Quat::from_euler(EulerRot::YZX, time.as_secs_f32(), 0.0, 0.0)
+    // Yaw
+    Quat::from_euler(
+        EulerRot::ZYX,
+        time.as_secs_f32().sin() * f32::consts::PI * 1.5,
+        0.0,
+        0.0,
+    )
+    // Roll
+    // Quat::from_euler(EulerRot::ZYX, 0.0, time.as_secs_f32().sin() * f32::consts::PI * 0.5, 0.0)
+    // Pitch
+    // Quat::from_euler(EulerRot::ZYX, 0.0, 0.0, time.as_secs_f32().sin() * f32::consts::PI * 0.5)
 }
