@@ -86,11 +86,11 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
             // TODO(high): Tune
             // TODO(low): Load from disk?
             PidConfig {
-                kp: 0.15,
-                ki: 0.07,
-                kd: 0.0,
-                kt: 5.0,
-                max_integral: 20.0,
+                kp: 0.1,
+                ki: 0.04,
+                kd: 0.01,
+                kt: 0.4,
+                max_integral: 40.0,
             },
             Replicate,
         ))
