@@ -18,7 +18,7 @@ use crate::{
 type HashMap<K, V> = StableHashMap<K, V>;
 
 #[instrument(level = "trace", skip(motor_config), ret)]
-pub fn reverse_solve<D: Number, MotorId: Hash + Ord + Clone + Debug>(
+pub fn reverse_solve<D: Number, MotorId: Ord + Clone + Debug>(
     movement: Movement<D>,
     motor_config: &MotorConfig<MotorId, D>,
 ) -> HashMap<MotorId, D> {

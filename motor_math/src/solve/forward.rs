@@ -11,7 +11,7 @@ use crate::{MotorConfig, Movement, Number};
 type HashMap<K, V> = StableHashMap<K, V>;
 
 #[instrument(level = "trace", skip(motor_config), ret)]
-pub fn forward_solve<D: Number, MotorId: Hash + Ord + Debug>(
+pub fn forward_solve<D: Number, MotorId: Clone + Ord + Debug>(
     motor_config: &MotorConfig<MotorId, D>,
     motor_forces: &HashMap<MotorId, D>,
 ) -> Movement<D> {

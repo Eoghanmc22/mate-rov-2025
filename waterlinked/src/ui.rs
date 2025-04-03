@@ -21,6 +21,7 @@ use common::{
 };
 use egui::{CentralPanel, Color32, PointerButton, Slider, Visuals};
 use egui_plot::{Line, MarkerShape, Plot, PlotItem, PlotPoint, PlotPoints, Points};
+use tokio::sync::oneshot::error;
 use tracing::{error, info, warn};
 
 use crate::{
@@ -240,6 +241,10 @@ fn main_pane(
 
                     let error = error.normalize_or_zero() * normalize_angle(error.length());
 
+                    // let error = error.to_euler(EulerRot::ZYX);
+
+                    // orientation_norm_history
+                    //     .push((time.elapsed_secs(), Vec3::new(error.2, error.1, error.0)));
                     orientation_norm_history.push((time.elapsed_secs(), error));
                 }
 
@@ -247,15 +252,15 @@ fn main_pane(
                     .width(ui.available_width())
                     .height(500.0)
                     .show(ui, |ui| {
-                        // ui.line(
-                        //     Line::new(
-                        //         orientation_norm_history
-                        //             .iter()
-                        //             .map(|(time, pos)| [*time as _, pos.x as _])
-                        //             .collect::<Vec<[f64; 2]>>(),
-                        //     )
-                        //     .name("X rot norm"),
-                        // );
+                        ui.line(
+                            Line::new(
+                                orientation_norm_history
+                                    .iter()
+                                    .map(|(time, pos)| [*time as _, pos.x as _])
+                                    .collect::<Vec<[f64; 2]>>(),
+                            )
+                            .name("X rot norm"),
+                        );
                         ui.line(
                             Line::new(
                                 orientation_norm_history
@@ -265,15 +270,15 @@ fn main_pane(
                             )
                             .name("Y rot norm"),
                         );
-                        // ui.line(
-                        //     Line::new(
-                        //         orientation_norm_history
-                        //             .iter()
-                        //             .map(|(time, pos)| [*time as _, pos.z as _])
-                        //             .collect::<Vec<[f64; 2]>>(),
-                        //     )
-                        //     .name("Z rot norm"),
-                        // );
+                        ui.line(
+                            Line::new(
+                                orientation_norm_history
+                                    .iter()
+                                    .map(|(time, pos)| [*time as _, pos.z as _])
+                                    .collect::<Vec<[f64; 2]>>(),
+                            )
+                            .name("Z rot norm"),
+                        );
                     });
 
                 if ui.button("Save").clicked() {

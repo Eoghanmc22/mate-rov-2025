@@ -14,14 +14,16 @@ pub mod x3d;
 
 use std::{
     fmt::Debug,
+    hash::Hash,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
 use bevy_reflect::prelude::ReflectDefault;
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
-use nalgebra::{Matrix6xX, MatrixXx6, RealField, Vector3, SVD};
+use nalgebra::{vector, Matrix6xX, MatrixXx6, RealField, Vector3, SVD};
 use num_dual::DualNum;
 use serde::{Deserialize, Serialize};
+use solve::{forward, reverse::reverse_solve};
 use tracing::instrument;
 
 #[cfg(feature = "double_precision")]
@@ -45,7 +47,7 @@ pub struct MotorConfig<MotorId: Debug + Ord, D: Number> {
     pub pseudo_inverse: MatrixXx6<D>,
 }
 
-impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
+impl<MotorId: Ord + Debug + Clone, D: Number> MotorConfig<MotorId, D> {
     #[instrument(level = "trace", skip_all, ret)]
     pub fn new_raw(
         motors: impl IntoIterator<Item = (MotorId, Motor<D>)>,
@@ -93,12 +95,50 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
             )
         });
         let pseudo_inverse = svd.pseudo_inverse(D::from(0.0001)).unwrap();
+        println!("Motors: {motors:#?}");
+        println!("Matrix: {matrix}");
+        println!("Psuedo Inverse: {pseudo_inverse}");
 
-        Self {
+        let this = Self {
             motors,
             matrix,
             pseudo_inverse,
-        }
+        };
+
+        let reverse = reverse_solve(
+            Movement {
+                force: vector![D::zero(), D::zero(), D::zero()],
+                torque: vector![D::zero(), D::zero(), D::one()],
+            },
+            &this,
+        );
+        println!("Reverse: {reverse:#?}");
+        let forward = forward::forward_solve(&this, &reverse);
+        println!("Forward: {forward:#?}");
+
+        let reverse = reverse_solve(
+            Movement {
+                force: vector![D::one(), D::zero(), D::zero()],
+                torque: vector![D::zero(), D::zero(), D::zero()],
+            },
+            &this,
+        );
+        println!("Reverse: {reverse:#?}");
+        let forward = forward::forward_solve(&this, &reverse);
+        println!("Forward: {forward:#?}");
+
+        let reverse = reverse_solve(
+            Movement {
+                force: vector![D::zero(), D::one(), D::zero()],
+                torque: vector![D::zero(), D::zero(), D::zero()],
+            },
+            &this,
+        );
+        println!("Reverse: {reverse:#?}");
+        let forward = forward::forward_solve(&this, &reverse);
+        println!("Forward: {forward:#?}");
+
+        this
     }
 
     pub fn motor(&self, motor: &MotorId) -> Option<&Motor<D>> {

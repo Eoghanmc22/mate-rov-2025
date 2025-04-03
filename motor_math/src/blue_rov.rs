@@ -1,5 +1,7 @@
+use std::iter;
+
 use bevy_reflect::{Reflect, ReflectDeserialize, ReflectSerialize};
-use nalgebra::Vector3;
+use nalgebra::{vector, Vector3};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
@@ -40,10 +42,12 @@ impl<D: Number> MotorConfig<BlueRovMotorId, D> {
     ) -> Self {
         #[rustfmt::skip]
         let motors = [
+            // remove for two and three
             (BlueRovMotorId::LateralFrontRight, lateral_front_right, false, &[].as_slice()),
             (BlueRovMotorId::LateralFrontLeft, lateral_front_right, false, &[VectorTransform::ReflectYZ].as_slice()),
             (BlueRovMotorId::LateralBackRight, lateral_front_right, true, &[VectorTransform::ReflectXZ].as_slice()),
-            (BlueRovMotorId::LateralBackLeft, lateral_front_right, true, &[VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
+            // remove for two, and 6dof
+            // (BlueRovMotorId::LateralBackLeft, lateral_front_right, true, &[VectorTransform::ReflectYZ, VectorTransform::ReflectXZ].as_slice()),
 
             (BlueRovMotorId::VerticalRight, vertical_right, false, &[].as_slice()),
             (BlueRovMotorId::VerticalLeft, vertical_right, true, &[VectorTransform::ReflectYZ].as_slice()),
@@ -72,6 +76,25 @@ impl<D: Number> MotorConfig<BlueRovMotorId, D> {
                 )
             });
 
-        Self::new_raw(motors, center_mass)
+        let full_6dof = true;
+        if !full_6dof {
+            Self::new_raw(motors, center_mass)
+        } else {
+            Self::new_raw(
+                motors.chain(iter::once((
+                    BlueRovMotorId::LateralBackLeft,
+                    Motor {
+                        position: vector![
+                            D::from(-0.4361 / 2.0),
+                            D::from(-0.2400 / 2.0),
+                            D::from(0.004)
+                        ],
+                        orientation: vector![D::zero(), D::zero(), D::one()],
+                        direction: crate::Direction::CounterClockwise,
+                    },
+                ))),
+                center_mass,
+            )
+        }
     }
 }

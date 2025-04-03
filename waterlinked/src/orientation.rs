@@ -9,6 +9,7 @@ use bevy::{
 use common::{
     bundles::MovementContributionBundle,
     components::{MovementContribution, Orientation, OrientationTarget},
+    ecs_sync::Replicate,
 };
 use motor_math::glam::MovementGlam;
 
@@ -40,11 +41,14 @@ fn insert_orientation_state(mut world: DeferredWorld, entity: Entity, _component
     let robot = *world.get(entity).unwrap();
     let contributor = world
         .commands()
-        .spawn(MovementContributionBundle {
-            name: Name::new("Orientation Feedforward"),
-            contribution: MovementContribution(MovementGlam::default()),
-            robot,
-        })
+        .spawn((
+            MovementContributionBundle {
+                name: Name::new("Orientation Feedforward"),
+                contribution: MovementContribution(MovementGlam::default()),
+                robot,
+            },
+            Replicate,
+        ))
         .id();
 
     world
@@ -69,7 +73,7 @@ fn orientation_controller(
 
         cmds.entity(entity).insert(OrientationTarget(target_quat));
         cmds.entity(state.feedforward)
-            .insert(MovementContribution(movement));
+            .try_insert(MovementContribution(movement));
     }
 }
 
@@ -81,11 +85,22 @@ fn orientation_controller(
 
 fn get_control_output(time: Duration, current: Quat) -> (Quat, MovementGlam) {
     // // Yaw
-    // Quat::from_euler(
-    //     EulerRot::ZYX,
-    //     (time.as_secs_f32() / 10.0).sin() * f32::consts::PI * 1.5,
-    //     0.0,
-    //     0.0,
+    // (
+    //     Quat::from_euler(
+    //         EulerRot::ZYX,
+    //         (time.as_secs_f32() / 10.0).sin() * f32::consts::PI * 1.5,
+    //         0.0,
+    //         0.0,
+    //     ),
+    //     // MovementGlam::default(),
+    //     MovementGlam {
+    //         force: Vec3A::ZERO,
+    //         torque: Vec3A::new(
+    //             0.0,
+    //             0.0,
+    //             (time.as_secs_f32() / 10.0).cos() * f32::consts::PI * 1.5 / 10.0 * 0.75,
+    //         ),
+    //     },
     // )
 
     let mut yaw = current;
@@ -101,20 +116,23 @@ fn get_control_output(time: Duration, current: Quat) -> (Quat, MovementGlam) {
         // yaw *= Quat::from_rotation_y(180f32.to_radians()).inverse();
     }
 
-    // Roll
-    let roll = (time.as_secs_f32() / 10.0).sin() * f32::consts::PI * 0.25;
+    // // Roll
+    // let roll = (time.as_secs_f32() / 10.0).sin() * f32::consts::PI / 8.0;
+    // (
+    //     /*yaw * */ Quat::from_euler(EulerRot::ZYX, 0.0, roll, 0.0),
+    //     MovementGlam {
+    //         force: Vec3A::ZERO,
+    //         torque: Vec3A::new(0.0, roll.sin() * 3.0, 0.0),
+    //     },
+    // )
+
+    // Pitch
+    let pitch = (time.as_secs_f32() / 10.0).sin() * f32::consts::PI / 8.0;
     (
-        yaw * Quat::from_euler(EulerRot::ZYX, 0.0, roll, 0.0),
+        /*yaw * */ Quat::from_euler(EulerRot::ZYX, 0.0, 0.0, pitch),
         MovementGlam {
             force: Vec3A::ZERO,
-            torque: Vec3A::new(0.0, roll * 0.5, 0.0),
+            torque: Vec3A::new(pitch.sin() * 2.0, 0.0, 0.0),
         },
     )
-    // // Pitch
-    // Quat::from_euler(
-    //     EulerRot::ZYX,
-    //     0.0,
-    //     0.0,
-    //     (time.as_secs_f32() / 10.0).sin() * f32::consts::PI * 0.25,
-    // )
 }
