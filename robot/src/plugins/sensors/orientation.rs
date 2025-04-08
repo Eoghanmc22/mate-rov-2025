@@ -7,10 +7,12 @@ use ahrs::{Ahrs, Madgwick};
 use anyhow::{anyhow, Context};
 use bevy::{app::AppExit, prelude::*};
 use common::{
-    components::{Inertial, Magnetic, Orientation},
+    components::{
+        AccelerometerMeasurement, GyroMeasurement, MagnetometerMeasurement, Orientation,
+        TempertureMeasurement,
+    },
     error::{self, ErrorEvent, Errors},
     events::ResetYaw,
-    types::hw::{InertialFrame, MagneticFrame},
 };
 use crossbeam::channel::{self, Receiver, Sender};
 use nalgebra::Vector3;
@@ -18,7 +20,7 @@ use tracing::{span, Level};
 
 use crate::{
     peripheral::{icm20602::Icm20602, mmc5983::Mcc5983},
-    plugins::core::robot::{LocalRobot, LocalRobotMarker},
+    plugins::core::robot::LocalRobot,
 };
 
 pub struct OrientationPlugin;
@@ -41,7 +43,14 @@ impl Plugin for OrientationPlugin {
 
 #[derive(Resource)]
 struct InertialChannels(
-    Receiver<([InertialFrame; 10], [MagneticFrame; 1])>,
+    Receiver<(
+        [(
+            GyroMeasurement,
+            AccelerometerMeasurement,
+            TempertureMeasurement,
+        ); 10],
+        [MagnetometerMeasurement; 1],
+    )>,
     Sender<()>,
 );
 
@@ -70,8 +79,8 @@ fn start_inertial_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Res
 
             let mut counter = 0;
 
-            let mut inertial_buffer = [InertialFrame::default(); 10];
-            let mut mag_buffer = [MagneticFrame::default(); 1];
+            let mut inertial_buffer = [Default::default(); 10];
+            let mut mag_buffer = [Default::default(); 1];
 
             let inertial_divisor = counts / inertial_buffer.len();
             let mag_divisor = counts / mag_buffer.len();
@@ -147,10 +156,9 @@ fn read_new_data(
     for (inertial, magnetic) in channels.0.try_iter() {
         // We currently ignore mag updates as the compass is not calibrated
         // TODO(high): Calibrate the compass
-        for inertial in inertial {
-            let gyro = Vector3::new(inertial.gyro_x.0, inertial.gyro_y.0, inertial.gyro_z.0)
-                * (std::f32::consts::PI / 180.0);
-            let accel = Vector3::new(inertial.accel_x.0, inertial.accel_y.0, inertial.accel_z.0);
+        for (gyro, accel, _temp) in inertial {
+            let gyro = Vector3::new(gyro.x.0, gyro.y.0, gyro.z.0) * (std::f32::consts::PI / 180.0);
+            let accel = Vector3::new(accel.x.0, accel.y.0, accel.z.0);
 
             let rst = madgwick_filter.0.update_imu(&gyro, &accel);
             if let Err(msg) = rst {
@@ -161,11 +169,8 @@ fn read_new_data(
         let quat: glam::Quat = madgwick_filter.0.quat.into();
         let orientation = Orientation(quat);
 
-        let inertial = inertial.last().unwrap();
-        let inertial = Inertial(*inertial);
-
-        let magnetic = magnetic.last().unwrap();
-        let magnetic = Magnetic(*magnetic);
+        let inertial = *inertial.last().unwrap();
+        let magnetic = *magnetic.last().unwrap();
 
         cmds.entity(robot.entity)
             .insert((orientation, inertial, magnetic));

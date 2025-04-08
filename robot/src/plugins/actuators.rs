@@ -1,6 +1,6 @@
 pub mod depth_hold;
+pub mod hardware;
 pub mod leds;
-pub mod pwm;
 pub mod servo;
 pub mod stabilize;
 pub mod thruster;
@@ -20,7 +20,8 @@ impl PluginGroup for MovementPlugins {
         #[cfg(rpi)]
         let plugins = plugins
             // Plugins depending on robot hardware
-            .add(pwm::PwmOutputPlugin)
+            .add(hardware::pwm::PwmOutputPlugin)
+            .add(hardware::dc_motor::DcMotorPlugin)
             .add(leds::LedPlugin);
 
         plugins

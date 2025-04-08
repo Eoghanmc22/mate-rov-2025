@@ -7,12 +7,12 @@ use bevy::{
 };
 use common::{
     components::{
-        Depth, DepthTarget, MovementContribution, Orientation, OrientationTarget, Robot, RobotId,
-        ServoContribution, ServoTargets,
+        DepthMeasurement, DepthTarget, MotorContribution, MotorTargets, MovementContribution,
+        Orientation, OrientationTarget, Robot, RobotId,
     },
     types::units::Meters,
 };
-use motor_math::{glam::MovementGlam, Movement};
+use motor_math::glam::MovementGlam;
 use opencv::{
     calib3d,
     core::{self, Point2f, Point3f, Scalar, Vector},
@@ -73,7 +73,7 @@ enum InternalState {
 
 impl Pipeline for SquareTrackingPipeline {
     // (robot, robot_orientation,)
-    type Input = Option<(Entity, Orientation, Depth, ServoTargets)>;
+    type Input = Option<(Entity, Orientation, DepthMeasurement, MotorTargets)>;
 
     // Extracts the necessary data from the ECS world
     // Runs on the main thread
@@ -90,10 +90,10 @@ impl Pipeline for SquareTrackingPipeline {
         let &orientation = robot.get::<Orientation>()?;
 
         // Read the robot's depth from the pressure sensor
-        let &depth = robot.get::<Depth>()?;
+        let &depth = robot.get::<DepthMeasurement>()?;
 
         // Read the target positions of the robot's servos
-        let servos = robot.get::<ServoTargets>()?.clone();
+        let servos = robot.get::<MotorTargets>()?.clone();
 
         Some((robot.id(), orientation, depth, servos))
     }
@@ -436,7 +436,7 @@ impl Pipeline for SquareTrackingPipeline {
                 // Lower depth slowly by continually setting the depth target this distance lower
                 // than the current depth or by `remaining_depth` which ever is less
                 let depth_target_delta = 0.07f32;
-                let new_depth_target = depth.0.depth.0 + depth_target_delta.min(remaing_depth);
+                let new_depth_target = depth.depth.0 + depth_target_delta.min(remaing_depth);
 
                 // Send new depth target to robot
                 cmds.world(move |world| {
@@ -453,15 +453,18 @@ impl Pipeline for SquareTrackingPipeline {
                 }
             }
             InternalState::ReleasePayload => {
+                todo!("ReleasePayload state in squares pipeline is not implemented");
+
                 // Slowly open claw
                 cmds.pipeline(move |mut entity| {
-                    entity.insert(ServoContribution([("Claw1".into(), -0.1)].into()));
+                    // entity.insert(MotorContribution([("Claw1".into(), -0.1)].into()));
                 });
 
                 // If claw is open, end the pipeline
-                if servos.0.get("Claw1").iter().any(|&&val| val < -0.8) {
-                    cmds.should_end();
-                }
+                // if servos.0.get("Claw1").iter().any(|&&val| val < -0.8) {
+                //     cmds.should_end();
+                // }
+                panic!()
             }
         }
 

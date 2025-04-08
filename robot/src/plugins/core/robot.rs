@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 use common::{
     bundles::RobotCoreBundle,
-    components::{Robot, RobotId, RobotStatus, Singleton},
+    components::{Robot, RobotId, Singleton},
     ecs_sync::{NetId, Replicate},
     InstanceName,
 };
+
+use super::state::RobotStatus;
 
 pub struct RobotPlugin;
 
@@ -30,10 +32,11 @@ fn setup_robot(mut cmds: Commands, name: Res<InstanceName>) {
         .spawn((
             RobotCoreBundle {
                 name: Name::new(name.0.clone()),
-                status: RobotStatus::default(),
                 robot_id: RobotId(net_id),
                 marker: Robot,
             },
+            // TODO: Make this a required component of smth
+            RobotStatus::default(),
             LocalRobotMarker,
             Replicate,
             Singleton,

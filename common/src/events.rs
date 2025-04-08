@@ -7,7 +7,9 @@ use bevy::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{adapters::serde::ReflectSerdeAdapter, ecs_sync::AppReplicateExt};
+use crate::{
+    adapters::serde::ReflectSerdeAdapter, components::GenericMotorId, ecs_sync::AppReplicateExt,
+};
 
 macro_rules! events {
     ($($name:ident),*) => {
@@ -43,6 +45,6 @@ pub struct ResetYaw;
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub struct ResetServos;
 
-#[derive(Event, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
+#[derive(Event, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct ResetServo(pub Cow<'static, str>);
+pub struct ResetServo(pub GenericMotorId);

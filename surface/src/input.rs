@@ -8,8 +8,9 @@ use bevy::{
 use common::{
     bundles::MovementContributionBundle,
     components::{
-        Armed, Depth, DepthTarget, MovementAxisMaximums, MovementContribution, Orientation,
-        OrientationTarget, Robot, RobotId, ServoContribution, Servos,
+        Armed, DepthMeasurement, DepthTarget, GenericMotorId, MotorContribution, Motors,
+        MovementAxisMaximums, MovementContribution, Orientation, OrientationTarget, Robot, RobotId,
+        Thrusters,
     },
     ecs_sync::{NetId, Replicate},
     events::ResetServo,
@@ -50,7 +51,7 @@ impl Plugin for InputPlugin {
 
 #[derive(Component, Debug, Clone, Default, Reflect)]
 pub struct SelectedServo {
-    pub servo: Option<Cow<'static, str>>,
+    pub servo: Option<(GenericMotorId, Cow<'static, str>)>,
 }
 
 #[derive(Component, Debug, Clone, Copy, Reflect, PartialEq)]
@@ -235,7 +236,7 @@ fn attach_to_new_robots(mut cmds: Commands, new_robots: Query<(&NetId, &Name), A
                 contribution: MovementContribution(MovementGlam::default()),
                 robot: RobotId(*robot),
             },
-            ServoContribution(Default::default()),
+            MotorContribution(Default::default()),
             InputInterpolation::normal(),
             InputMarker,
             Replicate,
@@ -375,7 +376,7 @@ fn arm(
 fn depth_hold(
     mut cmds: Commands,
     inputs: Query<(&RobotId, &ActionState<Action>), With<InputMarker>>,
-    robots: Query<(Entity, &Depth, Option<&DepthTarget>, &RobotId), With<Robot>>,
+    robots: Query<(Entity, &DepthMeasurement, Option<&DepthTarget>, &RobotId), With<Robot>>,
 ) {
     for (robot, action_state) in &inputs {
         let toggle = action_state.just_pressed(&Action::ToggleDepthHold);
@@ -392,7 +393,7 @@ fn depth_hold(
                         cmds.entity(robot).remove::<DepthTarget>();
                     }
                     None => {
-                        let depth = depth.0.depth;
+                        let depth = depth.depth;
 
                         info!("Set Depth Hold: {:.2}", depth);
                         cmds.entity(robot).insert(DepthTarget(depth));
@@ -564,60 +565,74 @@ fn servos(
         With<InputMarker>,
     >,
     mut writer: EventWriter<ResetServo>,
-    robots: Query<(&Servos, &RobotId), With<Robot>>,
+    robots: Query<(&Motors, &RobotId), With<Robot>>,
+    servos: Query<(&GenericMotorId, &Name, &RobotId)>,
 ) {
-    for (entity, robot, action_state, interpolation, mut selected_servo) in &mut inputs {
+    for (entity, robot_id, action_state, interpolation, mut selected_servo) in &mut inputs {
         let center = action_state.just_pressed(&Action::ServoCenter);
         let switch = action_state.just_pressed(&Action::SwitchServo);
         let switch_inverted = action_state.just_pressed(&Action::SwitchServoInverted);
         let select_important = action_state.just_pressed(&Action::SelectImportantServo);
         let input = action_state.value(&Action::Servo) - action_state.value(&Action::ServoInverted);
 
-        let robot = robots.iter().find(|&(_, other_robot)| robot == other_robot);
+        let robot = robots
+            .iter()
+            .find(|&(_, other_robot_id)| robot_id == other_robot_id);
 
-        if let Some((servos, _)) = robot {
+        if let Some((motors, _)) = robot {
             let offset = if switch {
                 1
             } else {
-                servos.servos.len().saturating_sub(1)
+                motors.ids.len().saturating_sub(1)
             };
 
             if select_important {
-                if selected_servo.servo.as_ref().map(|it| it.as_str()) != Some("Claw1") {
-                    if servos.servos.iter().any(|it| it.as_str() == "Claw1") {
-                        selected_servo.servo = Some("Claw1".into());
-                    }
-                } else if servos
-                    .servos
-                    .iter()
-                    .any(|it| it.as_str() == "FrontCameraRotate")
-                {
-                    selected_servo.servo = Some("FrontCameraRotate".into());
-                }
+                error!("Select important servo is not implemented!");
+
+                // if selected_servo.servo.as_ref().map(|it| it.as_str()) != Some("Claw1") {
+                //     if servos.motors.iter().any(|it| it.as_str() == "Claw1") {
+                //         selected_servo.servo = Some("Claw1".into());
+                //     }
+                // } else if servos
+                //     .motors
+                //     .iter()
+                //     .any(|it| it.as_str() == "FrontCameraRotate")
+                // {
+                //     selected_servo.servo = Some("FrontCameraRotate".into());
+                // }
             } else if (switch || switch_inverted || selected_servo.servo.is_none())
-                && !servos.servos.is_empty()
+                && !motors.ids.is_empty()
             {
-                let idx = servos
-                    .servos
+                let idx = motors
+                    .ids
                     .iter()
-                    .position(|it| {
-                        Some(it.as_str()) == selected_servo.servo.as_ref().map(|it| it.as_str())
-                    })
-                    .map(|it| (it + offset) % servos.servos.len())
+                    .position(|it| Some(it) == selected_servo.servo.as_ref().map(|(id, _)| id))
+                    .map(|it| (it + offset) % motors.ids.len())
                     .unwrap_or(0);
 
-                selected_servo.servo = Some(servos.servos[idx].clone());
+                let servo_id = motors.ids[idx];
+                let servo_name = servos
+                    .iter()
+                    .filter(|(_, _, servo_robot_id)| **servo_robot_id == *robot_id)
+                    .filter(|(servo_channel, _, _)| **servo_channel == servo_id)
+                    .map(|(_, name, _)| Cow::from(name.as_str().to_owned()))
+                    .next();
+                selected_servo.servo =
+                    Some((servo_id, servo_name.unwrap_or("Unknown Servo".into())));
             }
 
             if let Some(servo) = &selected_servo.servo {
                 if center {
-                    writer.send(ResetServo(servo.clone()));
+                    writer.send(ResetServo(servo.0));
                 }
 
                 let movement = input * interpolation.servo_rate;
 
-                cmds.entity(entity).insert(ServoContribution(
-                    vec![(servo.clone(), movement)].into_iter().collect(),
+                cmds.entity(entity).insert(MotorContribution(
+                    vec![(servo.clone(), movement)]
+                        .into_iter()
+                        .map(|((id, _), output)| (id, output))
+                        .collect(),
                 ));
             }
         }

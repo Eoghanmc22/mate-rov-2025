@@ -1,9 +1,9 @@
 use std::{thread, time::Duration};
 
 use anyhow::{bail, Context};
-use common::types::{
-    hw::DepthFrame,
-    units::{Celsius, Mbar, Meters},
+use common::{
+    components::{DepthMeasurement, TempertureMeasurement},
+    types::units::{Celsius, Mbar, Meters},
 };
 use rppal::i2c::I2c;
 use tracing::{debug, info, instrument};
@@ -42,19 +42,21 @@ impl Ms5837 {
     }
 
     #[instrument(level = "trace", skip(self), ret)]
-    pub fn read_frame(&mut self) -> anyhow::Result<DepthFrame> {
+    pub fn read_frame(&mut self) -> anyhow::Result<(DepthMeasurement, TempertureMeasurement)> {
         let raw = self.read_raw().context("Read raw frame")?;
 
         let (pressure, temperature) = calculate_pressure_and_temperature(raw, &self.calibration);
         let altitude = pressure_to_altitude(pressure, self.sea_level.0);
         let depth = pressure_to_depth(pressure, self.fluid_density, self.sea_level.0);
 
-        Ok(DepthFrame {
-            depth,
-            altitude,
-            pressure,
-            temperature,
-        })
+        Ok((
+            DepthMeasurement {
+                depth,
+                altitude,
+                pressure,
+            },
+            TempertureMeasurement { temperature },
+        ))
     }
 }
 

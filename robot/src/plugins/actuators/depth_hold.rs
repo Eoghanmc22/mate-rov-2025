@@ -2,13 +2,14 @@ use bevy::prelude::*;
 use common::{
     bundles::MovementContributionBundle,
     components::{
-        Armed, Depth, DepthTarget, MovementContribution, Orientation, PidConfig, PidResult, RobotId,
+        Armed, DepthMeasurement, DepthTarget, MovementContribution, Orientation, PidConfig,
+        PidResult, RobotId,
     },
     ecs_sync::Replicate,
     types::{units::Meters, utils::PidController},
 };
 use glam::Vec3A;
-use motor_math::{glam::MovementGlam, Movement};
+use motor_math::glam::MovementGlam;
 
 use crate::plugins::core::robot::LocalRobot;
 
@@ -53,7 +54,7 @@ fn depth_hold_system(
     mut cmds: Commands,
     robot: Res<LocalRobot>,
     mut state: ResMut<DepthHoldState>,
-    robot_query: Query<(&Armed, &Depth, &DepthTarget, &Orientation)>,
+    robot_query: Query<(&Armed, &DepthMeasurement, &DepthTarget, &Orientation)>,
     entity_query: Query<&PidConfig>,
     time: Res<Time<Real>>,
 ) {
@@ -61,7 +62,7 @@ fn depth_hold_system(
     let pid_config = entity_query.get(state.0).unwrap();
 
     if let Ok((&Armed::Armed, depth, depth_target, orientation)) = robot {
-        let depth_error = depth_target.0 - depth.0.depth;
+        let depth_error = depth_target.0 - depth.depth;
         let depth_td = depth_target.0 - last_target.unwrap_or(depth_target.0);
 
         let pid = &mut state.1;

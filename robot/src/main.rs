@@ -14,6 +14,7 @@ use bevy::{
     log::LogPlugin,
     prelude::*,
 };
+use bevy_tokio_tasks::TokioTasksPlugin;
 use common::{sync::SyncRole, CommonPlugins};
 use config::RobotConfig;
 use plugins::{actuators::MovementPlugins, core::CorePlugins, monitor::MonitorPlugins};
@@ -54,6 +55,8 @@ fn main() -> anyhow::Result<()> {
             // })
             // Logging
             LogPlugin::default(),
+            // Tokio
+            TokioTasksPlugin::default(),
             // Diagnostics
             (
                 DiagnosticsPlugin,

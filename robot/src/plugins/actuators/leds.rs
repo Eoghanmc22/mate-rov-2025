@@ -8,7 +8,7 @@ use std::{
 use anyhow::Context;
 use bevy::{app::AppExit, prelude::*, utils::HashMap};
 use common::{
-    components::{PwmChannel, PwmSignal, RobotId, RobotStatus},
+    components::{GenericMotorId, MotorRawSignalRange, MotorSignal, RobotId},
     error::{self, ErrorEvent, Errors},
 };
 use crossbeam::channel::{self, Sender};
@@ -18,7 +18,7 @@ use tracing::{span, Level};
 
 use crate::{
     peripheral::neopixel::{Neopixel, NeopixelBuffer},
-    plugins::core::robot::LocalRobotMarker,
+    plugins::core::{robot::LocalRobotMarker, state::RobotStatus},
 };
 
 pub struct LedPlugin;
@@ -148,7 +148,12 @@ fn start_leds(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<()> {
 fn update_leds(
     mut leds: ResMut<LedChannels>,
     robot: Query<(&RobotStatus, &RobotId), With<LocalRobotMarker>>,
-    thrusters: Query<(&PwmChannel, &PwmSignal, &RobotId)>,
+    thrusters: Query<(
+        &GenericMotorId,
+        &MotorSignal,
+        &MotorRawSignalRange,
+        &RobotId,
+    )>,
     time: Res<Time<Real>>,
     mut errors: EventReader<ErrorEvent>,
 ) {
@@ -157,8 +162,8 @@ fn update_leds(
     let (status, id) = robot.single();
     let thrusters = thrusters
         .iter()
-        .filter(|(_, _, robot)| **robot == *id)
-        .map(|(&channel, &signal, _)| (channel, signal))
+        .filter(|(_, _, _, robot)| **robot == *id)
+        .map(|(channel, signal, raw_range, _)| (channel, (signal, raw_range)))
         .collect::<HashMap<_, _>>();
 
     let brightness = 0.5;
@@ -173,18 +178,21 @@ fn update_leds(
             }
             // Choose color based on thruster speed
             LedType::Thruster(id) => {
-                let signal = thrusters.get(&PwmChannel(id));
+                let signal = thrusters.get(&GenericMotorId(id));
 
-                if let Some(signal) = signal {
-                    let micros = signal.0.as_micros();
+                if let Some((signal, raw_range)) = signal {
+                    let pct = match signal {
+                        MotorSignal::Percent(pct) => *pct,
+                        MotorSignal::Raw(signal) => raw_range.percent_from_raw(*signal),
+                    };
 
-                    if micros >= 1500 {
+                    if pct > 0.0 {
                         // Forward
-                        let green = (micros as u32 - 1500) * 255 / 400;
+                        let green = pct * 255.0 / 400.0;
                         RGB8::new(0, green as u8, 0)
                     } else {
                         // Backward
-                        let red = (1500 - micros as u32) * 255 / 400;
+                        let red = -pct * 255.0 / 400.0;
                         RGB8::new(red as u8, 0, 0)
                     }
                 } else {

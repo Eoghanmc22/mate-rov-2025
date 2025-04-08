@@ -6,9 +6,10 @@ use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
     bundles::MovementContributionBundle,
     components::{
-        Armed, Camera, CpuTotal, CurrentDraw, Depth, DepthTarget, Inertial, LoadAverage,
-        MeasuredVoltage, Memory, MovementAxisMaximums, MovementContribution, OrientationTarget,
-        PwmChannel, PwmManualControl, PwmSignal, Robot, RobotId, RobotStatus, Temperatures,
+        Armed, Camera, CpuTotal, CurrentDraw, DepthMeasurement, DepthTarget, DisableMovementApi,
+        GenericMotorId, LoadAverage, MeasuredVoltage, Memory, MotorRawSignalRange, MotorSignal,
+        MovementAxisMaximums, MovementContribution, OrientationTarget, Robot, RobotId,
+        Temperatures, TempertureMeasurement,
     },
     ecs_sync::{NetId, Replicate},
     events::{CalibrateSeaLevel, ResetServos, ResetYaw, ResyncCameras},
@@ -92,7 +93,7 @@ fn topbar(
     robots: Query<
         (
             &Name,
-            &RobotStatus,
+            &Armed,
             Option<&DepthTarget>,
             Option<&OrientationTarget>,
         ),
@@ -272,22 +273,10 @@ fn topbar(
                             },
                         );
 
+                        // FIXME: Slight regression here since this the Armed status in the local
+                        // esc could become out of sync with the robot's ecs
                         match state {
-                            RobotStatus::NoPeer => {
-                                layout_job.append(
-                                    "Unknown",
-                                    7.0,
-                                    TextFormat {
-                                        color: if DARK_MODE {
-                                            Color32::WHITE
-                                        } else {
-                                            Color32::BLACK
-                                        },
-                                        ..default()
-                                    },
-                                );
-                            }
-                            RobotStatus::Disarmed => {
+                            Armed::Disarmed => {
                                 layout_job.append(
                                     "Disarmed",
                                     7.0,
@@ -297,7 +286,7 @@ fn topbar(
                                     },
                                 );
                             }
-                            RobotStatus::Armed => {
+                            Armed::Armed => {
                                 layout_job.append(
                                     "Armed",
                                     7.0,
@@ -357,18 +346,16 @@ fn hud(
         (
             &Name,
             Option<&Armed>,
-            Option<&MeasuredVoltage>,
-            Option<&CurrentDraw>,
-            Option<&CpuTotal>,
-            Option<&Inertial>,
-            Option<&LoadAverage>,
-            Option<&Memory>,
-            Option<&Temperatures>,
-            Option<&Depth>,
-            Option<&DepthTarget>,
-            Option<&OrientationTarget>,
-            Option<&Peer>,
-            Option<&Latency>,
+            (Option<&MeasuredVoltage>, Option<&CurrentDraw>),
+            (Option<&OrientationTarget>, Option<&TempertureMeasurement>),
+            (
+                Option<&CpuTotal>,
+                Option<&LoadAverage>,
+                Option<&Memory>,
+                Option<&Temperatures>,
+            ),
+            (Option<&DepthMeasurement>, Option<&DepthTarget>),
+            (Option<&Peer>, Option<&Latency>),
             &RobotId,
         ),
         With<Robot>,
@@ -394,18 +381,11 @@ fn hud(
     if let Ok((
         robot_name,
         armed,
-        voltage,
-        current_draw,
-        cpu,
-        inertial,
-        load,
-        memory,
-        temps,
-        depth,
-        depth_target,
-        orientation_target,
-        peer,
-        latency,
+        (voltage, current_draw),
+        (orientation_target, imu_temp),
+        (cpu, load, memory, temps),
+        (depth, depth_target),
+        (peer, latency),
         robot_id,
     )) = robots.get_single()
     {
@@ -497,7 +477,7 @@ fn hud(
                             ui.label(RichText::new("Servo:").size(size));
                             if let Some(selected_servo) = &selected_servo.servo {
                                 ui.label(
-                                    RichText::new(selected_servo.clone())
+                                    RichText::new(selected_servo.1.clone())
                                         .size(size)
                                         .color(Color32::GREEN),
                                 );
@@ -587,9 +567,9 @@ fn hud(
                         ui.add_space(10.0);
                     }
 
-                    if let Some(inertial) = inertial {
+                    if let Some(imu_temp) = imu_temp {
                         ui.label(
-                            RichText::new(format!("IMU Temp: {}", inertial.0.tempature)).size(size),
+                            RichText::new(format!("IMU Temp: {}", imu_temp.temperature)).size(size),
                         );
                     }
 
@@ -602,19 +582,20 @@ fn hud(
                         }
                     }
 
-                    if let Some(depth) = depth {
-                        ui.label(
-                            RichText::new(format!("Water Temp: {}", depth.0.temperature))
-                                .size(size),
-                        );
-                    }
+                    // TODO: Find a way to support this again
+                    // if let Some(depth) = depth {
+                    //     ui.label(
+                    //         RichText::new(format!("Water Temp: {}", depth.0.temperature))
+                    //             .size(size),
+                    //     );
+                    // }
 
-                    if inertial.is_some() || temps.is_some() {
+                    if imu_temp.is_some() || temps.is_some() {
                         ui.add_space(10.0);
                     }
 
                     if let Some(depth) = depth {
-                        ui.label(RichText::new(format!("Depth: {}", depth.0.depth)).size(size));
+                        ui.label(RichText::new(format!("Depth: {}", depth.depth)).size(size));
 
                         if let Some(depth_target) = depth_target {
                             ui.label(
@@ -719,8 +700,14 @@ fn pwm_control(
     mut cmds: Commands,
     mut contexts: EguiContexts,
     mut pwm_control: ResMut<PwmControl>,
-    robots: Query<(Entity, Option<&PwmManualControl>, &RobotId), With<Robot>>,
-    motors: Query<(Entity, Option<&PwmSignal>, &PwmChannel, &RobotId)>,
+    robots: Query<(Entity, Option<&DisableMovementApi>, &RobotId), With<Robot>>,
+    motors: Query<(
+        Entity,
+        Option<&MotorSignal>,
+        Option<&MotorRawSignalRange>,
+        &GenericMotorId,
+        &RobotId,
+    )>,
 ) {
     let context = contexts.ctx_mut();
     let mut open = true;
@@ -739,20 +726,24 @@ fn pwm_control(
 
                     if enabled {
                         info!("Enabled manual control");
-                        cmds.entity(robot).insert(PwmManualControl);
+                        cmds.entity(robot).insert(DisableMovementApi);
                     } else {
                         info!("Disabled manual control");
-                        cmds.entity(robot).remove::<PwmManualControl>();
+                        cmds.entity(robot).remove::<DisableMovementApi>();
                     }
                 }
 
-                for (motor, signal, channel, m_robot_id) in &motors {
+                for (motor, signal, raw_range, channel, m_robot_id) in &motors {
                     if robot_id != m_robot_id {
                         continue;
                     }
 
-                    let last_value = if let Some(signal) = signal {
-                        (signal.0.as_micros() as i32 - 1500) as f32 / 400.0
+                    let last_value = if let (Some(signal), Some(raw_range)) = (signal, raw_range) {
+                        // This is repeated in s few places, mode into method on MotorSignal
+                        match *signal {
+                            MotorSignal::Percent(pct) => pct,
+                            MotorSignal::Raw(raw) => raw_range.percent_from_raw(raw),
+                        }
                     } else {
                         0.0
                     };
@@ -767,9 +758,7 @@ fn pwm_control(
                     });
 
                     if value != last_value {
-                        let signal = 1500 + (value * 400.0) as i32;
-                        cmds.entity(motor)
-                            .insert(PwmSignal(Duration::from_micros(signal as u64)));
+                        cmds.entity(motor).insert(MotorSignal::Percent(value));
                     }
                 }
             } else {
@@ -785,7 +774,7 @@ fn pwm_control(
 fn cleanup_pwm_control(mut cmds: Commands, robots: Query<Entity, With<Robot>>) {
     info!("Disabled manual control");
     for robot in &robots {
-        cmds.entity(robot).remove::<PwmManualControl>();
+        cmds.entity(robot).remove::<DisableMovementApi>();
     }
 }
 

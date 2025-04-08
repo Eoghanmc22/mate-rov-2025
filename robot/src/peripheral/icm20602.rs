@@ -1,6 +1,6 @@
-use common::types::{
-    hw::InertialFrame,
-    units::{Celsius, Dps, GForce},
+use common::{
+    components::{AccelerometerMeasurement, GyroMeasurement, TempertureMeasurement},
+    types::units::{Celsius, Dps, GForce},
 };
 use std::{thread, time::Duration};
 use tracing::{debug, info, instrument};
@@ -30,7 +30,13 @@ impl Icm20602 {
     }
 
     #[instrument(level = "trace", skip(self), ret)]
-    pub fn read_frame(&mut self) -> anyhow::Result<InertialFrame> {
+    pub fn read_frame(
+        &mut self,
+    ) -> anyhow::Result<(
+        GyroMeasurement,
+        AccelerometerMeasurement,
+        TempertureMeasurement,
+    )> {
         let raw = self.read_raw_frame().context("Read raw frame")?;
 
         // The first byte is junk
@@ -50,7 +56,7 @@ impl Icm20602 {
         let accel_native_y = raw_accel_native_y as i16 as f32 / 4096.0;
         let accel_native_z = raw_accel_native_z as i16 as f32 / 4096.0;
 
-        let tempature = raw_tempature as i16 as f32 / 326.8 + 25.0;
+        let temperature = raw_tempature as i16 as f32 / 326.8 + 25.0;
 
         let gyro_native_x = raw_gyro_native_x as i16 as f32 / 16.4;
         let gyro_native_y = raw_gyro_native_y as i16 as f32 / 16.4;
@@ -64,15 +70,21 @@ impl Icm20602 {
         let gyro_y = -gyro_native_x;
         let gyro_z = -gyro_native_z;
 
-        Ok(InertialFrame {
-            gyro_x: Dps(gyro_x),
-            gyro_y: Dps(gyro_y),
-            gyro_z: Dps(gyro_z),
-            accel_x: GForce(accel_x),
-            accel_y: GForce(accel_y),
-            accel_z: GForce(accel_z),
-            tempature: Celsius(tempature),
-        })
+        Ok((
+            GyroMeasurement {
+                x: Dps(gyro_x),
+                y: Dps(gyro_y),
+                z: Dps(gyro_z),
+            },
+            AccelerometerMeasurement {
+                x: GForce(accel_x),
+                y: GForce(accel_y),
+                z: GForce(accel_z),
+            },
+            TempertureMeasurement {
+                temperature: Celsius(temperature),
+            },
+        ))
     }
 }
 

@@ -8,6 +8,7 @@ common = { workspace = true }
 networking = { workspace = true }
 motor_math = { workspace = true }
 stable_hashmap = { workspace = true }
+dc_motor_interface = { workspace = true }
 
 bevy = { workspace = true }
 nalgebra = { workspace = true }
@@ -28,6 +29,9 @@ toml = { workspace = true }
 
 crossbeam = { workspace = true }
 ahash = { workspace = true }
+
+tokio = { workspace = true }
+bevy-tokio-tasks = { workspace = true }
 
 [features]
 tracy = ["bevy/trace_tracy", "common/tracy_frame_mark"]

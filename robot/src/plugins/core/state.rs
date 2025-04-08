@@ -1,8 +1,5 @@
 use bevy::prelude::*;
-use common::{
-    components::{Armed, RobotStatus},
-    sync::Peer,
-};
+use common::{components::Armed, sync::Peer};
 
 use super::robot::LocalRobotMarker;
 
@@ -13,6 +10,17 @@ impl Plugin for StatePlugin {
         app.add_systems(PreUpdate, update_state)
             .add_systems(Update, log_state_transition);
     }
+}
+
+#[derive(Component, Debug, Copy, Clone, PartialEq, Default)]
+pub enum RobotStatus {
+    /// No peer is connected
+    #[default]
+    NoPeer,
+    /// Peer is connected and robot is disarmed
+    Disarmed,
+    /// Peer is connected and robot is armed
+    Armed,
 }
 
 // TODO(high): More nuanced state to drive the neopixels

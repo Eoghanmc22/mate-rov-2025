@@ -7,15 +7,16 @@ use ahash::HashMap;
 use anyhow::{anyhow, Context};
 use bevy::{app::AppExit, prelude::*};
 use common::{
-    components::{Armed, PwmChannel, PwmSignal, RobotId},
+    components::{Armed, GenericMotorId, MotorRawSignalRange, MotorSignal, RobotId},
     ecs_sync::NetId,
     error::{self, Errors},
-    types::hw::PwmChannelId,
 };
 use crossbeam::channel::{self, Sender};
 use tracing::{span, Level};
 
 use crate::{peripheral::pca9685::Pca9685, plugins::core::robot::LocalRobotMarker};
+
+use super::motor_id_map::{LocalMotorId, PwmChannel};
 
 pub struct PwmOutputPlugin;
 
@@ -26,19 +27,19 @@ impl Plugin for PwmOutputPlugin {
             PostUpdate,
             listen_to_pwms
                 .pipe(error::handle_errors)
-                .run_if(resource_exists::<PwmChannels>),
+                .run_if(resource_exists::<GenericMotorIds>),
         );
-        app.add_systems(Last, shutdown.run_if(resource_exists::<PwmChannels>));
+        app.add_systems(Last, shutdown.run_if(resource_exists::<GenericMotorIds>));
     }
 }
 
 #[derive(Resource)]
-struct PwmChannels(Sender<PwmEvent>);
+struct GenericMotorIds(Sender<PwmEvent>);
 
 #[derive(Debug)]
 enum PwmEvent {
     Arm(Armed),
-    UpdateChannel(PwmChannelId, Duration),
+    UpdateChannel(PwmChannel, Duration),
     BatchComplete,
     Shutdown,
 }
@@ -59,7 +60,7 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
 
     pwm_controller.output_disable();
 
-    cmds.insert_resource(PwmChannels(tx_data));
+    cmds.insert_resource(GenericMotorIds(tx_data));
 
     let errors = errors.0.clone();
     thread::Builder::new()
@@ -148,7 +149,7 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
                     // Copy pwm values from `channel_pwms` into `pwms`
                     // `channel_pwms` is cleared in the disarmed case
                     for (channel, new_pwm) in &channel_pwms {
-                        let channel_pwm = pwms.get_mut(*channel as usize);
+                        let channel_pwm = pwms.get_mut(channel.id() as usize);
 
                         // If this is a valid channel, set the corresponding channel's pwm
                         if let Some(channel_pwm) = channel_pwm {
@@ -191,9 +192,14 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
 }
 
 fn listen_to_pwms(
-    channels: Res<PwmChannels>,
+    channels: Res<GenericMotorIds>,
     robot: Query<(&NetId, &Armed), With<LocalRobotMarker>>,
-    pwms: Query<(&RobotId, &PwmChannel, &PwmSignal)>,
+    pwms: Query<(
+        &RobotId,
+        &GenericMotorId,
+        &MotorSignal,
+        &MotorRawSignalRange,
+    )>,
 ) -> anyhow::Result<()> {
     let (net_id, armed) = robot.single();
 
@@ -202,13 +208,25 @@ fn listen_to_pwms(
         .send(PwmEvent::Arm(*armed))
         .context("Send data to pwm thread")?;
 
-    for (RobotId(robot_net_id), pwm_channel, pwm) in &pwms {
-        if robot_net_id == net_id {
-            channels
-                .0
-                .send(PwmEvent::UpdateChannel(pwm_channel.0, pwm.0))
-                .context("Send data to pwm thread")?;
+    for (RobotId(robot_net_id), &channel, &signal, raw_range) in &pwms {
+        if robot_net_id != net_id {
+            continue;
         }
+
+        let LocalMotorId::PwmChannel(channel) = channel.into() else {
+            continue;
+        };
+
+        let pwm = match signal {
+            MotorSignal::Percent(pct) => raw_range.raw_from_percent(pct),
+            MotorSignal::Raw(raw) => raw,
+        };
+        let pwm = Duration::from_micros(raw_range.clamp_raw(pwm) as u64);
+
+        channels
+            .0
+            .send(PwmEvent::UpdateChannel(channel, pwm))
+            .context("Send data to pwm thread")?;
     }
 
     channels
@@ -219,7 +237,7 @@ fn listen_to_pwms(
     Ok(())
 }
 
-fn shutdown(channels: Res<PwmChannels>, mut exit: EventReader<AppExit>) {
+fn shutdown(channels: Res<GenericMotorIds>, mut exit: EventReader<AppExit>) {
     for _event in exit.read() {
         let _ = channels.0.send(PwmEvent::Shutdown);
     }

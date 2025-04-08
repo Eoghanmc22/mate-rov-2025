@@ -6,10 +6,9 @@ use std::{
 use anyhow::Context;
 use bevy::{app::AppExit, prelude::*};
 use common::{
-    components::{Depth, DepthSettings},
+    components::{DepthMeasurement, DepthSettings, TempertureMeasurement},
     error::{self, Errors},
     events::CalibrateSeaLevel,
-    types::hw::DepthFrame,
 };
 use crossbeam::channel::{self, Receiver, Sender};
 use tracing::{span, Level};
@@ -43,7 +42,10 @@ impl Plugin for DepthPlugin {
 }
 
 #[derive(Resource)]
-struct DepthChannels(Receiver<DepthFrame>, Sender<Message>);
+struct DepthChannels(
+    Receiver<(DepthMeasurement, TempertureMeasurement)>,
+    Sender<Message>,
+);
 
 enum Message {
     Settings(DepthSettings),
@@ -63,7 +65,7 @@ fn start_depth_thread(
 
     cmds.insert_resource(DepthChannels(rx_data, tx_exit));
 
-    let sea_level = depth.read_frame().context("Read Sea Level")?;
+    let (sea_level, _) = depth.read_frame().context("Read Sea Level")?;
     depth.sea_level = sea_level.pressure;
 
     cmds.entity(robot.entity).insert(DepthSettings {
@@ -122,23 +124,24 @@ fn start_depth_thread(
 }
 
 fn read_new_data(mut cmds: Commands, channels: Res<DepthChannels>, robot: Res<LocalRobot>) {
-    for depth in channels.0.try_iter() {
-        let depth = Depth(depth);
-
+    for (depth, temp) in channels.0.try_iter() {
+        // TODO: when we move this to a child entity, we will add the temperature measurement to
+        // that
         cmds.entity(robot.entity).insert(depth);
+        let _ = temp;
     }
 }
 
 fn calibrate_sea_level(
     mut cmds: Commands,
     mut events: EventReader<CalibrateSeaLevel>,
-    mut robot: Query<(&Depth, &mut DepthSettings), With<LocalRobotMarker>>,
+    mut robot: Query<(&DepthMeasurement, &mut DepthSettings), With<LocalRobotMarker>>,
 ) {
     for _ in events.read() {
         info!("Calibrating Sea Level");
 
         for (depth, mut settings) in &mut robot {
-            settings.sea_level = depth.0.pressure;
+            settings.sea_level = depth.pressure;
         }
     }
 }

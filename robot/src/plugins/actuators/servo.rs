@@ -1,12 +1,10 @@
-use std::time::Duration;
-
 use ahash::{HashMap, HashSet};
 use bevy::prelude::*;
 use common::{
-    bundles::{PwmActuatorBundle, ServoBundle},
+    bundles::{ActuatorBundle, MotorBundle},
     components::{
-        PwmChannel, PwmManualControl, PwmSignal, RobotId, ServoContribution, ServoDefinition,
-        ServoMode, ServoTargets, Servos,
+        DisableMovementApi, GenericMotorId, MotorCameraReference, MotorContribution,
+        MotorContributionMode, MotorSignal, MotorSignalType, MotorTargets, Motors, RobotId,
     },
     ecs_sync::{NetId, Replicate},
     events::{ResetServo, ResetServos},
@@ -36,35 +34,45 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
 
     // TODO: Make this a bundle
     cmds.entity(robot.entity).insert((
-        Servos {
-            servos: servos.iter().map(|(name, _)| name.clone().into()).collect(),
+        Motors {
+            ids: servos
+                .iter()
+                .map(|(_, servo)| servo.channel.into())
+                .collect(),
         },
-        ServoTargets::default(),
+        MotorTargets::default(),
     ));
 
     for (
         name,
-        Servo {
-            pwm_channel,
-            cameras,
+        &Servo {
+            channel,
+            ref camera,
         },
     ) in servos
     {
-        cmds.spawn((
-            ServoBundle {
-                actuator: PwmActuatorBundle {
+        let mut entity = cmds.spawn((
+            MotorBundle {
+                actuator: ActuatorBundle {
                     name: Name::new(name.clone()),
-                    pwm_channel: PwmChannel(*pwm_channel),
-                    pwm_signal: PwmSignal(Duration::from_micros(1500)),
+                    channel: channel.into(),
+                    signal: MotorSignal::Percent(0.0),
                     robot: RobotId(robot.net_id),
+                    signal_type: MotorSignalType::Position,
+                    // TODO : We need a way to get the actual range
+                    signal_range: channel.default_signal_range(),
                 },
-                servo: ServoDefinition {
-                    cameras: cameras.iter().map(|it| it.clone().into()).collect(),
-                },
-                servo_mode: ServoMode::Velocity,
+                // TODO: This should prob be configurable
+                mode: MotorContributionMode::ZerothOrder,
             },
             Replicate,
         ));
+        if let Some(camera) = camera {
+            entity.insert(MotorCameraReference {
+                // TODO: this defeats the point of COW
+                camera: camera.to_owned().into(),
+            });
+        }
     }
 }
 
@@ -72,12 +80,20 @@ fn handle_servo_input(
     mut cmds: Commands,
 
     robot: Query<
-        (Entity, &NetId, &ServoTargets),
-        (With<LocalRobotMarker>, Without<PwmManualControl>),
+        (Entity, &NetId, &MotorTargets),
+        // FIXME: Should this really be `Without<DisableMovementApi>`
+        (With<LocalRobotMarker>, Without<DisableMovementApi>),
     >,
-    servo_inputs: Query<(&RobotId, &ServoContribution)>,
+    servo_inputs: Query<(&RobotId, &MotorContribution)>,
     // TODO
-    servos: Query<(Entity, &Name, &ServoMode, &ServoDefinition, &RobotId)>,
+    servos: Query<(
+        Entity,
+        &Name,
+        &MotorSignalType,
+        &MotorContributionMode,
+        &GenericMotorId,
+        &RobotId,
+    )>,
 
     mut reset: EventReader<ResetServos>,
     mut reset_single: EventReader<ResetServo>,
@@ -102,7 +118,7 @@ fn handle_servo_input(
 
     let servos_by_id = servos
         .iter()
-        .map(|it| (it.1.as_str(), it))
+        .map(|it| (it.4, it))
         .collect::<HashMap<_, _>>();
 
     let mut full_reset = false;
@@ -121,11 +137,12 @@ fn handle_servo_input(
     }
 
     new_positions.extend(all_inputs.into_iter().flat_map(|(id, input)| {
-        let (_, _, mode, _, _) = servos_by_id.get(&*id)?;
+        let (_, _, _, mode, _, _) = servos_by_id.get(&id)?;
 
+        // TODO: Check if this is even right
         match mode {
-            ServoMode::Position => Some((id, input)),
-            ServoMode::Velocity => {
+            MotorContributionMode::ZerothOrder => Some((id, input)),
+            MotorContributionMode::FirstOrder => {
                 let last_position = if !full_reset && !should_reset.contains(&id) {
                     last_positions.0.get(&id).copied().unwrap_or(0.0)
                 } else {
@@ -140,15 +157,14 @@ fn handle_servo_input(
     }));
 
     for (id, position) in &new_positions {
-        let Some((servo, ..)) = servos_by_id.get(&**id) else {
+        let Some((servo, ..)) = servos_by_id.get(&*id) else {
             continue;
         };
 
-        let micros = 1500.0 + 400.0 * position.clamp(-1.0, 1.0);
+        // let micros = 1500.0 + 400.0 * position.clamp(-1.0, 1.0);
 
-        cmds.entity(*servo)
-            .insert(PwmSignal(Duration::from_micros(micros as u64)));
+        cmds.entity(*servo).insert(MotorSignal::Percent(*position));
     }
 
-    cmds.entity(robot).insert(ServoTargets(new_positions));
+    cmds.entity(robot).insert(MotorTargets(new_positions));
 }

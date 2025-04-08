@@ -1,6 +1,5 @@
 use ahash::{HashMap, HashSet};
 use bevy::{ecs::system::Resource, transform::components::Transform};
-use common::types::hw::PwmChannelId;
 use glam::{vec3, EulerRot, Quat, Vec3A};
 use motor_math::{
     blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::MotorGlam, x3d::X3dMotorId,
@@ -8,6 +7,8 @@ use motor_math::{
 };
 use nalgebra::vector;
 use serde::{Deserialize, Serialize};
+
+use crate::plugins::actuators::hardware::motor_id_map::LocalMotorId;
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct RobotConfig {
@@ -36,7 +37,7 @@ pub enum MotorConfigDefinition {
 pub struct X3dDefinition {
     pub seed_motor: MotorGlam,
 
-    pub motors: HashMap<X3dMotorId, PwmChannelId>,
+    pub motors: HashMap<X3dMotorId, LocalMotorId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,7 +45,7 @@ pub struct BlueRovDefinition {
     pub vertical_seed_motor: MotorGlam,
     pub lateral_seed_motor: MotorGlam,
 
-    pub motors: HashMap<BlueRovMotorId, PwmChannelId>,
+    pub motors: HashMap<BlueRovMotorId, LocalMotorId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,7 +53,7 @@ pub struct HeavyDefinition {
     pub vertical_seed_motor: MotorGlam,
     pub lateral_seed_motor: MotorGlam,
 
-    pub motors: HashMap<HeavyMotorId, PwmChannelId>,
+    pub motors: HashMap<HeavyMotorId, LocalMotorId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,7 +63,7 @@ pub struct CustomDefinition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomMotor {
-    pub pwm_channel: PwmChannelId,
+    pub pwm_channel: LocalMotorId,
     pub motor: MotorGlam,
 }
 
@@ -121,7 +122,7 @@ impl MotorConfigDefinition {
         &self,
         center_mass: Vec3A,
     ) -> (
-        impl Iterator<Item = (ErasedMotorId, MotorGlam, PwmChannelId)>,
+        impl Iterator<Item = (ErasedMotorId, MotorGlam, LocalMotorId)>,
         MotorConfig<ErasedMotorId, motor_math::FloatType>,
     ) {
         let motors: Vec<_>;
@@ -235,8 +236,9 @@ pub struct ServoConfigDefinition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Servo {
-    pub pwm_channel: PwmChannelId,
-    pub cameras: HashSet<String>,
+    pub channel: LocalMotorId,
+    // pub cameras: HashSet<String>,
+    pub camera: Option<String>,
 }
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]

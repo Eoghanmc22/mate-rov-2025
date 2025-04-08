@@ -11,7 +11,7 @@ use bevy::{
     },
 };
 use bevy_egui::EguiContexts;
-use common::components::{Motors, Orientation, OrientationTarget, Robot};
+use common::components::{Orientation, OrientationTarget, Robot, Thrusters};
 use egui::TextureId;
 use motor_math::{glam::MotorGlam, x3d::X3dMotorId, Direction, ErasedMotorId, Motor, MotorConfig};
 
@@ -60,6 +60,7 @@ fn setup(
         // height: 512,
         // width: 1024,
         // height: 1024,
+        // FIXME: why is this using such a weird size?
         width: 920,
         height: 920,
         ..default()
@@ -205,7 +206,7 @@ fn add_motor(
 
 fn update_motor_conf(
     mut commands: Commands,
-    motor_conf: Query<&Motors, Changed<Motors>>,
+    motor_conf: Query<&Thrusters, Changed<Thrusters>>,
     motors_query: Query<Entity, With<OrientationDisplayMarker>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,

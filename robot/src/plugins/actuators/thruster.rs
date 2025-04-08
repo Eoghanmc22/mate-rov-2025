@@ -3,11 +3,12 @@ use std::time::Duration;
 use ahash::HashMap;
 use bevy::prelude::*;
 use common::{
-    bundles::{MotorBundle, PwmActuatorBundle, RobotActuatorBundle},
+    bundles::{ActuatorBundle, RobotThrusterBundle, ThrusterBundle},
     components::{
-        ActualForce, ActualMovement, Armed, CurrentDraw, JerkLimit, MotorContribution,
-        MotorDefinition, Motors, MovementAxisMaximums, MovementContribution, MovementCurrentCap,
-        PwmChannel, PwmManualControl, PwmSignal, RobotId, TargetForce, TargetMovement,
+        ActualForce, ActualMovement, Armed, CurrentDraw, DisableMovementApi, GenericMotorId,
+        JerkLimit, MotorRawSignalRange, MotorSignal, MotorSignalType, MovementAxisMaximums,
+        MovementContribution, MovementCurrentCap, RobotId, TargetForce, TargetMovement,
+        ThrustContribution, ThrusterDefinition, Thrusters,
     },
     ecs_sync::{NetId, Replicate},
     types::units::{Amperes, Newtons},
@@ -58,16 +59,16 @@ fn create_motors(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
 
     info!("Generating motor config");
 
-    cmds.entity(robot.entity).insert(RobotActuatorBundle {
+    cmds.entity(robot.entity).insert(RobotThrusterBundle {
         movement_target: TargetMovement(Default::default()),
         movement_actual: ActualMovement(Default::default()),
-        motor_config: Motors(motor_config),
+        thruster_config: Thrusters(motor_config),
         axis_maximums: MovementAxisMaximums(Default::default()),
         current_cap: MovementCurrentCap(config.motor_amperage_budget.into()),
         armed: Armed::Disarmed,
     });
 
-    for (motor_id, motor, pwm_channel) in motors {
+    for (motor_id, motor, channel) in motors {
         let name = match config.motor_config {
             MotorConfigDefinition::X3d(_) => {
                 format!(
@@ -91,14 +92,18 @@ fn create_motors(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
         };
 
         cmds.spawn((
-            MotorBundle {
-                actuator: PwmActuatorBundle {
+            ThrusterBundle {
+                actuator: ActuatorBundle {
                     name: Name::new(name),
-                    pwm_channel: PwmChannel(pwm_channel),
-                    pwm_signal: PwmSignal(Duration::from_micros(1500)),
+                    channel: channel.into(),
+                    signal: MotorSignal::Percent(0.0),
                     robot: RobotId(robot.net_id),
+                    signal_type: MotorSignalType::Velocity,
+                    // TODO:  Come up with a better way to do this
+                    // FIXME:
+                    signal_range: channel.default_signal_range(),
                 },
-                motor: MotorDefinition(motor_id, motor),
+                motor: ThrusterDefinition(motor_id, motor),
                 target_force: TargetForce(0.0f32.into()),
                 actual_force: ActualForce(0.0f32.into()),
                 current_draw: CurrentDraw(0.0f32.into()),
@@ -116,13 +121,13 @@ fn setup_motor_math(mut cmds: Commands, config: Res<RobotConfig>, robot: Res<Loc
 fn update_axis_maximums(
     mut cmds: Commands,
     robot: Query<
-        (Entity, &MovementCurrentCap, &Motors),
+        (Entity, &MovementCurrentCap, &Thrusters),
         (With<LocalRobotMarker>, Changed<MovementCurrentCap>),
     >,
     motor_data: Res<MotorDataRes>,
 ) {
-    for (entity, current_cap, motor_config) in &robot {
-        let motor_config = &motor_config.0;
+    for (entity, current_cap, thruster_config) in &robot {
+        let motor_config = &thruster_config.0;
         let motor_data = &motor_data.0;
         let current_cap = current_cap.0 .0;
 
@@ -139,12 +144,15 @@ fn update_axis_maximums(
 
 fn accumulate_movements(
     mut cmds: Commands,
-    robot: Query<(Entity, &NetId, &Motors), (With<LocalRobotMarker>, Without<PwmManualControl>)>,
+    robot: Query<
+        (Entity, &NetId, &Thrusters),
+        (With<LocalRobotMarker>, Without<DisableMovementApi>),
+    >,
     movements: Query<(&RobotId, &MovementContribution)>,
 
     motor_data: Res<MotorDataRes>,
 ) {
-    let Ok((entity, net_id, Motors(motor_config))) = robot.get_single() else {
+    let Ok((entity, net_id, Thrusters(thruster_config))) = robot.get_single() else {
         return;
     };
     let mut robot = cmds.entity(entity);
@@ -157,14 +165,14 @@ fn accumulate_movements(
         }
     }
 
-    let forces = solve::reverse::reverse_solve(total_movement.into(), motor_config);
-    let motor_cmds = solve::reverse::forces_to_cmds(forces, motor_config, &motor_data.0);
+    let forces = solve::reverse::reverse_solve(total_movement.into(), thruster_config);
+    let motor_cmds = solve::reverse::forces_to_cmds(forces, thruster_config, &motor_data.0);
     let forces = motor_cmds
         .into_iter()
         .map(|(motor, cmd)| (motor, Newtons(cmd.force as _)))
         .collect();
 
-    robot.insert(MotorContribution(forces));
+    robot.insert(ThrustContribution(forces));
 }
 
 // TODO(mid): Split into smaller systems
@@ -173,11 +181,11 @@ fn accumulate_motor_forces(
     mut last_movement: Local<StableHashMap<ErasedMotorId, MotorRecord<motor_math::FloatType>>>,
 
     robot: Query<
-        (Entity, &NetId, &Motors, &MovementCurrentCap, &JerkLimit),
-        (With<LocalRobotMarker>, Without<PwmManualControl>),
+        (Entity, &NetId, &Thrusters, &MovementCurrentCap, &JerkLimit),
+        (With<LocalRobotMarker>, Without<DisableMovementApi>),
     >,
-    motor_forces: Query<(&RobotId, &MotorContribution)>,
-    motors: Query<(Entity, &MotorDefinition, &RobotId)>,
+    thruster_forces: Query<(&RobotId, &ThrustContribution)>,
+    thrusters: Query<(Entity, &ThrusterDefinition, &RobotId)>,
 
     time: Res<Time<Real>>,
     motor_data: Res<MotorDataRes>,
@@ -185,7 +193,7 @@ fn accumulate_motor_forces(
     let Ok((
         entity,
         &net_id,
-        Motors(motor_config),
+        Thrusters(thruster_config),
         &MovementCurrentCap(current_cap),
         &JerkLimit(jerk_limit),
     )) = robot.get_single()
@@ -196,7 +204,7 @@ fn accumulate_motor_forces(
 
     let mut all_forces = StableHashMap::default();
 
-    for (&RobotId(robot_net_id), motor_force_contributions) in &motor_forces {
+    for (&RobotId(robot_net_id), motor_force_contributions) in &thruster_forces {
         if robot_net_id == net_id {
             for (motor, force) in &motor_force_contributions.0 {
                 *all_forces.entry(*motor).or_default() += force.0 as motor_math::FloatType;
@@ -204,13 +212,13 @@ fn accumulate_motor_forces(
         }
     }
 
-    let target_movement = solve::forward::forward_solve(motor_config, &all_forces);
+    let target_movement = solve::forward::forward_solve(thruster_config, &all_forces);
     robot.insert(TargetMovement(target_movement.into()));
 
     let motor_cmds = all_forces
         .iter()
         .map(|(motor, force)| {
-            let direction = motor_config
+            let direction = thruster_config
                 .motor(motor)
                 .map(|it| it.direction)
                 .unwrap_or(Direction::Clockwise);
@@ -228,7 +236,7 @@ fn accumulate_motor_forces(
 
     let motor_cmds = solve::reverse::clamp_amperage(
         motor_cmds,
-        motor_config,
+        thruster_config,
         &motor_data.0,
         current_cap.0 as _,
         0.01,
@@ -244,7 +252,7 @@ fn accumulate_motor_forces(
                     let delta = record.force - last.force;
 
                     if delta.abs() > jerk_limit as _ {
-                        let direction = motor_config
+                        let direction = thruster_config
                             .motor(motor)
                             .map(|it| it.direction)
                             .unwrap_or(Direction::Clockwise);
@@ -267,7 +275,7 @@ fn accumulate_motor_forces(
         // FIXME: Why do we clamp amperage twice???
         solve::reverse::clamp_amperage(
             slew_motor_cmds,
-            motor_config,
+            thruster_config,
             &motor_data.0,
             current_cap.0 as _,
             0.01,
@@ -279,34 +287,36 @@ fn accumulate_motor_forces(
         .map(|(motor, data)| (*motor, data.force))
         .collect();
 
-    let actual_movement = solve::forward::forward_solve(motor_config, &motor_forces);
+    let actual_movement = solve::forward::forward_solve(thruster_config, &motor_forces);
     robot.insert(ActualMovement(actual_movement.into()));
 
-    for (motor_entity, MotorDefinition(id, _motor), &RobotId(robot_net_id)) in &motors {
-        if robot_net_id == net_id {
-            let mut motor = cmds.entity(motor_entity);
+    for (motor_entity, ThrusterDefinition(id, _motor), &RobotId(robot_net_id)) in &thrusters {
+        if robot_net_id != net_id {
+            continue;
+        }
 
-            // FIXME(mid): panics
-            let target_force = all_forces.get(id);
-            let actual_data = motor_cmds.get(id);
+        let mut motor = cmds.entity(motor_entity);
 
-            // TODO(mid): Special case for 0
+        // FIXME(mid): panics
+        let target_force = all_forces.get(id);
+        let actual_data = motor_cmds.get(id);
 
-            if let (Some(target_force), Some(actual_data)) = (target_force, actual_data) {
-                motor.insert((
-                    TargetForce(Newtons(*target_force as _)),
-                    ActualForce(Newtons(actual_data.force as _)),
-                    CurrentDraw(Amperes(actual_data.current as _)),
-                    PwmSignal(Duration::from_micros(actual_data.pwm as u64)),
-                ));
-            } else {
-                motor.insert((
-                    TargetForce(0.0.into()),
-                    ActualForce(0.0.into()),
-                    CurrentDraw(0.0.into()),
-                    PwmSignal(Duration::from_micros(1500)),
-                ));
-            }
+        // TODO(mid): Special case for 0
+
+        if let (Some(target_force), Some(actual_data)) = (target_force, actual_data) {
+            motor.insert((
+                TargetForce(Newtons(*target_force as _)),
+                ActualForce(Newtons(actual_data.force as _)),
+                CurrentDraw(Amperes(actual_data.current as _)),
+                MotorSignal::Raw(actual_data.pwm as _),
+            ));
+        } else {
+            motor.insert((
+                TargetForce(0.0.into()),
+                ActualForce(0.0.into()),
+                CurrentDraw(0.0.into()),
+                MotorSignal::Percent(0.0),
+            ));
         }
     }
 

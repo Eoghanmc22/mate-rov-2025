@@ -1,5 +1,4 @@
-use common::types::hw::MagneticFrame;
-use common::types::units::Gauss;
+use common::{components::MagnetometerMeasurement, types::units::Gauss};
 use std::{thread, time::Duration};
 use tracing::{debug, info, instrument, trace};
 
@@ -34,7 +33,7 @@ impl Mcc5983 {
     // TODO(high): Hard and soft iron calibration?
 
     #[instrument(level = "trace", skip(self), ret)]
-    pub fn read_frame(&mut self) -> anyhow::Result<MagneticFrame> {
+    pub fn read_frame(&mut self) -> anyhow::Result<MagnetometerMeasurement> {
         let raw = self.read_raw_frame().context("Read raw frame")?;
 
         // The first byte is junk
@@ -55,10 +54,10 @@ impl Mcc5983 {
         let mag_y = mag_native_x - self.offset[0];
         let mag_z = mag_native_z - self.offset[2];
 
-        Ok(MagneticFrame {
-            mag_x: Gauss(mag_x),
-            mag_y: Gauss(mag_y),
-            mag_z: Gauss(mag_z),
+        Ok(MagnetometerMeasurement {
+            x: Gauss(mag_x),
+            y: Gauss(mag_y),
+            z: Gauss(mag_z),
         })
     }
 }
@@ -149,9 +148,9 @@ impl Mcc5983 {
         trace!(?reset, "Reset calibration");
 
         let offset = [
-            (set.mag_x.0 + reset.mag_x.0) / 2.0,
-            (set.mag_y.0 + reset.mag_y.0) / 2.0,
-            (set.mag_z.0 + reset.mag_z.0) / 2.0,
+            (set.x.0 + reset.x.0) / 2.0,
+            (set.y.0 + reset.y.0) / 2.0,
+            (set.z.0 + reset.z.0) / 2.0,
         ];
 
         self.offset = offset;
