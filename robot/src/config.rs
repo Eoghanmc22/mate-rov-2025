@@ -16,12 +16,14 @@ pub struct RobotConfig {
     pub port: u16,
 
     pub motor_config: MotorConfigDefinition,
+    #[serde(default)]
     pub servo_config: ServoConfigDefinition,
 
     pub motor_amperage_budget: f32,
     pub jerk_limit: f32,
     pub center_of_mass: Vec3A,
 
+    #[serde(default)]
     pub cameras: HashMap<String, CameraDefinition>,
 }
 
@@ -229,7 +231,7 @@ impl MotorConfigDefinition {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ServoConfigDefinition {
     pub servos: HashMap<String, Servo>,
 }

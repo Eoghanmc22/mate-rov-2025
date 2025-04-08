@@ -1,4 +1,4 @@
-name = "Dark Shark"
+name = "Dark Shark v2"
 port = 44445
 
 center_of_mass = [0.0, -0.035, 0.0]

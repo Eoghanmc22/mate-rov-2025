@@ -1,1 +1,1 @@
-rpi-runner_bluerov.sh
+rpi-runner_mate.sh

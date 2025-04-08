@@ -1,0 +1,72 @@
+name = "Dark Shark v3"
+port = 44445
+
+center_of_mass = [0.0, -0.05, 0.0]
+motor_amperage_budget = 25.0
+jerk_limit = 40.0
+
+[motor_config.Custom.motors.BackRightBottom]
+pwm_channel = 4
+position = [0.16586998298392233, -0.11110624989197548, -0.07966385632084612]
+orientation = [0.3653688221537718, 0.8681561970388947, -0.3358726564353363]
+direction = "CounterClockwise"
+
+# Mirror of BackRightBottom
+[motor_config.Custom.motors.BackLeftBottom]
+pwm_channel = 1
+position = [-0.16586998298392233, -0.11110624989197548, -0.07966385632084612]
+orientation = [-0.3653688221537718, 0.8681561970388947, -0.3358726564353363]
+direction = "Clockwise"
+
+[motor_config.Custom.motors.BackRightTop]
+pwm_channel = 5
+position = [0.16531173024124723, -0.07867911545875274, 0.07974266168755904]
+orientation = [-0.29416119788223927, 0.8196981925098801, 0.4914916711975105]
+direction = "CounterClockwise"
+
+# Mirror of BackRightTop
+[motor_config.Custom.motors.BackLeftTop]
+pwm_channel = 2
+position = [-0.16531173024124723, -0.07867911545875274, 0.07974266168755904]
+orientation = [0.29416119788223927, 0.8196981925098801, 0.4914916711975105]
+direction = "Clockwise"
+
+[motor_config.Custom.motors.FrontRight]
+pwm_channel = 3
+position = [0.16549094637027176, 0.19004773079177034, 0.0]
+orientation = [0.5086841141129421, -0.3340963555185603, 0.7934860410103929]
+direction = "CounterClockwise"
+
+# Mirror of FrontRight
+[motor_config.Custom.motors.FrontLeft]
+pwm_channel = 0
+position = [-0.16549094637027176, 0.19004773079177034, 0.0]
+orientation = [-0.5086841141129421, -0.3340963555185603, 0.7934860410103929]
+direction = "Clockwise"
+
+[servo_config.servos]
+# FrontCameraRotate = { pwm_channel = 15, cameras = ["Front"] }
+# Claw1 = { pwm_channel = 14, cameras = ["Front"] }
+# Claw2 = { pwm_channel = 13, cameras = ["Front"] }
+# Claw3 = { pwm_channel = 12, cameras = ["Front"] }
+
+
+# [cameras."/dev/video2"]
+# name = "Front"
+# transform = { position = { x = 0.0, y = 1.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+#
+# [cameras."/dev/video6"]
+# name = "Top"
+# transform = { position = { x = 0.0, y = 0.0, z = 1.0 }, rotation = { yaw = 0.0, pitch = -90.0, roll = 0.0 } }
+#
+# [cameras."/dev/video10"]
+# name = "A"
+# transform = { position = { x = 0.0, y = 0.0, z = -1.0 }, rotation = { yaw = 0.0, pitch = 90.0, roll = 0.0 } }
+#
+# [cameras."/dev/video14"]
+# name = "B"
+# transform = { position = { x = 0.0, y = -1.0, z = 0.0 }, rotation = { yaw = -180.0, pitch = 0.0, roll = 0.0 } }
+#
+# [cameras."/dev/video18"]
+# name = "C"
+# transform = { position = { x = 1.0, y = 0.0, z = 0.0 }, rotation = { yaw = -90.0, pitch = 0.0, roll = 0.0 } }
