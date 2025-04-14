@@ -27,7 +27,7 @@ pub struct OrientationPlugin;
 
 impl Plugin for OrientationPlugin {
     fn build(&self, app: &mut App) {
-        let orientation_offset = Quat::from_euler(EulerRot::YXZ, 90.0f32.to_radians(), 0.0, 0.0);
+        let orientation_offset = Quat::from_euler(EulerRot::YXZ, 180.0f32.to_radians(), 0.0, 0.0);
         let mut madgwick = Madgwick::new(1.0 / 1000.0, 0.041);
         madgwick.quat = orientation_offset.into();
 
