@@ -65,7 +65,8 @@ pub struct CustomDefinition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomMotor {
-    pub pwm_channel: LocalMotorId,
+    pub channel: LocalMotorId,
+    #[serde(flatten)]
     pub motor: MotorGlam,
 }
 
@@ -206,7 +207,7 @@ impl MotorConfigDefinition {
                             custom
                                 .motors
                                 .get(id)
-                                .map(|it| it.pwm_channel)
+                                .map(|it| it.channel)
                                 .expect("Incomplete motor definition"),
                         )
                     })
