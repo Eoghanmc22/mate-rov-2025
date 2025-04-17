@@ -169,13 +169,13 @@ fn read_new_data(
             let gyro = Vector3::new(gyro.x.0, gyro.y.0, gyro.z.0) * (std::f32::consts::PI / 180.0);
             let accel = Vector3::new(accel.x.0, accel.y.0, accel.z.0);
 
-            let rst = if let Some(magnetic) = magnetic {
-                let mag = Vector3::new(magnetic.mag_x.0, magnetic.mag_y.0, magnetic.mag_z.0);
-
-                madgwick_filter.0.update(&gyro, &accel, &mag)
-            } else {
-                madgwick_filter.0.update_imu(&gyro, &accel)
-            };
+            // let rst = if let Some(magnetic) = magnetic {
+            //     let mag = Vector3::new(magnetic.mag_x.0, magnetic.mag_y.0, magnetic.mag_z.0);
+            //
+            //     madgwick_filter.0.update(&gyro, &accel, &mag)
+            // } else {
+            let rst = madgwick_filter.0.update_imu(&gyro, &accel);
+            // };
 
             if let Err(msg) = rst {
                 errors.send(anyhow!("Process IMU frame: {msg:?}").into());
