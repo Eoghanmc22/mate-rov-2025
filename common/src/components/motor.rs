@@ -33,6 +33,13 @@ pub enum MotorSignal {
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+pub enum MotorSignalType {
+    Position,
+    Velocity,
+}
+
+#[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
+#[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub struct MotorRawSignalRange {
     pub min: i32,
     pub center: i32,
@@ -63,13 +70,6 @@ impl MotorRawSignalRange {
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub enum MotorSignalType {
-    Position,
-    Velocity,
-}
-
-#[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
-#[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub enum MotorContributionMode {
     // Uses contribution sum directly
     ZerothOrder,
@@ -77,6 +77,8 @@ pub enum MotorContributionMode {
     FirstOrder,
 }
 
+// NOTE: In the current impl, this only reflects non-thruster actuator targets, ie those controlled
+// using the servo plugin
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
 pub struct MotorTargets(pub StableHashMap<GenericMotorId, f32>);

@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail, Context};
 use bevy::{app::AppExit, prelude::*};
 use common::{
     bundles::CameraBundle,
-    components::{Camera, RobotId},
+    components::{CameraDefinition, RobotId},
     ecs_sync::{NetId, Replicate},
     error::{self, Errors},
     events::ResyncCameras,
@@ -302,7 +302,7 @@ fn read_new_data(
     mut cmds: Commands,
     channels: Res<CameraChannels>,
     robot: Query<(Entity, &NetId), With<LocalRobotMarker>>,
-    cameras: Query<(Entity, &RobotId), With<Camera>>,
+    cameras: Query<(Entity, &RobotId), With<CameraDefinition>>,
 ) {
     let mut new_cameras = None;
     for camera_update in channels.1.try_iter() {
@@ -399,7 +399,7 @@ fn camera_list(
 
         list.push(CameraBundle {
             name: Name::new(name),
-            camera: Camera { location },
+            camera: CameraDefinition { location },
             robot,
             transform,
         });

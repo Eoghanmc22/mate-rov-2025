@@ -29,7 +29,9 @@ pub struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.register_type::<InputInterpolation>()
-            .add_plugins(InputManagerPlugin::<Action>::default())
+            .register_type::<SelectedServo>();
+
+        app.add_plugins(InputManagerPlugin::<Action>::default())
             .add_systems(
                 Update,
                 (
@@ -180,6 +182,9 @@ fn attach_to_new_robots(mut cmds: Commands, new_robots: Query<(&NetId, &Name), A
 
         input_map.insert(Action::ServoInverted, GamepadButton::RightTrigger);
         input_map.insert(Action::Servo, GamepadButton::LeftTrigger);
+        // input_map.insert(Action::ServoInverted, GamepadButton::RightTrigger2);
+        // input_map.insert(Action::Servo, GamepadButton::LeftTrigger2);
+
         // input_map.insert(Action::Pitch, GamepadButton::RightTrigger);
         // input_map.insert(Action::PitchInverted, GamepadButton::LeftTrigger);
 
@@ -311,6 +316,8 @@ fn movement(
             -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
         ) * maximums[&Axis::ZRot].0;
 
+        // TODO: We should never zero the z input, this should instead allow switching between
+        // interperting z as local vs global
         let force = if depth_target.is_some() {
             if let Some(orientation) = orientation {
                 // TODO: Validate this actually works, and make it into a helper function, also
@@ -338,6 +345,7 @@ fn movement(
             vec3a(x, y, z)
         };
 
+        // TODO: torque vector should always be applied to act as feed forward for pid
         let torque = if orientation_target.is_some() {
             Vec3A::ZERO
         } else {
@@ -575,7 +583,10 @@ fn servos(
         let switch = action_state.just_pressed(&Action::SwitchServo);
         let switch_inverted = action_state.just_pressed(&Action::SwitchServoInverted);
         let select_important = action_state.just_pressed(&Action::SelectImportantServo);
-        let input = action_state.value(&Action::Servo) - action_state.value(&Action::ServoInverted);
+        // TODO: just why? why cant we have nice things...
+        let input = action_state.button_value(&Action::Servo)
+            - action_state.button_value(&Action::ServoInverted);
+        // let input = action_state.value(&Action::Servo) - action_state.value(&Action::ServoInverted);
 
         let robot = robots
             .iter()

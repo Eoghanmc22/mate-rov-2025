@@ -50,6 +50,13 @@ pub struct DepthMeasurement {
     pub pressure: Mbar,
 }
 
+#[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq)]
+#[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+pub struct DepthSettings {
+    pub sea_level: Mbar,
+    pub fluid_density: f32,
+}
+
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq, Default)]
 pub struct TempertureMeasurement {
@@ -63,15 +70,8 @@ pub struct Leak(pub bool);
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Eq)]
 #[reflect(from_reflect = false)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq)]
-pub struct Camera {
+pub struct CameraDefinition {
     // TODO(low): This bad
     #[reflect(ignore)]
     pub location: SocketAddr,
-}
-
-#[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq)]
-#[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-pub struct DepthSettings {
-    pub sea_level: Mbar,
-    pub fluid_density: f32,
 }

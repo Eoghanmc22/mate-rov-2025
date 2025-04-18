@@ -5,7 +5,7 @@ use bevy::{
     prelude::*,
     render::{camera::Camera as BevyCamera, view::RenderLayers},
 };
-use common::components::Camera;
+use common::components::CameraDefinition;
 
 use crate::video_stream::ImageHandle;
 
@@ -164,8 +164,8 @@ fn setup(mut cmds: Commands) {
 fn create_display(
     mut cmds: Commands,
 
-    new_cameras: Query<Entity, (With<Camera>, Added<ImageHandle>)>,
-    mut lost_cameras: RemovedComponents<Camera>,
+    new_cameras: Query<Entity, (With<CameraDefinition>, Added<ImageHandle>)>,
+    mut lost_cameras: RemovedComponents<CameraDefinition>,
 
     cameras: Query<&ImageHandle>,
     mut parent: Query<(Entity, &mut VideoTree), With<DisplayParent>>,

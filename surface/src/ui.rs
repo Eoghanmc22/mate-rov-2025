@@ -6,10 +6,10 @@ use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
     bundles::MovementContributionBundle,
     components::{
-        Armed, Camera, CpuTotal, CurrentDraw, DepthMeasurement, DepthTarget, DisableMovementApi,
-        GenericMotorId, LoadAverage, MeasuredVoltage, Memory, MotorRawSignalRange, MotorSignal,
-        MovementAxisMaximums, MovementContribution, OrientationTarget, Robot, RobotId,
-        Temperatures, TempertureMeasurement,
+        Armed, CameraDefinition, CurrentDraw, DepthMeasurement, DepthTarget, DisableMovementApi,
+        GenericMotorId, MeasuredVoltage, MotorRawSignalRange, MotorSignal, MovementAxisMaximums,
+        MovementContribution, OrientationTarget, Robot, RobotId, SystemCpuTotal, SystemLoadAverage,
+        SystemMemory, SystemTemperatures, TempertureMeasurement,
     },
     ecs_sync::{NetId, Replicate},
     events::{CalibrateSeaLevel, ResetServos, ResetYaw, ResyncCameras},
@@ -102,7 +102,7 @@ fn topbar(
 
     cameras: Query<
         (Entity, &Name, Option<&VideoProcessorFactory>),
-        (With<Camera>, With<VideoThread>),
+        (With<CameraDefinition>, With<VideoThread>),
     >,
     pipelines: Res<VideoPipelines>,
 
@@ -349,10 +349,10 @@ fn hud(
             (Option<&MeasuredVoltage>, Option<&CurrentDraw>),
             (Option<&OrientationTarget>, Option<&TempertureMeasurement>),
             (
-                Option<&CpuTotal>,
-                Option<&LoadAverage>,
-                Option<&Memory>,
-                Option<&Temperatures>,
+                Option<&SystemCpuTotal>,
+                Option<&SystemLoadAverage>,
+                Option<&SystemMemory>,
+                Option<&SystemTemperatures>,
             ),
             (Option<&DepthMeasurement>, Option<&DepthTarget>),
             (Option<&Peer>, Option<&Latency>),

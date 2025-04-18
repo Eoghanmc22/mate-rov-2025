@@ -41,53 +41,77 @@ macro_rules! components {
     }
 }
 
+// TODO: think of a way where its a compile error for a type to not be registered here
 components! {
+    // This file
     Singleton,
     Robot,
     Surface,
+    Armed,
+    RobotId,
+
+    // control.rs
+    DepthTarget,
+    OrientationTarget,
+
+    // motor.rs
+    MotorCameraReference,
+    Motors,
+    MotorSignal,
+    MotorSignalType,
+    MotorRawSignalRange,
+    MotorContributionMode,
+    MotorTargets,
+    MotorContribution,
+    GenericMotorId,
+
+    // pid.rs
+    PidConfig,
+    PidResult,
+
+    // power.rs
+    MeasuredVoltage,
+    CurrentDraw,
+
+    // sensor.rs
     Orientation,
     GyroMeasurement,
     AccelerometerMeasurement,
     MagnetometerMeasurement,
-    TempertureMeasurement,
     DepthMeasurement,
-    DepthTarget,
     DepthSettings,
-    OrientationTarget,
+    TempertureMeasurement,
     Leak,
-    Armed,
-    Camera,
-    RobotId,
-    Processes,
-    LoadAverage,
-    Networks,
-    CpuTotal,
-    Cores,
-    Memory,
-    Temperatures,
-    Disks,
-    Uptime,
-    OperatingSystem,
-    TargetForce,
-    ActualForce,
-    MotorTargets,
-    ThrusterDefinition,
-    ThrusterDefinition,
-    MotorSignalType,
-    Motors,
-    Thrusters,
+    CameraDefinition,
+
+
+    // system_monitor.rs
+    SystemProcesses,
+    SystemLoadAverage,
+    SystemNetworks,
+    SystemCpuTotal,
+    SystemCores,
+    SystemMemory,
+    SystemTemperatures,
+    SystemDisks,
+    SystemUptime,
+    SystemOs,
+
+    // thruster.rs/movement_api
     TargetMovement,
     ActualMovement,
-    MeasuredVoltage,
     MovementContribution,
-    MotorContribution,
-    ThrustContribution,
     MovementAxisMaximums,
     MovementCurrentCap,
-    CurrentDraw,
-    JerkLimit,
-    PidConfig,
-    PidResult
+    DisableMovementApi,
+
+    // thruster.rs/thruster_api
+    TargetForce,
+    ActualForce,
+    ThrusterDefinition,
+    Thrusters,
+    ThrustContribution,
+    JerkLimit
 }
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]

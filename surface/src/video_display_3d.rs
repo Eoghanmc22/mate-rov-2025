@@ -3,7 +3,7 @@ use bevy::{
     render::{camera::Camera as BevyCamera, view::RenderLayers},
 };
 use bevy_panorbit_camera::PanOrbitCamera;
-use common::components::Camera;
+use common::components::CameraDefinition;
 
 use crate::video_stream::ImageHandle;
 
@@ -56,7 +56,7 @@ fn create_display(
     mut cmds: Commands,
     new_cameras: Query<
         (Entity, &ImageHandle, Option<&Transform>),
-        (With<Camera>, Added<ImageHandle>),
+        (With<CameraDefinition>, Added<ImageHandle>),
     >,
     parent: Query<Entity, With<DisplayParent>>,
     mut materials: ResMut<Assets<StandardMaterial>>,

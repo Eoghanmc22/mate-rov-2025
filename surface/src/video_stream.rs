@@ -7,7 +7,7 @@ use bevy::{
     render::render_resource::{Extent3d, TextureUsages},
 };
 use common::{
-    components::Camera,
+    components::CameraDefinition,
     error::{self, ErrorEvent, Errors},
 };
 use crossbeam::channel::{self, Receiver, Sender};
@@ -81,7 +81,7 @@ pub struct VideoThread(
 
 fn handle_added_camera(
     mut cmds: Commands,
-    cameras: Query<(Entity, &Camera), Changed<Camera>>,
+    cameras: Query<(Entity, &CameraDefinition), Changed<CameraDefinition>>,
     mut images: ResMut<Assets<Image>>,
     errors: Res<Errors>,
 ) -> anyhow::Result<()> {
@@ -196,7 +196,7 @@ fn handle_frames(
             Option<&MeshMaterial3d<StandardMaterial>>,
             Option<&MeshMaterial2d<ColorMaterial>>,
         ),
-        With<Camera>,
+        With<CameraDefinition>,
     >,
     mut images: ResMut<Assets<Image>>,
     mut image_events1: EventWriter<AssetEvent<StandardMaterial>>,
@@ -237,8 +237,11 @@ fn handle_frames(
 fn handle_video_processors(
     mut cmds: Commands,
 
-    cameras: Query<&VideoThread, With<Camera>>,
-    cameras_with_processor: Query<(Entity, &VideoThread, Ref<VideoProcessorFactory>), With<Camera>>,
+    cameras: Query<&VideoThread, With<CameraDefinition>>,
+    cameras_with_processor: Query<
+        (Entity, &VideoThread, Ref<VideoProcessorFactory>),
+        With<CameraDefinition>,
+    >,
     mut removed: RemovedComponents<VideoProcessorFactory>,
     mut errors: EventWriter<ErrorEvent>,
 ) {
@@ -282,7 +285,7 @@ fn handle_video_processors(
 }
 
 /// Generates the gstreamer pipeline to recieve data from `camera`
-fn gen_src(camera: &Camera) -> String {
+fn gen_src(camera: &CameraDefinition) -> String {
     let ip = camera.location.ip();
     let port = camera.location.port();
 

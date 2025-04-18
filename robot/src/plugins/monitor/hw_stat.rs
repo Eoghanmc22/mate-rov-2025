@@ -5,8 +5,8 @@ use bevy::{app::AppExit, prelude::*};
 use common::{
     bundles::RobotSystemBundle,
     components::{
-        Cores, CpuTotal, Disks, LoadAverage, Memory, Networks, OperatingSystem, Processes,
-        Temperatures, Uptime,
+        SystemCores, SystemCpuTotal, SystemDisks, SystemLoadAverage, SystemMemory, SystemNetworks,
+        SystemOs, SystemProcesses, SystemTemperatures, SystemUptime,
     },
     error::{self, Errors},
     types::{
@@ -106,7 +106,7 @@ fn collect_system_state(system: &System) -> anyhow::Result<RobotSystemBundle> {
     // FIXME(mid): We dont use most of this data
     // TODO(low): sorting?
     let hw_state = RobotSystemBundle {
-        processes: Processes(
+        processes: SystemProcesses(
             system
                 .processes()
                 .values()
@@ -122,12 +122,12 @@ fn collect_system_state(system: &System) -> anyhow::Result<RobotSystemBundle> {
                 })
                 .collect(),
         ),
-        load_average: LoadAverage {
+        load_average: SystemLoadAverage {
             one_min: system.load_average().one,
             five_min: system.load_average().five,
             fifteen_min: system.load_average().fifteen,
         },
-        networks: Networks(
+        networks: SystemNetworks(
             system
                 .networks()
                 .iter()
@@ -142,12 +142,12 @@ fn collect_system_state(system: &System) -> anyhow::Result<RobotSystemBundle> {
                 })
                 .collect(),
         ),
-        cpu: CpuTotal(Cpu {
+        cpu: SystemCpuTotal(Cpu {
             frequency: system.global_cpu_info().frequency(),
             usage: system.global_cpu_info().cpu_usage(),
             name: system.global_cpu_info().name().to_owned(),
         }),
-        cores: Cores(
+        cores: SystemCores(
             system
                 .cpus()
                 .iter()
@@ -158,7 +158,7 @@ fn collect_system_state(system: &System) -> anyhow::Result<RobotSystemBundle> {
                 })
                 .collect(),
         ),
-        memory: Memory {
+        memory: SystemMemory {
             total_mem: system.total_memory(),
             used_mem: system.used_memory(),
             free_mem: system.free_memory(),
@@ -166,7 +166,7 @@ fn collect_system_state(system: &System) -> anyhow::Result<RobotSystemBundle> {
             used_swap: system.used_swap(),
             free_swap: system.free_swap(),
         },
-        temps: Temperatures(
+        temps: SystemTemperatures(
             system
                 .components()
                 .iter()
@@ -178,7 +178,7 @@ fn collect_system_state(system: &System) -> anyhow::Result<RobotSystemBundle> {
                 })
                 .collect(),
         ),
-        disks: Disks(
+        disks: SystemDisks(
             system
                 .disks()
                 .iter()
@@ -191,8 +191,8 @@ fn collect_system_state(system: &System) -> anyhow::Result<RobotSystemBundle> {
                 })
                 .collect(),
         ),
-        uptime: Uptime(Duration::from_secs(system.uptime())),
-        os: OperatingSystem {
+        uptime: SystemUptime(Duration::from_secs(system.uptime())),
+        os: SystemOs {
             name: system.name(),
             kernel_version: system.kernel_version(),
             os_version: system.long_os_version(),

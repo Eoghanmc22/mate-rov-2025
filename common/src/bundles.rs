@@ -1,12 +1,13 @@
 use bevy::{core::Name, ecs::bundle::Bundle, transform::components::Transform};
 
 use crate::components::{
-    AccelerometerMeasurement, ActualForce, ActualMovement, Armed, Camera, Cores, CpuTotal,
-    CurrentDraw, DepthMeasurement, Disks, GenericMotorId, GyroMeasurement, Leak, LoadAverage,
-    MagnetometerMeasurement, MeasuredVoltage, Memory, MotorContributionMode, MotorRawSignalRange,
-    MotorSignal, MotorSignalType, MovementAxisMaximums, MovementContribution, MovementCurrentCap,
-    Networks, OperatingSystem, Orientation, Processes, Robot, RobotId, TargetForce, TargetMovement,
-    Temperatures, TempertureMeasurement, ThrusterDefinition, Thrusters, Uptime,
+    AccelerometerMeasurement, ActualForce, ActualMovement, Armed, CameraDefinition, CurrentDraw,
+    DepthMeasurement, GenericMotorId, GyroMeasurement, Leak, MagnetometerMeasurement,
+    MeasuredVoltage, MotorContributionMode, MotorRawSignalRange, MotorSignal, MotorSignalType,
+    MovementAxisMaximums, MovementContribution, MovementCurrentCap, Orientation, Robot, RobotId,
+    SystemCores, SystemCpuTotal, SystemDisks, SystemLoadAverage, SystemMemory, SystemNetworks,
+    SystemOs, SystemProcesses, SystemTemperatures, SystemUptime, TargetForce, TargetMovement,
+    TempertureMeasurement, ThrusterDefinition, Thrusters,
 };
 
 #[derive(Bundle, PartialEq)]
@@ -45,16 +46,16 @@ pub struct RobotSensorBundle {
 #[derive(Bundle, PartialEq)]
 #[deprecated]
 pub struct RobotSystemBundle {
-    pub processes: Processes,
-    pub load_average: LoadAverage,
-    pub networks: Networks,
-    pub cpu: CpuTotal,
-    pub cores: Cores,
-    pub memory: Memory,
-    pub temps: Temperatures,
-    pub disks: Disks,
-    pub uptime: Uptime,
-    pub os: OperatingSystem,
+    pub processes: SystemProcesses,
+    pub load_average: SystemLoadAverage,
+    pub networks: SystemNetworks,
+    pub cpu: SystemCpuTotal,
+    pub cores: SystemCores,
+    pub memory: SystemMemory,
+    pub temps: SystemTemperatures,
+    pub disks: SystemDisks,
+    pub uptime: SystemUptime,
+    pub os: SystemOs,
 }
 
 #[derive(Bundle, PartialEq)]
@@ -83,7 +84,7 @@ pub struct RobotPowerBundle {
 #[deprecated]
 pub struct CameraBundle {
     pub name: Name,
-    pub camera: Camera,
+    pub camera: CameraDefinition,
     pub transform: Transform,
 
     pub robot: RobotId,
