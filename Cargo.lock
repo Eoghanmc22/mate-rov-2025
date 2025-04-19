@@ -5277,30 +5277,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "robot_new"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "ahrs",
- "anyhow",
- "bevy",
- "common",
- "crossbeam",
- "glam",
- "motor_math",
- "nalgebra",
- "networking",
- "rgb",
- "rppal",
- "serde",
- "stable_hashmap",
- "sysinfo 0.29.11",
- "toml",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "rodio"
 version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
