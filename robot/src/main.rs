@@ -17,10 +17,9 @@ use bevy::{
 use bevy_tokio_tasks::TokioTasksPlugin;
 use common::{sync::SyncRole, CommonPlugins};
 use config::RobotConfig;
-use plugins::{actuators::MovementPlugins, core::CorePlugins, monitor::MonitorPlugins};
-
-#[cfg(rpi)]
-use crate::plugins::sensors::SensorPlugins;
+use plugins::{
+    actuators::MovementPlugins, core::CorePlugins, monitor::MonitorPlugins, sensors::SensorPlugins,
+};
 
 // TODO: LogPlugin now exposes a way to play with the tracing subscriber
 fn main() -> anyhow::Result<()> {
@@ -70,11 +69,8 @@ fn main() -> anyhow::Result<()> {
                     name,
                 },
                 CorePlugins,
-                #[cfg(rpi)]
-                SensorPlugins,
-                // #[cfg(rpi)]
                 MovementPlugins,
-                #[cfg(rpi)]
+                SensorPlugins,
                 MonitorPlugins,
             ),
         ))

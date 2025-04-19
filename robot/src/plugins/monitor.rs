@@ -7,8 +7,11 @@ pub struct MonitorPlugins;
 
 impl PluginGroup for MonitorPlugins {
     fn build(self) -> PluginGroupBuilder {
-        PluginGroupBuilder::start::<Self>()
-            .add(hw_stat::HwStatPlugin)
-            .add(voltage::VoltagePlugin)
+        let builder = PluginGroupBuilder::start::<Self>().add(hw_stat::HwStatPlugin);
+
+        #[cfg(rpi)]
+        let builder = builder.add(voltage::VoltagePlugin);
+
+        builder
     }
 }
