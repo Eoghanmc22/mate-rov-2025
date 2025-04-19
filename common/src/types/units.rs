@@ -15,6 +15,10 @@ macro_rules! unit {
         #[reflect(Serialize, Deserialize, Debug, PartialEq, Default)]
         pub struct $name(pub $repr);
 
+        impl $name {
+            pub const ZERO: $name = $name(0.0);
+        }
+
         impl Display for $name {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
                 f.pad(&format!($fmt, self.0))

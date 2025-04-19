@@ -14,6 +14,7 @@ mod motor;
 pub use motor::*;
 
 mod system_monitor;
+use stable_hashmap::StableHashMap;
 pub use system_monitor::*;
 
 mod thruster;
@@ -126,6 +127,7 @@ pub struct Robot;
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Surface;
 
+// TODO: This could be changed to a unit struct that is added and removed from the robot entity
 #[derive(
     Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq, Eq, Default,
 )]
@@ -140,3 +142,7 @@ pub enum Armed {
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 #[deprecated]
 pub struct RobotId(pub NetId);
+
+// #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
+// #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+// pub struct Statistics(pub StableHashMap<String, f32>);
