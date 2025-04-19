@@ -51,6 +51,7 @@ FrontCameraRotate = { channel = { PwmChannel = 15 }, cameras = ["Front"] }
 Claw1 = { channel = { DcChannel = 0 } }
 Claw2 = { channel = { DcChannel = 1 } }
 Claw3 = { channel = { DcChannel = 2 } }
+Lights = { channel = { DcChannel = 3 } }
 
 
 # [cameras."/dev/video2"]

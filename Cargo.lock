@@ -3442,7 +3442,7 @@ dependencies = [
 [[package]]
 name = "interface"
 version = "0.1.0"
-source = "git+https://github.com/Eoghanmc22/dc-motor.git?rev=62eceffe565a65b9cf6abf74c6133c7719501668#62eceffe565a65b9cf6abf74c6133c7719501668"
+source = "git+https://github.com/Eoghanmc22/dc-motor.git?rev=611f3d5c95b1605203043361cddf287f87b0bc48#611f3d5c95b1605203043361cddf287f87b0bc48"
 dependencies = [
  "anyhow",
  "bitflags 2.9.0",

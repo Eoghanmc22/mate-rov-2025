@@ -14,18 +14,16 @@ use common::{
     error::{self, Errors},
     types::units::Amperes,
 };
-// use crossbeam::channel::{self, Sender};
 use dc_motor_interface::{
-    c2h::{self, PacketC2H},
+    c2h::{self, MotorState, PacketC2H},
     h2c::{self, PacketH2C},
     implementation_tokio::{DcMotorController, DcMotorControllerHandle},
     Interval, Motors, Speed,
 };
 use tokio::{
-    select,
     sync::{
-        broadcast,
-        mpsc::{self, Sender},
+        broadcast::{self, error::RecvError},
+        mpsc::{self, Receiver, Sender},
         Notify,
     },
     time,
@@ -41,6 +39,10 @@ impl Plugin for DcMotorPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, start_dc_motor_thread.pipe(error::handle_errors));
         app.add_systems(
+            PreUpdate,
+            read_telemetry.run_if(resource_exists::<DcMotorChannels>),
+        );
+        app.add_systems(
             PostUpdate,
             listen_to_dc_motors
                 .pipe(error::handle_errors)
@@ -51,7 +53,7 @@ impl Plugin for DcMotorPlugin {
 }
 
 #[derive(Resource)]
-struct DcMotorChannels(Sender<DcMotorEvent>);
+struct DcMotorChannels(Sender<DcMotorEvent>, Receiver<MotorState>);
 
 #[derive(Debug)]
 enum DcMotorEvent {
@@ -69,23 +71,20 @@ enum DcMotorEvent {
 fn start_dc_motor_thread(
     mut cmds: Commands,
     runtime: ResMut<TokioTasksRuntime>,
-    local_robot: Res<LocalRobot>,
     errors: Res<Errors>,
 ) -> anyhow::Result<()> {
     let interval = Duration::from_secs_f32(1.0 / 100.0);
     let max_inactive = Duration::from_secs_f32(1.0 / 10.0);
 
     let ping_interval = Duration::from_secs_f32(1.0 / 25.0);
-    let max_ping_latency = Duration::from_millis(10);
-
-    let motor_controller = DcMotorController::open(DcMotorControllerHandle::FirstAvaible)
-        .context("Get motor controller interface")?;
+    let max_ping_latency = Duration::from_millis(500);
 
     let (tx_data, mut rx_data) = mpsc::channel(10);
+    let (tx_state, rx_state) = mpsc::channel(10);
 
     const STOP_SIGNALS: [i16; 4] = [0; 4];
 
-    cmds.insert_resource(DcMotorChannels(tx_data));
+    cmds.insert_resource(DcMotorChannels(tx_data, rx_state));
 
     let errors = errors.0.clone();
     let (tx_out, rx_out) = mpsc::channel(10);
@@ -96,39 +95,23 @@ fn start_dc_motor_thread(
     runtime.spawn_background_task({
         let errors = errors.clone();
         let mut rx_in = tx_in.subscribe();
-        let local_robot = local_robot.net_id;
 
-        async move |mut ctx| -> anyhow::Result<()> {
-            loop {
-                match rx_in.recv().await? {
-                    PacketC2H::MotorState(state) => {
-                        ctx.run_on_main_thread(move |ctx| {
-                            // TODO: Replace with a filtered query when we add a marker component to local
-                            // entities
-                            let mut query =
-                                ctx.world.query::<(Entity, &GenericMotorId, &RobotId)>();
-                            let Some((entity, ..)) =
-                                query.iter(ctx.world).find(|(_, &motor, robot)| {
-                                    robot.0 == local_robot
-                                        && matches!(motor.into(), LocalMotorId::DcChannel(ch)
-                                if ch.id() == state.motor_id)
-                                })
-                            else {
-                                return;
-                            };
-
-                            // TODO: Also put fault status in world
-                            ctx.world
-                                .entity_mut(entity)
-                                .insert(CurrentDraw(Amperes(state.current_draw.as_f32_amps())));
-                        })
-                        .await;
-                    }
-                    PacketC2H::Error(err) => {
-                        let _ =
-                            errors.send(anyhow!("DC Motor controller reported an error: {err:?}"));
-                    }
-                    _ => {}
+        async move |_| loop {
+            match rx_in.recv().await {
+                Ok(PacketC2H::MotorState(state)) => {
+                    let res = tx_state.send(state).await;
+                    res.unwrap();
+                }
+                Ok(PacketC2H::Error(err)) => {
+                    let _ = errors.send(anyhow!("DC Motor controller reported an error: {err:?}"));
+                }
+                Ok(_) => {}
+                Err(RecvError::Lagged(count)) => {
+                    warn!("Telemetry dc rx lagged: {count}");
+                }
+                Err(RecvError::Closed) => {
+                    warn!("Telemetry dc rx closed");
+                    return;
                 }
             }
         }
@@ -151,7 +134,6 @@ fn start_dc_motor_thread(
                 interval.tick().await;
 
                 tx_out.send(h2c::Ping { id: tx_id }.into()).await?;
-                tx_id += 1;
 
                 let deadline = Instant::now() + max_ping_latency;
 
@@ -177,112 +159,172 @@ fn start_dc_motor_thread(
                     un_acked_pings = 0;
                 }
 
+                tx_id += 1;
+
                 // TODO: explode if un_acked_pings passes a threshold
             }
         }
     });
 
     // Signal output and setup task
-    runtime.spawn_background_task(async move |_| -> anyhow::Result<()> {
-        // let _span = span!(Level::INFO, "Motor Controller Bridge").entered();
+    runtime.spawn_background_task({
+        let errors = errors.clone();
 
-        loop {
-            tx_out.send(PacketH2C::ReadProtocolVersion).await?;
-            if let PacketC2H::ProtocolVersionResponse(version) = rx_in.recv().await? {
-                assert!(version.version == dc_motor_interface::PROTOCOL_VERSION);
-                break;
+        async move |_| -> anyhow::Result<()> {
+            // let _span = span!(Level::INFO, "Motor Controller Bridge").entered();
+
+            loop {
+                tx_out.send(PacketH2C::ReadProtocolVersion).await?;
+                if let PacketC2H::ProtocolVersionResponse(version) = rx_in.recv().await? {
+                    assert!(version.version == dc_motor_interface::PROTOCOL_VERSION);
+                    break;
+                }
             }
-        }
 
-        tx_out.send(h2c::SetArmed::Disarmed.into()).await?;
-        tx_out
-            .send(
-                h2c::StartStream {
-                    motors: Motors::all(),
-                    interval: Interval::from_duration(interval),
-                }
-                .into(),
-            )
-            .await?;
-        tx_out
-            .send(
-                h2c::SetSpeed {
-                    motors: Motors::all(),
-                    speed: Speed(0),
-                }
-                .into(),
-            )
-            .await?;
-
-        info!("DC Motor Controller bridge thread starting");
-        connected.notify_waiters();
-
-        let mut next_channel_pwms = HashMap::default();
-        let mut batch_started = false;
-
-        let mut last_armed = Armed::Disarmed;
-        let mut armed = Armed::Disarmed;
-        let mut channel_pwms = HashMap::default();
-        let mut last_batch = Instant::now();
-
-        let mut do_shutdown = false;
-        let mut interval = time::interval(interval);
-
-        while !do_shutdown {
-            interval.tick().await;
-
-            while let Ok(event) = rx_data.try_recv() {
-                trace!(?event, "Got DcMotorEvent");
-
-                match event {
-                    DcMotorEvent::Arm(Armed::Armed) => {
-                        batch_started = true;
-                        next_channel_pwms.clear();
+            tx_out.send(h2c::SetArmed::Disarmed.into()).await?;
+            tx_out
+                .send(
+                    h2c::StartStream {
+                        motors: Motors::all(),
+                        interval: Interval::from_duration(interval),
                     }
-                    DcMotorEvent::Arm(Armed::Disarmed) => {
-                        batch_started = false;
-                        armed = Armed::Disarmed;
+                    .into(),
+                )
+                .await?;
+            tx_out
+                .send(
+                    h2c::SetSpeed {
+                        motors: Motors::all(),
+                        speed: Speed(0),
                     }
-                    DcMotorEvent::UpdateChannel(channel, pwm) => {
-                        if batch_started {
-                            next_channel_pwms.insert(channel, pwm);
+                    .into(),
+                )
+                .await?;
+
+            info!("DC Motor Controller bridge thread starting");
+            connected.notify_waiters();
+
+            let mut next_channel_pwms = HashMap::default();
+            let mut batch_started = false;
+
+            let mut last_armed = Armed::Disarmed;
+            let mut armed = Armed::Disarmed;
+            let mut channel_pwms = HashMap::default();
+            let mut last_batch = Instant::now();
+
+            let mut do_shutdown = false;
+            let mut interval = time::interval(interval);
+
+            while !do_shutdown {
+                interval.tick().await;
+
+                while let Ok(event) = rx_data.try_recv() {
+                    trace!(?event, "Got DcMotorEvent");
+
+                    match event {
+                        DcMotorEvent::Arm(Armed::Armed) => {
+                            batch_started = true;
+                            next_channel_pwms.clear();
                         }
-                    }
-                    DcMotorEvent::BatchComplete => {
-                        if batch_started {
+                        DcMotorEvent::Arm(Armed::Disarmed) => {
                             batch_started = false;
+                            armed = Armed::Disarmed;
+                        }
+                        DcMotorEvent::UpdateChannel(channel, pwm) => {
+                            if batch_started {
+                                next_channel_pwms.insert(channel, pwm);
+                            }
+                        }
+                        DcMotorEvent::BatchComplete => {
+                            if batch_started {
+                                batch_started = false;
 
-                            armed = Armed::Armed;
-                            channel_pwms = mem::take(&mut next_channel_pwms);
-                            last_batch = Instant::now();
+                                armed = Armed::Armed;
+                                channel_pwms = mem::take(&mut next_channel_pwms);
+                                last_batch = Instant::now();
+                            }
+                        }
+                        DcMotorEvent::Shutdown => {
+                            armed = Armed::Disarmed;
+                            do_shutdown = true;
+
+                            break;
                         }
                     }
-                    DcMotorEvent::Shutdown => {
-                        armed = Armed::Disarmed;
-                        do_shutdown = true;
+                }
 
-                        break;
+                assert!(!rx_data.is_closed());
+                // Update state
+                if matches!(armed, Armed::Armed) && last_batch.elapsed() > max_inactive {
+                    warn!("Time since last batch exceeded max_inactive, disarming");
+
+                    // TODO(mid): Should this notify bevy?
+                    let _ = errors.send(anyhow!("Motors disarmed due to inactivity"));
+                    armed = Armed::Disarmed;
+                }
+
+                // Sync state with pwm chip
+                match armed {
+                    Armed::Armed => {
+                        let res = tx_out
+                            .send(
+                                h2c::SetArmed::Armed {
+                                    duration: Interval::from_duration(max_inactive),
+                                }
+                                .into(),
+                            )
+                            .await;
+
+                        if let Err(err) = res {
+                            let _ = errors.send(
+                                anyhow::format_err!(err)
+                                    .context("Dc Motor interface tx channel error"),
+                            );
+                        }
+                    }
+                    Armed::Disarmed => {
+                        let res = tx_out.send(h2c::SetArmed::Disarmed.into()).await;
+
+                        // No motors should be active when disarmed
+                        channel_pwms.clear();
+
+                        if let Err(err) = res {
+                            let _ = errors.send(
+                                anyhow::format_err!(err)
+                                    .context("Dc Motor interface tx channel error"),
+                            );
+                        }
                     }
                 }
-            }
 
-            assert!(!rx_data.is_closed());
-            // Update state
-            if matches!(armed, Armed::Armed) && last_batch.elapsed() > max_inactive {
-                warn!("Time since last batch exceeded max_inactive, disarming");
+                // Generate the pwm states for each channel
+                let pwms = {
+                    // By default all motors should be stopped
+                    let mut pwms = STOP_SIGNALS;
 
-                // TODO(mid): Should this notify bevy?
-                let _ = errors.send(anyhow!("Motors disarmed due to inactivity"));
-                armed = Armed::Disarmed;
-            }
+                    // Copy pwm values from `channel_pwms` into `pwms`
+                    // `channel_pwms` is cleared in the disarmed case
+                    for (channel, new_pwm) in &channel_pwms {
+                        let channel_pwm = pwms.get_mut(channel.id() as usize);
 
-            // Sync state with pwm chip
-            match armed {
-                Armed::Armed => {
+                        // If this is a valid channel, set the corresponding channel's pwm
+                        if let Some(channel_pwm) = channel_pwm {
+                            *channel_pwm = *new_pwm;
+                        }
+                    }
+
+                    pwms
+                };
+
+                trace!(?armed, ?channel_pwms, ?pwms, "Writing Pwms");
+
+                // Write the current pwms to the pwm chip
+                for (idx, pwm) in pwms.iter().enumerate() {
                     let res = tx_out
                         .send(
-                            h2c::SetArmed::Armed {
-                                duration: Interval::from_duration(max_inactive),
+                            h2c::SetSpeed {
+                                motors: Motors::from_bits_truncate(1u8 << idx),
+                                speed: Speed(*pwm),
                             }
                             .into(),
                         )
@@ -294,74 +336,33 @@ fn start_dc_motor_thread(
                         );
                     }
                 }
-                Armed::Disarmed => {
-                    let res = tx_out.send(h2c::SetArmed::Disarmed.into()).await;
 
-                    // No motors should be active when disarmed
-                    channel_pwms.clear();
+                if last_armed != armed {
+                    info!("DC Motor Controller: {armed:?}");
 
-                    if let Err(err) = res {
-                        let _ = errors.send(
-                            anyhow::format_err!(err).context("Dc Motor interface tx channel error"),
-                        );
-                    }
+                    last_armed = armed;
                 }
             }
 
-            // Generate the pwm states for each channel
-            let pwms = {
-                // By default all motors should be stopped
-                let mut pwms = STOP_SIGNALS;
+            warn!("DC Motor Controller bridge thread died");
 
-                // Copy pwm values from `channel_pwms` into `pwms`
-                // `channel_pwms` is cleared in the disarmed case
-                for (channel, new_pwm) in &channel_pwms {
-                    let channel_pwm = pwms.get_mut(channel.id() as usize);
-
-                    // If this is a valid channel, set the corresponding channel's pwm
-                    if let Some(channel_pwm) = channel_pwm {
-                        *channel_pwm = *new_pwm;
-                    }
-                }
-
-                pwms
-            };
-
-            trace!(?armed, ?channel_pwms, ?pwms, "Writing Pwms");
-
-            // Write the current pwms to the pwm chip
-            for (idx, pwm) in pwms.iter().enumerate() {
-                let res = tx_out
-                    .send(
-                        h2c::SetSpeed {
-                            motors: Motors::from_bits_truncate(1u8 << idx),
-                            speed: Speed(*pwm),
-                        }
-                        .into(),
-                    )
-                    .await;
-
-                if let Err(err) = res {
-                    let _ = errors.send(
-                        anyhow::format_err!(err).context("Dc Motor interface tx channel error"),
-                    );
-                }
-            }
-
-            if last_armed != armed {
-                info!("DC Motor Controller: {armed:?}");
-
-                last_armed = armed;
-            }
+            Ok(())
         }
-
-        warn!("DC Motor Controller bridge thread died");
-
-        Ok(())
     });
 
     runtime.spawn_background_task(async move |_| {
         // let _span = span!(Level::INFO, "Motor Controller Serial").entered();
+
+        let motor_controller = match DcMotorController::open(DcMotorControllerHandle::FirstAvaible)
+            .context("Get motor controller interface")
+        {
+            Ok(motor_controller) => motor_controller,
+            Err(err) => {
+                let _ = errors
+                    .send(anyhow::format_err!(err).context("Dc Motor interface tx channel error"));
+                return;
+            }
+        };
 
         motor_controller.start(tx_in, rx_out).await;
 
@@ -416,6 +417,27 @@ fn listen_to_dc_motors(
         .context("Send data to dc motor thread")?;
 
     Ok(())
+}
+
+fn read_telemetry(
+    mut cmds: Commands,
+    mut channels: ResMut<DcMotorChannels>,
+    local_robot: Res<LocalRobot>,
+    query: Query<(Entity, &GenericMotorId, &RobotId)>,
+) {
+    while let Ok(state) = channels.1.try_recv() {
+        let Some((entity, ..)) = query.iter().find(|(_, &motor, robot)| {
+            robot.0 == local_robot.net_id
+                && matches!(motor.into(), LocalMotorId::DcChannel(ch)
+                                if ch.id() == state.motor_id)
+        }) else {
+            return;
+        };
+
+        // TODO: Also put fault status in world
+        cmds.entity(entity)
+            .insert(CurrentDraw(Amperes(state.current_draw.as_f32_amps())));
+    }
 }
 
 fn shutdown(channels: Res<DcMotorChannels>, mut exit: EventReader<AppExit>) {

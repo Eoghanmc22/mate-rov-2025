@@ -17,7 +17,7 @@ common = { path = "common" }
 networking = { path = "networking" }
 motor_math = { path = "motor_math" }
 stable_hashmap = { path = "stable_hashmap" }
-dc_motor_interface = { package = "interface", git = "https://github.com/Eoghanmc22/dc-motor.git", rev = "62eceffe565a65b9cf6abf74c6133c7719501668" }
+dc_motor_interface = { package = "interface", git = "https://github.com/Eoghanmc22/dc-motor.git", rev = "611f3d5c95b1605203043361cddf287f87b0bc48" }
 
 # Bevy
 bevy = { version = "0.15", default-features = false, features = ["serialize"] }
