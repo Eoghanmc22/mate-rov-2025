@@ -51,6 +51,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
             ref camera,
             ref constraints,
             signal_type,
+            control_mode,
         },
     ) in servos
     {
@@ -67,6 +68,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
         } else {
             default_signal_range
         };
+        let mode = control_mode.unwrap_or_default();
 
         let mut entity = cmds.spawn((
             MotorBundle {
@@ -80,7 +82,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
                     signal_range,
                 },
                 // TODO: This should prob be configurable
-                mode: MotorContributionMode::ZerothOrder,
+                mode,
             },
             Replicate,
         ));

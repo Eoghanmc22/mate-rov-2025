@@ -68,10 +68,11 @@ impl MotorRawSignalRange {
     }
 }
 
-#[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
+#[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub enum MotorContributionMode {
     // Uses contribution sum directly
+    #[default]
     ZerothOrder,
     // Integrates contribution sum
     FirstOrder,
