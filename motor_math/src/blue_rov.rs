@@ -3,7 +3,7 @@ use nalgebra::Vector3;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
-use crate::{utils::VectorTransform, Motor, MotorConfig, Number};
+use crate::{utils::VectorTransform, MotorConfig, Number, Thruster};
 
 /// Motor ids for blue rov heavy
 #[derive(
@@ -34,8 +34,8 @@ pub enum BlueRovMotorId {
 
 impl<D: Number> MotorConfig<BlueRovMotorId, D> {
     pub fn new(
-        lateral_front_right: Motor<D>,
-        vertical_right: Motor<D>,
+        lateral_front_right: Thruster<D>,
+        vertical_right: Thruster<D>,
         center_mass: Vector3<D>,
     ) -> Self {
         #[rustfmt::skip]
@@ -62,7 +62,7 @@ impl<D: Number> MotorConfig<BlueRovMotorId, D> {
 
             (
                 motor_id,
-                Motor {
+                Thruster {
                     position,
                     orientation,
                     direction: seed.direction.flip_n(transforms.len() as _),

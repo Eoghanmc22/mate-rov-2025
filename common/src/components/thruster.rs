@@ -3,7 +3,7 @@ use bevy::{
     reflect::{prelude::ReflectDefault, Reflect, ReflectDeserialize, ReflectSerialize},
 };
 use motor_math::{
-    glam::{MotorGlam, MovementGlam},
+    glam::{MovementGlam, ThrusterGlam},
     solve::reverse::Axis,
     ErasedMotorId, MotorConfig,
 };
@@ -61,7 +61,7 @@ mod thruster_api {
 
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
     #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-    pub struct ThrusterDefinition(pub ErasedMotorId, pub MotorGlam);
+    pub struct ThrusterDefinition(pub ErasedMotorId, pub ThrusterGlam);
 
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
     #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq)]

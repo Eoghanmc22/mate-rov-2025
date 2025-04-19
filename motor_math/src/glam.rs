@@ -5,11 +5,11 @@ use glam::{vec3a, Vec3A};
 use nalgebra::vector;
 use serde::{Deserialize, Serialize};
 
-use crate::{Direction, Motor, Movement, Number};
+use crate::{Direction, Movement, Number, Thruster};
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
 #[reflect(Serialize, Deserialize, Debug, PartialEq)]
-pub struct MotorGlam {
+pub struct ThrusterGlam {
     /// Offset from origin
     pub position: Vec3A,
     /// Unit vector
@@ -18,14 +18,14 @@ pub struct MotorGlam {
     pub direction: Direction,
 }
 
-impl<N: Number> From<Motor<N>> for MotorGlam {
-    fn from(value: Motor<N>) -> Self {
-        let Motor {
+impl<N: Number> From<Thruster<N>> for ThrusterGlam {
+    fn from(value: Thruster<N>) -> Self {
+        let Thruster {
             position,
             orientation,
             direction,
         } = value;
-        MotorGlam {
+        ThrusterGlam {
             position: vec3a(
                 position.x.re() as _,
                 position.y.re() as _,
@@ -41,14 +41,14 @@ impl<N: Number> From<Motor<N>> for MotorGlam {
     }
 }
 
-impl<N: Number> From<MotorGlam> for Motor<N> {
-    fn from(value: MotorGlam) -> Self {
-        let MotorGlam {
+impl<N: Number> From<ThrusterGlam> for Thruster<N> {
+    fn from(value: ThrusterGlam) -> Self {
+        let ThrusterGlam {
             position,
             orientation,
             direction,
         } = value;
-        Motor {
+        Thruster {
             position: vector!(
                 N::from(position.x as _),
                 N::from(position.y as _),
@@ -64,14 +64,14 @@ impl<N: Number> From<MotorGlam> for Motor<N> {
     }
 }
 
-impl<N: Number + Copy> From<&Motor<N>> for MotorGlam {
-    fn from(value: &Motor<N>) -> Self {
-        let Motor {
+impl<N: Number + Copy> From<&Thruster<N>> for ThrusterGlam {
+    fn from(value: &Thruster<N>) -> Self {
+        let Thruster {
             position,
             orientation,
             direction,
         } = *value;
-        MotorGlam {
+        ThrusterGlam {
             position: vec3a(
                 position.x.re() as _,
                 position.y.re() as _,
@@ -87,14 +87,14 @@ impl<N: Number + Copy> From<&Motor<N>> for MotorGlam {
     }
 }
 
-impl<N: Number> From<&MotorGlam> for Motor<N> {
-    fn from(value: &MotorGlam) -> Self {
-        let MotorGlam {
+impl<N: Number> From<&ThrusterGlam> for Thruster<N> {
+    fn from(value: &ThrusterGlam) -> Self {
+        let ThrusterGlam {
             position,
             orientation,
             direction,
         } = *value;
-        Motor {
+        Thruster {
             position: vector!(
                 N::from(position.x as _),
                 N::from(position.y as _),

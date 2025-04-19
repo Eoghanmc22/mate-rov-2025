@@ -13,7 +13,9 @@ use bevy::{
 use bevy_egui::EguiContexts;
 use common::components::{Orientation, OrientationTarget, Robot, Thrusters};
 use egui::TextureId;
-use motor_math::{glam::MotorGlam, x3d::X3dMotorId, Direction, ErasedMotorId, Motor, MotorConfig};
+use motor_math::{
+    glam::ThrusterGlam, x3d::X3dMotorId, Direction, ErasedMotorId, MotorConfig, Thruster,
+};
 
 use crate::DARK_MODE;
 
@@ -119,7 +121,7 @@ fn setup(
     // on first connection to robot
     add_motor_conf(
         &MotorConfig::<X3dMotorId, f32>::new(
-            MotorGlam {
+            ThrusterGlam {
                 position: Vec3A::default(),
                 orientation: Vec3A::default(),
                 direction: Direction::Clockwise,
@@ -171,7 +173,7 @@ fn add_motor_conf(
 
 fn add_motor(
     motor_id: ErasedMotorId,
-    motor: &MotorGlam,
+    motor: &ThrusterGlam,
 
     builder: &mut ChildBuilder,
     meshes: &mut ResMut<Assets<Mesh>>,

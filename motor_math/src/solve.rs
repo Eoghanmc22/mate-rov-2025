@@ -14,14 +14,14 @@ mod tests {
         solve::forward,
         utils::vec_from_angles,
         x3d::X3dMotorId,
-        Direction, FloatType, Motor, MotorConfig, Movement,
+        Direction, FloatType, MotorConfig, Movement, Thruster,
     };
 
     use super::reverse;
 
     #[test]
     fn solve_roundtrip_x3d() {
-        let seed_motor = Motor {
+        let seed_motor = Thruster {
             position: vector![1.0, 1.0, 1.0].normalize(),
             orientation: vec_from_angles(60.0, 40.0),
             direction: Direction::Clockwise,
@@ -59,12 +59,12 @@ mod tests {
 
     #[test]
     fn solve_roundtrip_blue_rov() {
-        let lateral = Motor {
+        let lateral = Thruster {
             position: vector![1.0, 1.0, 0.0],
             orientation: vector![-1.0, 1.0, 0.0].normalize(),
             direction: Direction::Clockwise,
         };
-        let vertical = Motor {
+        let vertical = Thruster {
             position: vector![1.0, 1.0, 0.0],
             orientation: vector![0.0, 0.0, 1.0].normalize(),
             direction: Direction::Clockwise,
@@ -119,7 +119,7 @@ mod tests {
 
         motors.insert(
             MotorIds::Right,
-            Motor {
+            Thruster {
                 position: vector![1.0, 1.0, 0.0].normalize(),
                 orientation: vector![0.0, 1.0, 0.0],
                 direction: Direction::Clockwise,
@@ -128,7 +128,7 @@ mod tests {
 
         motors.insert(
             MotorIds::Left,
-            Motor {
+            Thruster {
                 position: vector![-1.0, 1.0, 0.0].normalize(),
                 orientation: vector![0.0, 1.0, 0.0],
                 direction: Direction::CounterClockwise,
@@ -137,7 +137,7 @@ mod tests {
 
         motors.insert(
             MotorIds::Lateral,
-            Motor {
+            Thruster {
                 position: vector![0.0, 0.0, 0.0],
                 orientation: vector![1.0, 0.0, 0.0],
                 direction: Direction::Clockwise,
@@ -146,7 +146,7 @@ mod tests {
 
         motors.insert(
             MotorIds::Up1,
-            Motor {
+            Thruster {
                 position: vector![1.0, 1.0, 0.0].normalize() * 2.0,
                 orientation: vector![0.0, 0.0, 1.0],
                 direction: Direction::Clockwise,
@@ -155,7 +155,7 @@ mod tests {
 
         motors.insert(
             MotorIds::Up2,
-            Motor {
+            Thruster {
                 position: vector![-1.0, 1.0, 0.0].normalize() * 2.0,
                 orientation: vector![0.0, 0.0, 1.0],
                 direction: Direction::CounterClockwise,
@@ -164,7 +164,7 @@ mod tests {
 
         motors.insert(
             MotorIds::Up3,
-            Motor {
+            Thruster {
                 position: vector![0.0, -1.0, 0.0].normalize() * 2.0,
                 orientation: vector![0.0, 0.0, 1.0],
                 direction: Direction::Clockwise,
@@ -200,7 +200,7 @@ mod tests {
 
     #[bench]
     fn bench_reverse_solver_x3d(b: &mut Bencher) {
-        let seed_motor = Motor {
+        let seed_motor = Thruster {
             position: vector![0.3, 0.5, 0.4].normalize(),
             orientation: vec_from_angles(60.0, 40.0),
             direction: Direction::Clockwise,
@@ -224,12 +224,12 @@ mod tests {
 
     #[bench]
     fn bench_reverse_solver_blue_rov(b: &mut Bencher) {
-        let lateral = Motor {
+        let lateral = Thruster {
             position: vector![1.0, 1.0, 0.0],
             orientation: vector![-1.0, 1.0, 0.0].normalize(),
             direction: Direction::Clockwise,
         };
-        let vertical = Motor {
+        let vertical = Thruster {
             position: vector![1.0, 1.0, 0.0],
             orientation: vector![0.0, 0.0, 1.0].normalize(),
             direction: Direction::Clockwise,

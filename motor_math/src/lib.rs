@@ -38,7 +38,7 @@ impl<T> Number for T where T: DualNum<FloatType> + RealField + Debug + Copy {}
 #[reflect(from_reflect = false)]
 #[reflect(Debug, PartialEq)]
 pub struct MotorConfig<MotorId: Debug + Ord, D: Number> {
-    pub motors: Vec<(MotorId, Motor<D>)>,
+    pub motors: Vec<(MotorId, Thruster<D>)>,
     #[reflect(ignore)]
     pub matrix: Matrix6xX<D>,
     #[reflect(ignore)]
@@ -48,7 +48,7 @@ pub struct MotorConfig<MotorId: Debug + Ord, D: Number> {
 impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
     #[instrument(level = "trace", skip_all, ret)]
     pub fn new_raw(
-        motors: impl IntoIterator<Item = (MotorId, Motor<D>)>,
+        motors: impl IntoIterator<Item = (MotorId, Thruster<D>)>,
         center_mass: Vector3<D>,
     ) -> Self {
         let mut motors: Vec<_> = motors
@@ -101,12 +101,12 @@ impl<MotorId: Ord + Debug, D: Number> MotorConfig<MotorId, D> {
         }
     }
 
-    pub fn motor(&self, motor: &MotorId) -> Option<&Motor<D>> {
+    pub fn motor(&self, motor: &MotorId) -> Option<&Thruster<D>> {
         // self.motors.get(motor)
         self.motors.iter().find(|it| &it.0 == motor).map(|it| &it.1)
     }
 
-    pub fn motors(&self) -> impl Iterator<Item = (&MotorId, &Motor<D>)> {
+    pub fn motors(&self) -> impl Iterator<Item = (&MotorId, &Thruster<D>)> {
         self.motors.iter().map(|it| (&it.0, &it.1))
     }
 
@@ -181,7 +181,7 @@ impl<D: Number> MotorConfig<ErasedMotorId, D> {
 
 #[derive(Debug, Copy, Clone, Serialize, Deserialize, Reflect, PartialEq)]
 #[reflect(Debug, PartialEq, Default)]
-pub struct Motor<D: Number> {
+pub struct Thruster<D: Number> {
     /// Offset from origin
     #[reflect(ignore)]
     pub position: Vector3<D>,
@@ -222,7 +222,7 @@ impl Direction {
     }
 }
 
-impl<D: Number> Default for Motor<D> {
+impl<D: Number> Default for Thruster<D> {
     fn default() -> Self {
         Self {
             position: Vector3::<D>::zeros(),

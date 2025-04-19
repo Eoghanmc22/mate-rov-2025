@@ -2,7 +2,7 @@ use ahash::{HashMap, HashSet};
 use bevy::{ecs::system::Resource, transform::components::Transform};
 use glam::{vec3, vec3a, EulerRot, Quat, Vec3A};
 use motor_math::{
-    blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::MotorGlam, x3d::X3dMotorId,
+    blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::ThrusterGlam, x3d::X3dMotorId,
     ErasedMotorId, MotorConfig,
 };
 use nalgebra::vector;
@@ -39,37 +39,37 @@ pub enum MotorConfigDefinition {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct X3dDefinition {
-    pub seed_motor: MotorGlam,
+    pub seed_motor: ThrusterGlam,
 
     pub motors: HashMap<X3dMotorId, LocalMotorId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlueRovDefinition {
-    pub vertical_seed_motor: MotorGlam,
-    pub lateral_seed_motor: MotorGlam,
+    pub vertical_seed_motor: ThrusterGlam,
+    pub lateral_seed_motor: ThrusterGlam,
 
     pub motors: HashMap<BlueRovMotorId, LocalMotorId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeavyDefinition {
-    pub vertical_seed_motor: MotorGlam,
-    pub lateral_seed_motor: MotorGlam,
+    pub vertical_seed_motor: ThrusterGlam,
+    pub lateral_seed_motor: ThrusterGlam,
 
     pub motors: HashMap<HeavyMotorId, LocalMotorId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomDefinition {
-    pub motors: HashMap<String, CustomMotor>,
+    pub motors: HashMap<String, CustomThruster>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CustomMotor {
+pub struct CustomThruster {
     pub channel: LocalMotorId,
     #[serde(flatten)]
-    pub motor: MotorGlam,
+    pub motor: ThrusterGlam,
 }
 
 impl X3dDefinition {
@@ -127,7 +127,7 @@ impl MotorConfigDefinition {
         &self,
         center_mass: Vec3A,
     ) -> (
-        impl Iterator<Item = (ErasedMotorId, MotorGlam, LocalMotorId)>,
+        impl Iterator<Item = (ErasedMotorId, ThrusterGlam, LocalMotorId)>,
         MotorConfig<ErasedMotorId, motor_math::FloatType>,
     ) {
         let motors: Vec<_>;

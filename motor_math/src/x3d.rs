@@ -3,7 +3,7 @@ use nalgebra::Vector3;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use serde::{Deserialize, Serialize};
 
-use crate::{utils::VectorTransform, Motor, MotorConfig, Number};
+use crate::{utils::VectorTransform, MotorConfig, Number, Thruster};
 
 #[derive(
     Clone,
@@ -34,7 +34,7 @@ pub enum X3dMotorId {
 }
 
 impl<D: Number> MotorConfig<X3dMotorId, D> {
-    pub fn new(front_right_top: Motor<D>, center_mass: Vector3<D>) -> Self {
+    pub fn new(front_right_top: Thruster<D>, center_mass: Vector3<D>) -> Self {
         #[rustfmt::skip]
         let motors = [
             (X3dMotorId::FrontRightTop, [].as_slice()),
@@ -63,7 +63,7 @@ impl<D: Number> MotorConfig<X3dMotorId, D> {
 
             (
                 motor_id,
-                Motor {
+                Thruster {
                     position,
                     orientation,
                     direction: front_right_top.direction.flip_n(transforms.len() as _),
