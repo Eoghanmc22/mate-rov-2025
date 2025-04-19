@@ -4,7 +4,8 @@ use common::{
     bundles::{ActuatorBundle, MotorBundle},
     components::{
         DisableMovementApi, GenericMotorId, MotorCameraReference, MotorContribution,
-        MotorContributionMode, MotorSignal, MotorSignalType, MotorTargets, Motors, RobotId,
+        MotorContributionMode, MotorRawSignalRange, MotorSignal, MotorSignalType, MotorTargets,
+        Motors, RobotId,
     },
     ecs_sync::{NetId, Replicate},
     events::{ResetServo, ResetServos},
@@ -48,9 +49,24 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
         &Servo {
             channel,
             ref camera,
+            ref constraints,
         },
     ) in servos
     {
+        let default_signal_range = channel.default_signal_range();
+        let signal_range = if let Some(constraints) = constraints {
+            let min_raw = default_signal_range.raw_from_percent(constraints.min);
+            let max_raw = default_signal_range.raw_from_percent(constraints.max);
+
+            MotorRawSignalRange {
+                min: default_signal_range.min.max(min_raw),
+                center: default_signal_range.center,
+                max: default_signal_range.max.min(max_raw),
+            }
+        } else {
+            default_signal_range
+        };
+
         let mut entity = cmds.spawn((
             MotorBundle {
                 actuator: ActuatorBundle {
@@ -60,7 +76,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
                     robot: RobotId(robot.net_id),
                     signal_type: MotorSignalType::Position,
                     // TODO : We need a way to get the actual range
-                    signal_range: channel.default_signal_range(),
+                    signal_range,
                 },
                 // TODO: This should prob be configurable
                 mode: MotorContributionMode::ZerothOrder,

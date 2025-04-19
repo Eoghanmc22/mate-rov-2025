@@ -47,11 +47,11 @@ orientation = [-0.5086841141129421, -0.3340963555185603, 0.7934860410103929]
 direction = "Clockwise"
 
 [servo_config.servos]
-FrontCameraRotate = { channel = { PwmChannel = 15 }, cameras = ["Front"] }
-Claw1 = { channel = { DcChannel = 0 } }
-Claw2 = { channel = { DcChannel = 1 } }
-Claw3 = { channel = { DcChannel = 2 } }
-Lights = { channel = { DcChannel = 3 } }
+FrontCameraRotate = { channel = { PwmChannel = 15 }, camera = "Front" }
+Claw1 = { channel = { DcChannel = 0 }, constraints = { min = -0.8, max = 0.8 } }
+Claw2 = { channel = { DcChannel = 1 }, constraints = { min = -0.8, max = 0.8 } }
+Claw3 = { channel = { DcChannel = 2 }, constraints = { min = -0.8, max = 0.8 } }
+Lights = { channel = { DcChannel = 3 }, constraints = { min = 0.0, max = 0.75 } }
 
 
 # [cameras."/dev/video2"]

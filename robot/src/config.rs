@@ -244,6 +244,13 @@ pub struct Servo {
     pub channel: LocalMotorId,
     // pub cameras: HashSet<String>,
     pub camera: Option<String>,
+    pub constraints: Option<ServoConstraints>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServoConstraints {
+    pub min: f32,
+    pub max: f32,
 }
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
