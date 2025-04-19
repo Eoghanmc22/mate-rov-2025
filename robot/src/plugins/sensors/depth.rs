@@ -66,7 +66,7 @@ fn start_depth_thread(
     cmds.insert_resource(DepthChannels(rx_data, tx_exit));
 
     let (sea_level, _) = depth.read_frame().context("Read Sea Level")?;
-    depth.sea_level = sea_level.pressure;
+    // depth.sea_level = sea_level.pressure;
 
     cmds.entity(robot.entity).insert(DepthSettings {
         sea_level: depth.sea_level,
