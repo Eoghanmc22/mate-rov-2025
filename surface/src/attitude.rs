@@ -153,9 +153,9 @@ fn add_motor_conf(
     commands
         .spawn((
             Mesh3d(meshes.add(Cuboid::new(
-                frt.position.x * 2.0 * 1.5,
-                frt.position.y * 2.0 * 1.5,
-                frt.position.z * 2.0 * 1.5,
+                (frt.position.x * 2.0 * 1.5).abs(),
+                (frt.position.y * 2.0 * 1.5).abs(),
+                (frt.position.z * 2.0 * 1.5).abs(),
             ))),
             MeshMaterial3d(materials_pbr.add(Color::srgb(0.8, 0.7, 0.6))),
             Transform::from_scale(Vec3::splat(3.5)),
