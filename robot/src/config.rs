@@ -1,5 +1,6 @@
 use ahash::{HashMap, HashSet};
 use bevy::{ecs::system::Resource, transform::components::Transform};
+use common::components::MotorSignalType;
 use glam::{vec3, vec3a, EulerRot, Quat, Vec3A};
 use motor_math::{
     blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::ThrusterGlam, x3d::X3dMotorId,
@@ -242,6 +243,7 @@ pub struct ServoConfigDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Servo {
     pub channel: LocalMotorId,
+    pub signal_type: MotorSignalType,
     // pub cameras: HashSet<String>,
     pub camera: Option<String>,
     pub constraints: Option<ServoConstraints>,

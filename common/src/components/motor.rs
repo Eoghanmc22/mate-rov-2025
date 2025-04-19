@@ -31,7 +31,7 @@ pub enum MotorSignal {
     Raw(i32),
 }
 
-#[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
+#[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub enum MotorSignalType {
     Position,

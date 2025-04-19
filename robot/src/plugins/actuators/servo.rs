@@ -50,6 +50,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
             channel,
             ref camera,
             ref constraints,
+            signal_type,
         },
     ) in servos
     {
@@ -74,7 +75,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
                     channel: channel.into(),
                     signal: MotorSignal::Percent(0.0),
                     robot: RobotId(robot.net_id),
-                    signal_type: MotorSignalType::Position,
+                    signal_type,
                     // TODO : We need a way to get the actual range
                     signal_range,
                 },
