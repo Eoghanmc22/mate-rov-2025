@@ -1,6 +1,6 @@
 use ahash::{HashMap, HashSet};
 use bevy::{ecs::system::Resource, transform::components::Transform};
-use glam::{vec3, EulerRot, Quat, Vec3A};
+use glam::{vec3, vec3a, EulerRot, Quat, Vec3A};
 use motor_math::{
     blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::MotorGlam, x3d::X3dMotorId,
     ErasedMotorId, MotorConfig,
@@ -22,6 +22,8 @@ pub struct RobotConfig {
     pub motor_amperage_budget: f32,
     pub jerk_limit: f32,
     pub center_of_mass: Vec3A,
+
+    pub imu_offset: ConfigRotation,
 
     #[serde(default)]
     pub cameras: HashMap<String, CameraDefinition>,
@@ -256,11 +258,26 @@ pub struct ConfigTransform {
     rotation: ConfigRotation,
 }
 
+impl ConfigTransform {
+    pub fn flatten(&self) -> Transform {
+        Transform::from_translation(self.position.flatten().into())
+            .with_rotation(self.rotation.flatten())
+    }
+}
+
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigPosition {
     x: f32,
     y: f32,
     z: f32,
+}
+
+impl ConfigPosition {
+    pub fn flatten(&self) -> Vec3A {
+        let &ConfigPosition { x, y, z } = self;
+
+        vec3a(x, y, z)
+    }
 }
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
@@ -270,17 +287,15 @@ pub struct ConfigRotation {
     roll: f32,
 }
 
-impl ConfigTransform {
-    pub fn flatten(&self) -> Transform {
-        let ConfigPosition { x, y, z } = self.position;
-        let ConfigRotation { yaw, pitch, roll } = self.rotation;
+impl ConfigRotation {
+    pub fn flatten(&self) -> Quat {
+        let &ConfigRotation { yaw, pitch, roll } = self;
 
-        Transform::from_translation(Quat::from_rotation_x(90f32.to_radians()) * vec3(x, -y, z))
-            .with_rotation(Quat::from_euler(
-                EulerRot::default(),
-                yaw.to_radians(),
-                pitch.to_radians(),
-                roll.to_radians(),
-            ))
+        Quat::from_euler(
+            EulerRot::ZXY,
+            yaw.to_radians(),
+            pitch.to_radians(),
+            roll.to_radians(),
+        )
     }
 }
