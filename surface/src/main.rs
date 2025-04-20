@@ -60,6 +60,7 @@ fn main() -> anyhow::Result<()> {
         .add_plugins((
             // Bevy Core
             DefaultPlugins.build().disable::<bevy::audio::AudioPlugin>(),
+            MeshPickingPlugin,
             // .set(TaskPoolPlugin {
             //     task_pool_options: TaskPoolOptions {
             //         compute: TaskPoolThreadAssignmentPolicy {
