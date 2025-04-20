@@ -1,6 +1,6 @@
 use ahash::{HashMap, HashSet};
 use bevy::{ecs::system::Resource, transform::components::Transform};
-use common::components::{MotorContributionMode, MotorSignalType};
+use common::components::{MotorContributionMode, MotorSignalType, PidConfig};
 use glam::{vec3, vec3a, EulerRot, Quat, Vec3A};
 use motor_math::{
     blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::ThrusterGlam, x3d::X3dMotorId,
@@ -9,7 +9,7 @@ use motor_math::{
 use nalgebra::vector;
 use serde::{Deserialize, Serialize};
 
-use crate::plugins::actuators::hardware::motor_id_map::LocalMotorId;
+use crate::plugins::actuators::{hardware::motor_id_map::LocalMotorId, stabilize::PidAxis};
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct RobotConfig {
@@ -28,6 +28,8 @@ pub struct RobotConfig {
 
     #[serde(default)]
     pub cameras: HashMap<String, CameraDefinition>,
+
+    pub pid_configs: HashMap<PidAxis, PidConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

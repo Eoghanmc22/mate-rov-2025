@@ -7,6 +7,12 @@ jerk_limit = 40.0
 
 imu_offset = { yaw = 0.0, pitch = 0.0, roll = 180.0 }
 
+[pid_configs]
+Depth = { kp = 100.0, ki = 5.0, kd = 1.5, max_integral = 10.0 }
+Yaw = { kp = 0.3, ki = 0.01, kd = 0.05, max_integral = 10.0 }
+Pitch = { kp = 0.25, ki = 0.015, kd = 0.07, max_integral = 60.0 }
+Roll = { kp = 0.15, ki = 0.01, kd = 0.05, max_integral = 40.0 }
+
 [motor_config.Custom.motors.BackRightBottom]
 channel = { PwmChannel = 4 }
 position = [0.16586998298392233, -0.1847582499, -0.07966385632084612]

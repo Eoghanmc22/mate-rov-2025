@@ -1,4 +1,3 @@
-pub mod depth_hold;
 pub mod hardware;
 pub mod leds;
 pub mod servo;
@@ -14,8 +13,7 @@ impl PluginGroup for MovementPlugins {
         let plugins = PluginGroupBuilder::start::<Self>()
             .add(servo::ServoPlugin)
             .add(thruster::ThrusterPlugin)
-            .add(stabilize::StabilizePlugin)
-            .add(depth_hold::DepthHoldPlugin);
+            .add(stabilize::StabilizePlugin);
 
         #[cfg(rpi)]
         let plugins = plugins

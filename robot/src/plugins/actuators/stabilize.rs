@@ -4,15 +4,20 @@ use bevy::prelude::*;
 use common::{
     bundles::MovementContributionBundle,
     components::{
-        Armed, MovementContribution, Orientation, OrientationTarget, PidConfig, PidResult, RobotId,
+        Armed, DepthMeasurement, DepthTarget, MovementContribution, Orientation, OrientationTarget,
+        PidConfig, PidResult, RobotId,
     },
     ecs_sync::Replicate,
     types::utils::PidController,
 };
 use glam::{vec3a, Vec3A};
-use motor_math::{glam::MovementGlam, Movement};
+use motor_math::glam::MovementGlam;
+use serde::{Deserialize, Serialize};
 
-use crate::plugins::core::robot::LocalRobot;
+use crate::{
+    config::RobotConfig,
+    plugins::core::robot::{LocalRobot, LocalRobotMarker},
+};
 
 pub struct StabilizePlugin;
 
@@ -23,162 +28,124 @@ impl Plugin for StabilizePlugin {
     }
 }
 
-#[derive(Resource)]
-struct StabilizeState {
-    pitch: Entity,
-    pitch_controller: PidController,
+#[derive(Component, Default)]
+struct PidState(PidController);
 
-    roll: Entity,
-    roll_controller: PidController,
-
-    yaw: Entity,
-    yaw_controller: PidController,
+#[derive(Component, Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+pub enum PidAxis {
+    Depth,
+    Yaw,
+    Pitch,
+    Roll,
 }
 
-fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>) {
-    let pitch = cmds
-        .spawn((
+impl PidAxis {
+    fn get_unit_local_movement(&self, orientation: Quat) -> MovementGlam {
+        match self {
+            PidAxis::Depth => MovementGlam {
+                force: orientation.inverse() * Vec3A::NEG_Z,
+                torque: Vec3A::ZERO,
+            },
+            PidAxis::Yaw => MovementGlam {
+                force: Vec3A::ZERO,
+                torque: Vec3A::Z,
+            },
+            PidAxis::Pitch => MovementGlam {
+                force: Vec3A::ZERO,
+                torque: Vec3A::X,
+            },
+            PidAxis::Roll => MovementGlam {
+                force: Vec3A::ZERO,
+                torque: Vec3A::Y,
+            },
+        }
+    }
+
+    fn get_unit_global_movement(&self, orientation: Quat) -> MovementGlam {
+        match self {
+            PidAxis::Depth => MovementGlam {
+                force: Vec3A::NEG_Z,
+                torque: Vec3A::ZERO,
+            },
+            PidAxis::Yaw => MovementGlam {
+                force: Vec3A::ZERO,
+                torque: orientation * Vec3A::Z,
+            },
+            PidAxis::Pitch => MovementGlam {
+                force: Vec3A::ZERO,
+                torque: orientation * Vec3A::X,
+            },
+            PidAxis::Roll => MovementGlam {
+                force: Vec3A::ZERO,
+                torque: orientation * Vec3A::Y,
+            },
+        }
+    }
+}
+
+fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotConfig>) {
+    for (axis, pid_config) in &config.pid_configs {
+        cmds.spawn((
             MovementContributionBundle {
-                name: Name::new("Stabalize Pitch"),
+                name: Name::new(format!("Stabalize {axis:?}")),
                 contribution: MovementContribution(MovementGlam::default()),
                 robot: RobotId(robot.net_id),
             },
-            // TODO(high): Tune
-            // TODO(low): Load from disk?
-            PidConfig {
-                kp: 0.25,
-                ki: 0.015,
-                kd: 0.07,
-                kt: 0.0,
-                max_integral: 60.0,
-            },
+            pid_config.clone(),
+            *axis,
+            PidState::default(),
             Replicate,
-        ))
-        .id();
-
-    let roll = cmds
-        .spawn((
-            MovementContributionBundle {
-                name: Name::new("Stabalize Roll"),
-                contribution: MovementContribution(MovementGlam::default()),
-                robot: RobotId(robot.net_id),
-            },
-            // TODO(high): Tune
-            // TODO(low): Load from disk?
-            PidConfig {
-                kp: 0.15,
-                ki: 0.01,
-                kd: 0.05,
-                kt: 0.0,
-                max_integral: 40.0,
-            },
-            Replicate,
-        ))
-        .id();
-
-    let yaw = cmds
-        .spawn((
-            MovementContributionBundle {
-                name: Name::new("Stabalize Yaw"),
-                contribution: MovementContribution(MovementGlam::default()),
-                robot: RobotId(robot.net_id),
-            },
-            // TODO(high): Tune
-            // TODO(low): Load from disk?
-            PidConfig {
-                kp: 0.3,
-                ki: 0.01,
-                kd: 0.05,
-                kt: 0.0,
-                max_integral: 10.0,
-            },
-            Replicate,
-        ))
-        .id();
-
-    cmds.insert_resource(StabilizeState {
-        pitch,
-        pitch_controller: PidController::default(),
-        roll,
-        roll_controller: PidController::default(),
-        yaw,
-        yaw_controller: PidController::default(),
-    });
+        ));
+    }
 }
 
 fn stabalize_system(
-    mut last_target: Local<Option<Quat>>,
     mut cmds: Commands,
-    robot: Res<LocalRobot>,
-    mut state: ResMut<StabilizeState>,
-    robot_query: Query<(&Armed, &Orientation, &OrientationTarget)>,
-    entity_query: Query<&PidConfig>,
+    robot_query: Query<
+        (
+            &Armed,
+            &Orientation,
+            &OrientationTarget,
+            &DepthMeasurement,
+            &DepthTarget,
+        ),
+        With<LocalRobotMarker>,
+    >,
+    mut conntroller_query: Query<(Entity, &PidConfig, &PidAxis, &mut PidState)>,
     time: Res<Time<Real>>,
 ) {
-    let robot = robot_query.get(robot.entity);
-    let pitch_pid_config = entity_query.get(state.pitch).unwrap();
-    let roll_pid_config = entity_query.get(state.roll).unwrap();
-    let yaw_pid_config = entity_query.get(state.yaw).unwrap();
+    let (armed, orientation, orientation_target, depth, depth_target) = robot_query.single();
 
-    if let Ok((&Armed::Armed, orientation, orientation_target)) = robot {
-        let error = orientation_target.0 * orientation.0.inverse();
-        let delta_target =
-            orientation_target.0 * last_target.unwrap_or(orientation_target.0).inverse();
+    if *armed != Armed::Armed {
+        for (entity, _config, _axis, mut state) in conntroller_query.iter_mut() {
+            cmds.entity(entity)
+                .remove::<(MovementContribution, PidResult)>();
 
-        // FIXME: Prefer roll over pitch
-        let pitch_error = instant_twist(error, orientation.0 * Vec3A::X).to_degrees();
-        let pitch_td = instant_twist(delta_target, orientation.0 * Vec3A::X).to_degrees();
-        let roll_error = instant_twist(error, orientation.0 * Vec3A::Y).to_degrees();
-        let roll_td = instant_twist(delta_target, orientation.0 * Vec3A::Y).to_degrees();
-        let yaw_error = instant_twist(error, orientation.0 * Vec3A::Z).to_degrees();
-        let yaw_td = instant_twist(delta_target, orientation.0 * Vec3A::Z).to_degrees();
+            state.0.reset_i();
+        }
+        return;
+    }
 
-        let res_pitch =
-            state
-                .pitch_controller
-                .update(pitch_error, pitch_td, pitch_pid_config, time.delta());
-        let res_roll =
-            state
-                .roll_controller
-                .update(roll_error, roll_td, roll_pid_config, time.delta());
-        let res_yaw = state
-            .yaw_controller
-            .update(yaw_error, yaw_td, yaw_pid_config, time.delta());
+    let orientation_error = orientation_target.0 * orientation.0.inverse();
+    let depth_error = depth_target.0 - depth.depth;
 
-        let pitch_movement = MovementGlam {
-            force: Vec3A::ZERO,
-            torque: /*orientation.0.inverse() **/ Vec3A::X * res_pitch.correction,
+    for (entity, config, axis, mut state) in conntroller_query.iter_mut() {
+        let res = match axis {
+            PidAxis::Depth => state.0.update(depth_error.0, config, time.delta()),
+            PidAxis::Yaw | PidAxis::Pitch | PidAxis::Roll => {
+                let error = instant_twist(
+                    orientation_error,
+                    axis.get_unit_global_movement(orientation.0).torque,
+                )
+                .to_degrees();
+
+                state.0.update(error, config, time.delta())
+            }
         };
 
-        let roll_movement = MovementGlam {
-            force: Vec3A::ZERO,
-            torque: /*orientation.0.inverse() **/ Vec3A::Y * res_roll.correction,
-        };
-
-        let yaw_movement = MovementGlam {
-            force: Vec3A::ZERO,
-            torque: /*orientation.0.inverse() **/ Vec3A::Z * res_yaw.correction,
-        };
-
-        cmds.entity(state.pitch)
-            .insert((MovementContribution(pitch_movement), res_pitch));
-        cmds.entity(state.roll)
-            .insert((MovementContribution(roll_movement), res_roll));
-        cmds.entity(state.yaw)
-            .insert((MovementContribution(yaw_movement), res_yaw));
-        *last_target = Some(orientation_target.0);
-    } else {
-        cmds.entity(state.pitch)
-            .remove::<(MovementContribution, PidResult)>();
-        cmds.entity(state.roll)
-            .remove::<(MovementContribution, PidResult)>();
-        cmds.entity(state.yaw)
-            .remove::<(MovementContribution, PidResult)>();
-
-        state.pitch_controller.reset_i();
-        state.roll_controller.reset_i();
-        state.yaw_controller.reset_i();
-        *last_target = None;
+        let movement = axis.get_unit_local_movement(orientation.0) * res.correction;
+        cmds.entity(entity)
+            .insert((MovementContribution(movement), res));
     }
 }
 fn instant_twist(q: Quat, twist_axis: Vec3A) -> f32 {
