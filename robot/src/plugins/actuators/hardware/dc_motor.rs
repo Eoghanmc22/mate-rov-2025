@@ -1,10 +1,8 @@
 use std::{
-    mem,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use ahash::HashMap;
 use anyhow::{anyhow, Context};
 use bevy::{app::AppExit, prelude::*};
 use bevy_tokio_tasks::TokioTasksRuntime;
@@ -29,9 +27,13 @@ use tokio::{
     time,
 };
 
+use super::motor_id_map::{DcChannel, LocalMotorId};
 use crate::plugins::core::robot::{LocalRobot, LocalRobotMarker};
 
-use super::motor_id_map::{DcChannel, LocalMotorId};
+const NUM_CHANNELS: usize = 4;
+// fraction of output
+type ChannelBatch = [i16; NUM_CHANNELS];
+const STOP_SIGNALS: ChannelBatch = [0; NUM_CHANNELS];
 
 pub struct DcMotorPlugin;
 
@@ -58,8 +60,7 @@ struct DcMotorChannels(Sender<DcMotorEvent>, Receiver<MotorState>);
 #[derive(Debug)]
 enum DcMotorEvent {
     Arm(Armed),
-    UpdateChannel(DcChannel, i16),
-    BatchComplete,
+    Batch(ChannelBatch),
     Shutdown,
 }
 
@@ -81,8 +82,6 @@ fn start_dc_motor_thread(
 
     let (tx_data, mut rx_data) = mpsc::channel(10);
     let (tx_state, rx_state) = mpsc::channel(10);
-
-    const STOP_SIGNALS: [i16; 4] = [0; 4];
 
     cmds.insert_resource(DcMotorChannels(tx_data, rx_state));
 
@@ -204,13 +203,10 @@ fn start_dc_motor_thread(
             info!("DC Motor Controller bridge thread starting");
             connected.notify_waiters();
 
-            let mut next_channel_pwms = HashMap::default();
-            let mut batch_started = false;
-
             let mut last_armed = Armed::Disarmed;
             let mut armed = Armed::Disarmed;
-            let mut channel_pwms = HashMap::default();
-            let mut last_batch = Instant::now();
+            let mut channel_signals = STOP_SIGNALS;
+            let mut last_arm_timestamp = Instant::now();
 
             let mut do_shutdown = false;
             let mut interval = time::interval(interval);
@@ -223,103 +219,70 @@ fn start_dc_motor_thread(
 
                     match event {
                         DcMotorEvent::Arm(Armed::Armed) => {
-                            batch_started = true;
-                            next_channel_pwms.clear();
+                            armed = Armed::Armed;
+                            last_arm_timestamp = Instant::now();
                         }
                         DcMotorEvent::Arm(Armed::Disarmed) => {
-                            batch_started = false;
                             armed = Armed::Disarmed;
+                            channel_signals = STOP_SIGNALS;
                         }
-                        DcMotorEvent::UpdateChannel(channel, pwm) => {
-                            if batch_started {
-                                next_channel_pwms.insert(channel, pwm);
-                            }
-                        }
-                        DcMotorEvent::BatchComplete => {
-                            if batch_started {
-                                batch_started = false;
-
-                                armed = Armed::Armed;
-                                channel_pwms = mem::take(&mut next_channel_pwms);
-                                last_batch = Instant::now();
+                        DcMotorEvent::Batch(new_channel_signals) => {
+                            if armed == Armed::Armed {
+                                channel_signals = new_channel_signals;
+                            } else {
+                                channel_signals = STOP_SIGNALS;
                             }
                         }
                         DcMotorEvent::Shutdown => {
                             armed = Armed::Disarmed;
+                            channel_signals = STOP_SIGNALS;
                             do_shutdown = true;
 
                             break;
                         }
                     }
                 }
+                if rx_data.is_closed() {
+                    do_shutdown = true;
+                }
 
-                assert!(!rx_data.is_closed());
                 // Update state
-                if matches!(armed, Armed::Armed) && last_batch.elapsed() > max_inactive {
-                    warn!("Time since last batch exceeded max_inactive, disarming");
+                if matches!(armed, Armed::Armed) && last_arm_timestamp.elapsed() > max_inactive {
+                    warn!("Time since last arm exceeded max_inactive, disarming");
 
-                    // TODO(mid): Should this notify bevy?
                     let _ = errors.send(anyhow!("Motors disarmed due to inactivity"));
                     armed = Armed::Disarmed;
+                    channel_signals = STOP_SIGNALS;
                 }
 
                 // Sync state with pwm chip
-                match armed {
+                let res = match armed {
                     Armed::Armed => {
-                        let res = tx_out
+                        tx_out
                             .send(
                                 h2c::SetArmed::Armed {
                                     duration: Interval::from_duration(max_inactive),
                                 }
                                 .into(),
                             )
-                            .await;
-
-                        if let Err(err) = res {
-                            let _ = errors.send(
-                                anyhow::format_err!(err)
-                                    .context("Dc Motor interface tx channel error"),
-                            );
-                        }
+                            .await
                     }
                     Armed::Disarmed => {
-                        let res = tx_out.send(h2c::SetArmed::Disarmed.into()).await;
-
-                        // No motors should be active when disarmed
-                        channel_pwms.clear();
-
-                        if let Err(err) = res {
-                            let _ = errors.send(
-                                anyhow::format_err!(err)
-                                    .context("Dc Motor interface tx channel error"),
-                            );
-                        }
+                        channel_signals = STOP_SIGNALS;
+                        tx_out.send(h2c::SetArmed::Disarmed.into()).await
                     }
-                }
-
-                // Generate the pwm states for each channel
-                let pwms = {
-                    // By default all motors should be stopped
-                    let mut pwms = STOP_SIGNALS;
-
-                    // Copy pwm values from `channel_pwms` into `pwms`
-                    // `channel_pwms` is cleared in the disarmed case
-                    for (channel, new_pwm) in &channel_pwms {
-                        let channel_pwm = pwms.get_mut(channel.id() as usize);
-
-                        // If this is a valid channel, set the corresponding channel's pwm
-                        if let Some(channel_pwm) = channel_pwm {
-                            *channel_pwm = *new_pwm;
-                        }
-                    }
-
-                    pwms
                 };
 
-                trace!(?armed, ?channel_pwms, ?pwms, "Writing Pwms");
+                if let Err(err) = res {
+                    let _ = errors.send(
+                        anyhow::format_err!(err).context("Dc Motor interface tx channel error"),
+                    );
+                }
+
+                trace!(?armed, ?channel_signals, "Writing Signals");
 
                 // Write the current pwms to the pwm chip
-                for (idx, pwm) in pwms.iter().enumerate() {
+                for (idx, pwm) in channel_signals.iter().enumerate() {
                     let res = tx_out
                         .send(
                             h2c::SetSpeed {
@@ -390,6 +353,7 @@ fn listen_to_dc_motors(
         .blocking_send(DcMotorEvent::Arm(*armed))
         .context("Send data to dc motor thread")?;
 
+    let mut channel_batch = STOP_SIGNALS;
     for (RobotId(robot_net_id), &channel, &signal, raw_range) in &pwms {
         if robot_net_id != net_id {
             continue;
@@ -405,15 +369,17 @@ fn listen_to_dc_motors(
         };
         let output = raw_range.clamp_raw(output) as i16;
 
-        channels
-            .0
-            .blocking_send(DcMotorEvent::UpdateChannel(channel, output))
-            .context("Send data to dc motor thread")?;
+        let id = channel.id() as usize;
+        if id < NUM_CHANNELS {
+            channel_batch[id] = output;
+        } else {
+            warn!("Attempted to drive unknown dc channel {id}");
+        }
     }
 
     channels
         .0
-        .blocking_send(DcMotorEvent::BatchComplete)
+        .blocking_send(DcMotorEvent::Batch(channel_batch))
         .context("Send data to dc motor thread")?;
 
     Ok(())

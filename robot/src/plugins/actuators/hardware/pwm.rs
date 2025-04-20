@@ -1,9 +1,8 @@
 use std::{
-    mem, thread,
+    array, thread,
     time::{Duration, Instant},
 };
 
-use ahash::HashMap;
 use anyhow::{anyhow, Context};
 use bevy::{app::AppExit, prelude::*};
 use common::{
@@ -14,9 +13,15 @@ use common::{
 use crossbeam::channel::{self, Sender};
 use tracing::{span, Level};
 
+use super::motor_id_map::LocalMotorId;
 use crate::{peripheral::pca9685::Pca9685, plugins::core::robot::LocalRobotMarker};
 
-use super::motor_id_map::{LocalMotorId, PwmChannel};
+const NUM_CHANNELS: usize = 16;
+// microseconds
+type ChannelBatch = [u16; NUM_CHANNELS];
+type ChannelPwms = [Duration; NUM_CHANNELS];
+const STOP_SIGNALS: ChannelBatch = [1500; NUM_CHANNELS];
+const STOP_PWMS: ChannelPwms = [Duration::from_micros(1500); NUM_CHANNELS];
 
 pub struct PwmOutputPlugin;
 
@@ -39,8 +44,7 @@ struct GenericMotorIds(Sender<PwmEvent>);
 #[derive(Debug)]
 enum PwmEvent {
     Arm(Armed),
-    UpdateChannel(PwmChannel, Duration),
-    BatchComplete,
+    Batch(ChannelBatch),
     Shutdown,
 }
 
@@ -53,7 +57,6 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
     let mut pwm_controller =
         Pca9685::new(Pca9685::I2C_BUS, Pca9685::I2C_ADDRESS, interval).context("PCA9685")?;
 
-    const STOP_PWMS: [Duration; 16] = [Duration::from_micros(1500); 16];
     pwm_controller
         .set_pwms(STOP_PWMS)
         .context("Set initial pwms")?;
@@ -70,13 +73,10 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
 
             let mut deadline = Instant::now();
 
-            let mut next_channel_pwms = HashMap::default();
-            let mut batch_started = false;
-
             let mut last_armed = Armed::Disarmed;
             let mut armed = Armed::Disarmed;
-            let mut channel_pwms = HashMap::default();
-            let mut last_batch = Instant::now();
+            let mut channel_pwms = STOP_PWMS;
+            let mut last_arm_timestamp = Instant::now();
 
             let mut do_shutdown = false;
 
@@ -89,29 +89,25 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
 
                     match event {
                         PwmEvent::Arm(Armed::Armed) => {
-                            batch_started = true;
-                            next_channel_pwms.clear();
+                            armed = Armed::Armed;
+                            last_arm_timestamp = Instant::now();
                         }
                         PwmEvent::Arm(Armed::Disarmed) => {
-                            batch_started = false;
                             armed = Armed::Disarmed;
+                            channel_pwms = STOP_PWMS;
                         }
-                        PwmEvent::UpdateChannel(channel, pwm) => {
-                            if batch_started {
-                                next_channel_pwms.insert(channel, pwm);
-                            }
-                        }
-                        PwmEvent::BatchComplete => {
-                            if batch_started {
-                                batch_started = false;
-
-                                armed = Armed::Armed;
-                                channel_pwms = mem::take(&mut next_channel_pwms);
-                                last_batch = Instant::now();
+                        PwmEvent::Batch(new_channel_signals) => {
+                            if armed == Armed::Armed {
+                                channel_pwms = array::from_fn(|idx| {
+                                    Duration::from_micros(new_channel_signals[idx] as u64)
+                                })
+                            } else {
+                                channel_pwms = STOP_PWMS;
                             }
                         }
                         PwmEvent::Shutdown => {
                             armed = Armed::Disarmed;
+                            channel_pwms = STOP_PWMS;
                             do_shutdown = true;
 
                             break;
@@ -120,12 +116,12 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
                 }
 
                 // Update state
-                if matches!(armed, Armed::Armed) && last_batch.elapsed() > max_inactive {
-                    warn!("Time since last batch exceeded max_inactive, disarming");
+                if matches!(armed, Armed::Armed) && last_arm_timestamp.elapsed() > max_inactive {
+                    warn!("Time since last arm exceeded max_inactive, disarming");
 
-                    // TODO(mid): Should this notify bevy?
                     let _ = errors.send(anyhow!("Motors disarmed due to inactivity"));
                     armed = Armed::Disarmed;
+                    channel_pwms = STOP_PWMS;
                 }
 
                 // Sync state with pwm chip
@@ -135,36 +131,15 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
                     }
                     Armed::Disarmed => {
                         pwm_controller.output_disable();
-
-                        // No motors should be active when disarmed
-                        channel_pwms.clear();
+                        channel_pwms = STOP_PWMS;
                     }
                 }
 
-                // Generate the pwm states for each channel
-                let pwms = {
-                    // By default all motors should be stopped
-                    let mut pwms = STOP_PWMS;
-
-                    // Copy pwm values from `channel_pwms` into `pwms`
-                    // `channel_pwms` is cleared in the disarmed case
-                    for (channel, new_pwm) in &channel_pwms {
-                        let channel_pwm = pwms.get_mut(channel.id() as usize);
-
-                        // If this is a valid channel, set the corresponding channel's pwm
-                        if let Some(channel_pwm) = channel_pwm {
-                            *channel_pwm = *new_pwm;
-                        }
-                    }
-
-                    pwms
-                };
-
-                trace!(?armed, ?channel_pwms, ?pwms, "Writing Pwms");
+                trace!(?armed, ?channel_pwms, "Writing Pwms");
 
                 // Write the current pwms to the pwm chip
                 let rst = pwm_controller
-                    .set_pwms(pwms)
+                    .set_pwms(channel_pwms)
                     .context("Could not communicate with PCA9685");
 
                 if let Err(err) = rst {
@@ -208,6 +183,7 @@ fn listen_to_pwms(
         .send(PwmEvent::Arm(*armed))
         .context("Send data to pwm thread")?;
 
+    let mut channel_batch = STOP_SIGNALS;
     for (RobotId(robot_net_id), &channel, &signal, raw_range) in &pwms {
         if robot_net_id != net_id {
             continue;
@@ -221,17 +197,19 @@ fn listen_to_pwms(
             MotorSignal::Percent(pct) => raw_range.raw_from_percent(pct),
             MotorSignal::Raw(raw) => raw,
         };
-        let pwm = Duration::from_micros(raw_range.clamp_raw(pwm) as u64);
+        let pwm = raw_range.clamp_raw(pwm) as u16;
 
-        channels
-            .0
-            .send(PwmEvent::UpdateChannel(channel, pwm))
-            .context("Send data to pwm thread")?;
+        let id = channel.id() as usize;
+        if id < NUM_CHANNELS {
+            channel_batch[id] = pwm;
+        } else {
+            warn!("Attempted to drive unknown pwm channel {id}");
+        }
     }
 
     channels
         .0
-        .send(PwmEvent::BatchComplete)
+        .send(PwmEvent::Batch(channel_batch))
         .context("Send data to pwm thread")?;
 
     Ok(())
