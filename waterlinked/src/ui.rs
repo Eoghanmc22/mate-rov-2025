@@ -39,7 +39,7 @@ fn set_style(mut contexts: EguiContexts) {
 
 fn main_pane(
     mut host: Local<String>,
-    mut position_history: Local<Vec<[f64; 2]>>,
+    mut position_history: Local<Vec<PlotPoint>>,
 
     mut cmds: Commands,
     mut contexts: EguiContexts,
@@ -110,7 +110,7 @@ fn main_pane(
             // Position plot
             if let Some(current_pose) = current_pose {
                 let current_pos = current_pose.0.position;
-                position_history.push([current_pos.x as f64, current_pos.y as f64]);
+                position_history.push(PlotPoint::new(current_pos.x as f64, current_pos.y as f64));
 
                 let response = Plot::new("Position Track")
                     .data_aspect(1.0)
@@ -119,23 +119,27 @@ fn main_pane(
                     .width(500.0)
                     .height(500.0)
                     .show(ui, |ui| {
-                        ui.line(Line::new((*position_history).clone()).name("Track"));
+                        ui.line(Line::new("Track", position_history.as_slice()).name("Track"));
                         ui.points(
-                            Points::new([current_pos.x as f64, current_pos.y as f64])
-                                .name("Current Position")
-                                .shape(MarkerShape::Circle)
-                                .color(Color32::BLUE)
-                                .radius(3.0),
+                            Points::new(
+                                "Current Position",
+                                [current_pos.x as f64, current_pos.y as f64],
+                            )
+                            .shape(MarkerShape::Circle)
+                            .color(Color32::BLUE)
+                            .radius(3.0),
                         );
 
                         if let Some(target_pose) = target_pose {
                             let target_pos = target_pose.0.position;
                             ui.points(
-                                Points::new([target_pos.x as f64, target_pos.y as f64])
-                                    .name("Target Position")
-                                    .shape(MarkerShape::Up)
-                                    .color(Color32::DARK_GREEN)
-                                    .radius(5.0),
+                                Points::new(
+                                    "Target Position",
+                                    [target_pos.x as f64, target_pos.y as f64],
+                                )
+                                .shape(MarkerShape::Up)
+                                .color(Color32::DARK_GREEN)
+                                .radius(5.0),
                             );
                         }
                     });

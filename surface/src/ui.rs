@@ -1,6 +1,10 @@
-use std::time::Duration;
+use std::{
+    collections::{hash_map::Entry, VecDeque},
+    time::Duration,
+};
 
-use bevy::{app::AppExit, prelude::*};
+use ahash::HashMap;
+use bevy::{app::AppExit, math::vec3a, prelude::*};
 use bevy_egui::{EguiContexts, EguiPlugin};
 use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
@@ -8,8 +12,8 @@ use common::{
     components::{
         Armed, CameraDefinition, CurrentDraw, DepthMeasurement, DepthTarget, DisableMovementApi,
         GenericMotorId, MeasuredVoltage, MotorRawSignalRange, MotorSignal, MovementAxisMaximums,
-        MovementContribution, OrientationTarget, Robot, RobotId, SystemCpuTotal, SystemLoadAverage,
-        SystemMemory, SystemTemperatures, TempertureMeasurement,
+        MovementContribution, OrientationTarget, PidResult, Robot, RobotId, SystemCpuTotal,
+        SystemLoadAverage, SystemMemory, SystemTemperatures, TempertureMeasurement,
     },
     ecs_sync::{NetId, Replicate},
     events::{CalibrateSeaLevel, ResetServos, ResetYaw, ResyncCameras},
@@ -19,6 +23,7 @@ use egui::{
     load::SizedTexture, text::LayoutJob, widgets, Align, Color32, Id, Label, Layout, RichText,
     TextBuffer, TextFormat, Visuals,
 };
+use egui_plot::{Line, Plot, PlotPoint};
 use leafwing_input_manager::input_map::InputMap;
 use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
 use tokio::net::lookup_host;
@@ -42,6 +47,7 @@ impl Plugin for EguiUiPlugin {
                 topbar,
                 hud.after(topbar),
                 movement_control.after(topbar),
+                pid_helper.after(topbar),
                 pwm_control
                     .after(topbar)
                     .run_if(resource_exists::<PwmControl>),
@@ -77,6 +83,9 @@ pub enum TimerType {
 
 #[derive(Component)]
 pub struct MovementController;
+
+#[derive(Component)]
+pub struct PidHelper;
 
 fn set_style(mut contexts: EguiContexts) {
     contexts.ctx_mut().set_visuals(if DARK_MODE {
@@ -210,6 +219,19 @@ fn topbar(
                         MovementController,
                         MovementContributionBundle {
                             name: Name::new("Manual Movement Controller"),
+                            contribution: Default::default(),
+                            robot: RobotId(NetId::invalid()),
+                        },
+                        Replicate,
+                    ));
+                }
+
+                if ui.button("PID Helper").clicked() {
+                    cmds.spawn((
+                        PidData::default(),
+                        PidHelper,
+                        MovementContributionBundle {
+                            name: Name::new("PID Helper"),
                             contribution: Default::default(),
                             robot: RobotId(NetId::invalid()),
                         },
@@ -874,6 +896,314 @@ fn movement_control(
 
         if !open {
             cmds.entity(contoller).despawn();
+        }
+    }
+}
+
+#[derive(Component, Default)]
+struct PidData(HashMap<PidAxis, PidDataEntry>);
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+enum PidAxis {
+    Yaw,
+    Pitch,
+    Roll,
+    Depth,
+}
+
+struct PidDataEntry {
+    error: VecDeque<PlotPoint>,
+    total: VecDeque<PlotPoint>,
+    kp: VecDeque<PlotPoint>,
+    ki: VecDeque<PlotPoint>,
+    kd: VecDeque<PlotPoint>,
+}
+
+impl Default for PidDataEntry {
+    fn default() -> Self {
+        Self {
+            error: VecDeque::with_capacity(PID_SAMPLES + 5),
+            total: VecDeque::with_capacity(PID_SAMPLES + 5),
+            kp: VecDeque::with_capacity(PID_SAMPLES + 5),
+            ki: VecDeque::with_capacity(PID_SAMPLES + 5),
+            kd: VecDeque::with_capacity(PID_SAMPLES + 5),
+        }
+    }
+}
+
+#[derive(Component)]
+struct PidDisturbanceDeadline(Duration);
+
+const PID_SAMPLES: usize = 500;
+const PID_DISTURBANCE_TIME: Duration = Duration::from_millis(500);
+
+// TODO: Use telemetry infra here after we get around to making that
+fn pid_helper(
+    mut cmds: Commands,
+    mut contexts: EguiContexts,
+
+    time: Res<Time<Real>>,
+
+    mut controllers: Query<
+        (
+            Entity,
+            &mut RobotId,
+            &mut MovementContribution,
+            &mut PidData,
+            Option<&PidDisturbanceDeadline>,
+        ),
+        (With<PidHelper>, Without<Robot>),
+    >,
+
+    pid_controllers: Query<(&Name, &PidResult, &RobotId), Without<PidData>>,
+
+    robots: Query<(&Name, &RobotId, &MovementAxisMaximums), With<Robot>>,
+    // motors: Query<(Entity, Option<&PwmSignal>, &PwmChannel, &RobotId)>,
+) {
+    for (controller, mut selected_robot, mut contribution, mut data, deadline) in &mut controllers {
+        let mut open = true;
+
+        let context = contexts.ctx_mut();
+        egui::Window::new("Pid Helper")
+            .id(Id::new(controller))
+            .constrain_to(context.available_rect().shrink(20.0))
+            .open(&mut open)
+            .show(context, |ui| {
+                ui.label("Robot:");
+                let Some(maximums) = ui
+                    .horizontal(|ui| {
+                        let mut maximums = None;
+
+                        for (name, robot_id, this_maximums) in &robots {
+                            ui.selectable_value(&mut selected_robot.0, robot_id.0, name.as_str());
+
+                            if selected_robot.0 == robot_id.0 {
+                                maximums = Some(this_maximums.0.clone());
+                            }
+                        }
+                        ui.selectable_value(&mut selected_robot.0, NetId::invalid(), "None");
+
+                        if selected_robot.0 != NetId::invalid() {
+                            maximums
+                        } else {
+                            None
+                        }
+                    })
+                    .inner
+                else {
+                    return;
+                };
+
+                ui.horizontal(|ui| {
+                    let yaw = ui.selectable_label(data.0.contains_key(&PidAxis::Yaw), "Yaw");
+                    if yaw.clicked() {
+                        match data.0.entry(PidAxis::Yaw) {
+                            Entry::Occupied(occupied_entry) => {
+                                occupied_entry.remove();
+                            }
+                            Entry::Vacant(vacant_entry) => {
+                                vacant_entry.insert(PidDataEntry::default());
+                            }
+                        }
+                    }
+
+                    let pitch = ui.selectable_label(data.0.contains_key(&PidAxis::Pitch), "Pitch");
+                    if pitch.clicked() {
+                        match data.0.entry(PidAxis::Pitch) {
+                            Entry::Occupied(occupied_entry) => {
+                                occupied_entry.remove();
+                            }
+                            Entry::Vacant(vacant_entry) => {
+                                vacant_entry.insert(PidDataEntry::default());
+                            }
+                        }
+                    }
+
+                    let roll = ui.selectable_label(data.0.contains_key(&PidAxis::Roll), "Roll");
+                    if roll.clicked() {
+                        match data.0.entry(PidAxis::Roll) {
+                            Entry::Occupied(occupied_entry) => {
+                                occupied_entry.remove();
+                            }
+                            Entry::Vacant(vacant_entry) => {
+                                vacant_entry.insert(PidDataEntry::default());
+                            }
+                        }
+                    }
+
+                    let depth = ui.selectable_label(data.0.contains_key(&PidAxis::Depth), "Depth");
+                    if depth.clicked() {
+                        match data.0.entry(PidAxis::Depth) {
+                            Entry::Occupied(occupied_entry) => {
+                                occupied_entry.remove();
+                            }
+                            Entry::Vacant(vacant_entry) => {
+                                vacant_entry.insert(PidDataEntry::default());
+                            }
+                        }
+                    }
+                });
+
+                for (axis, entry) in data.0.iter_mut() {
+                    let controller_name = match axis {
+                        PidAxis::Yaw => "Stabalize Yaw",
+                        PidAxis::Pitch => "Stabalize Pitch",
+                        PidAxis::Roll => "Stabalize Roll",
+                        PidAxis::Depth => "Depth Hold",
+                    };
+
+                    let pid_result = pid_controllers.iter().find(|(name, _, robot_id)| {
+                        **robot_id == *selected_robot && name.as_str() == controller_name
+                    });
+                    if let Some((_, pid_result, _)) = pid_result {
+                        entry
+                            .error
+                            .push_back(PlotPoint::new(time.elapsed_secs_f64(), pid_result.error));
+                        entry.total.push_back(PlotPoint::new(
+                            time.elapsed_secs_f64(),
+                            pid_result.correction,
+                        ));
+                        entry
+                            .kp
+                            .push_back(PlotPoint::new(time.elapsed_secs_f64(), pid_result.p));
+                        entry
+                            .ki
+                            .push_back(PlotPoint::new(time.elapsed_secs_f64(), pid_result.i));
+                        entry
+                            .kd
+                            .push_back(PlotPoint::new(time.elapsed_secs_f64(), pid_result.d));
+
+                        while entry.error.len() > PID_SAMPLES {
+                            entry.error.pop_front();
+                        }
+
+                        while entry.total.len() > PID_SAMPLES {
+                            entry.total.pop_front();
+                        }
+
+                        while entry.kp.len() > PID_SAMPLES {
+                            entry.kp.pop_front();
+                        }
+
+                        while entry.ki.len() > PID_SAMPLES {
+                            entry.ki.pop_front();
+                        }
+
+                        while entry.kd.len() > PID_SAMPLES {
+                            entry.kd.pop_front();
+                        }
+                    }
+                }
+
+                Plot::new("Pid Tuning Plot").height(300.0).show(ui, |plot| {
+                    for (axis, entry) in data.0.iter() {
+                        let (first, second) = entry.error.as_slices();
+                        plot.add(
+                            Line::new(format!("{axis:?}, error"), first)
+                                .stroke((1.5, Color32::BROWN)),
+                        );
+                        plot.add(
+                            Line::new(format!("{axis:?}, error"), second)
+                                .stroke((1.5, Color32::BROWN)),
+                        );
+
+                        let (first, second) = entry.total.as_slices();
+                        plot.add(
+                            Line::new(format!("{axis:?}, total"), first)
+                                .stroke((1.5, Color32::BLACK)),
+                        );
+                        plot.add(
+                            Line::new(format!("{axis:?}, total"), second)
+                                .stroke((1.5, Color32::BLACK)),
+                        );
+
+                        let (first, second) = entry.kp.as_slices();
+                        plot.add(
+                            Line::new(format!("{axis:?}, kp"), first).stroke((1.5, Color32::RED)),
+                        );
+                        plot.add(
+                            Line::new(format!("{axis:?}, kp"), second).stroke((1.5, Color32::RED)),
+                        );
+
+                        let (first, second) = entry.ki.as_slices();
+                        plot.add(
+                            Line::new(format!("{axis:?}, ki"), first).stroke((1.5, Color32::GREEN)),
+                        );
+                        plot.add(
+                            Line::new(format!("{axis:?}, ki"), second)
+                                .stroke((1.5, Color32::GREEN)),
+                        );
+
+                        let (first, second) = entry.kd.as_slices();
+                        plot.add(
+                            Line::new(format!("{axis:?}, kd"), first).stroke((1.5, Color32::BLUE)),
+                        );
+                        plot.add(
+                            Line::new(format!("{axis:?}, kd"), second).stroke((1.5, Color32::BLUE)),
+                        );
+                    }
+                });
+
+                let mut movement = contribution.0;
+
+                if let Some(deadline) = deadline {
+                    if time.elapsed() > deadline.0 || ui.button("Clear").clicked() {
+                        movement = MovementGlam::default();
+                        cmds.entity(controller).remove::<PidDisturbanceDeadline>();
+                    }
+                } else {
+                    movement = MovementGlam::default();
+                }
+
+                if ui.button("Yaw Disturbance").clicked() {
+                    movement = MovementGlam {
+                        force: vec3a(0.0, 0.0, 0.0),
+                        torque: vec3a(0.0, 0.0, 10.0),
+                    };
+                    cmds.entity(controller).insert(PidDisturbanceDeadline(
+                        time.elapsed() + PID_DISTURBANCE_TIME,
+                    ));
+                }
+
+                if ui.button("Pitch Disturbance").clicked() {
+                    movement = MovementGlam {
+                        force: vec3a(0.0, 0.0, 0.0),
+                        torque: vec3a(10.0, 0.0, 0.0),
+                    };
+                    cmds.entity(controller).insert(PidDisturbanceDeadline(
+                        time.elapsed() + PID_DISTURBANCE_TIME,
+                    ));
+                }
+
+                if ui.button("Roll Disturbance").clicked() {
+                    movement = MovementGlam {
+                        force: vec3a(0.0, 0.0, 0.0),
+                        torque: vec3a(0.0, 10.0, 0.0),
+                    };
+                    cmds.entity(controller).insert(PidDisturbanceDeadline(
+                        time.elapsed() + PID_DISTURBANCE_TIME,
+                    ));
+                }
+
+                if ui.button("Depth Disturbance").clicked() {
+                    movement = MovementGlam {
+                        force: vec3a(0.0, 0.0, -10.0),
+                        torque: vec3a(0.0, 0.0, 0.0),
+                    };
+                    cmds.entity(controller).insert(PidDisturbanceDeadline(
+                        time.elapsed() + PID_DISTURBANCE_TIME,
+                    ));
+                }
+
+                ui.add_space(7.0);
+
+                if movement != contribution.0 {
+                    contribution.0 = movement;
+                }
+            });
+
+        if !open {
+            cmds.entity(controller).despawn();
         }
     }
 }

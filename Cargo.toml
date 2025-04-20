@@ -25,15 +25,15 @@ bevy_reflect = "0.15"
 
 # Bevy plugins
 leafwing-input-manager = "0.16"
-bevy_panorbit_camera = "0.22"
+bevy_panorbit_camera = "0.25"
 bevy-tokio-tasks = "0.15"
 
 # Egui
-egui = "0.30"
-egui_extras = "0.30"
-egui_plot = "0.30"
-bevy_egui = { version = "0.32", default-features = false }
-bevy-inspector-egui = "0.29"
+egui = "0.31"
+egui_extras = "0.31"
+egui_plot = "0.32"
+bevy_egui = { version = "0.33", default-features = false }
+bevy-inspector-egui = "0.30"
 
 # Math
 nalgebra = { version = "0.33", features = [

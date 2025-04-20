@@ -64,6 +64,9 @@ pub struct InputInterpolation {
 
     power: f32,
     scale: f32,
+
+    translate_gain: Vec3A,
+    torque_gain: Vec3A,
 }
 
 impl InputInterpolation {
@@ -74,10 +77,12 @@ impl InputInterpolation {
     pub const fn normal() -> Self {
         Self {
             depth_mps: 0.3,
-            trim_dps: 60.0,
-            servo_rate: 5.0,
+            trim_dps: 100.0,
+            servo_rate: 1.5,
             power: 3.0,
             scale: 0.8,
+            translate_gain: vec3a(1.0, 1.0, 1.0),
+            torque_gain: vec3a(1.0, 1.0, 0.5),
         }
     }
 
@@ -85,9 +90,11 @@ impl InputInterpolation {
         Self {
             depth_mps: 0.1,
             trim_dps: 60.0,
-            servo_rate: 4.0,
+            servo_rate: 1.0,
             power: 3.0,
             scale: 0.3,
+            translate_gain: vec3a(1.0, 1.0, 1.0),
+            torque_gain: vec3a(1.0, 1.0, 0.5),
         }
     }
 }
@@ -298,23 +305,29 @@ fn movement(
 
         let x = interpolation.interpolate_input(
             action_state.value(&Action::Sway) - action_state.value(&Action::SwayInverted),
-        ) * maximums[&Axis::X].0;
+        ) * maximums[&Axis::X].0
+            * interpolation.translate_gain.x;
         let y = interpolation.interpolate_input(
             action_state.value(&Action::Surge) - action_state.value(&Action::SurgeInverted),
-        ) * maximums[&Axis::Y].0;
+        ) * maximums[&Axis::Y].0
+            * interpolation.translate_gain.y;
         let z = interpolation.interpolate_input(
             action_state.value(&Action::Heave) - action_state.value(&Action::HeaveInverted),
-        ) * maximums[&Axis::Z].0;
+        ) * maximums[&Axis::Z].0
+            * interpolation.translate_gain.z;
 
         let x_rot = interpolation.interpolate_input(
             action_state.value(&Action::Pitch) - action_state.value(&Action::PitchInverted),
-        ) * maximums[&Axis::XRot].0;
+        ) * maximums[&Axis::XRot].0
+            * interpolation.torque_gain.x;
         let y_rot = interpolation.interpolate_input(
             action_state.value(&Action::Roll) - action_state.value(&Action::RollInverted),
-        ) * maximums[&Axis::YRot].0;
+        ) * maximums[&Axis::YRot].0
+            * interpolation.torque_gain.y;
         let z_rot = interpolation.interpolate_input(
             -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
-        ) * maximums[&Axis::ZRot].0;
+        ) * maximums[&Axis::ZRot].0
+            * interpolation.torque_gain.z;
 
         // TODO: We should never zero the z input, this should instead allow switching between
         // interperting z as local vs global
@@ -346,11 +359,12 @@ fn movement(
         };
 
         // TODO: torque vector should always be applied to act as feed forward for pid
-        let torque = if orientation_target.is_some() {
-            Vec3A::ZERO
-        } else {
-            vec3a(x_rot, y_rot, z_rot)
-        };
+        // let torque = if orientation_target.is_some() {
+        //     Vec3A::ZERO
+        // } else {
+        //     vec3a(x_rot, y_rot, z_rot)
+        // };
+        let torque = vec3a(x_rot, y_rot, z_rot);
 
         let movement = MovementGlam { force, torque };
 

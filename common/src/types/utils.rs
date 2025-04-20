@@ -63,6 +63,7 @@ impl PidController {
         let correction = p + i + d + td;
 
         PidResult {
+            error,
             p,
             i,
             d,

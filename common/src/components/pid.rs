@@ -21,6 +21,7 @@ pub struct PidConfig {
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub struct PidResult {
+    pub error: f32,
     pub p: f32,
     pub i: f32,
     pub d: f32,
