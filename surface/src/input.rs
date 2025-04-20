@@ -559,11 +559,12 @@ fn trim_depth(
             if z != 0.0 {
                 let mut input = z * interpolation.depth_mps * time.delta_secs();
 
-                if let Some(orientation) = orientation {
-                    input *= (orientation.0 * Vec3A::Z).z.signum();
-                }
+                // if let Some(orientation) = orientation {
+                //     input *= (orientation.0 * Vec3A::Z).z.signum();
+                // }
 
-                depth_target -= input;
+                // Positive should cause upward movement, ie depth should decrease
+                depth_target += -input;
                 if depth_target < 0.0 {
                     depth_target = 0.0;
                 }
