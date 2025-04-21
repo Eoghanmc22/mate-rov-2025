@@ -60,22 +60,26 @@ Claw3 = { channel = { DcChannel = 2 }, signal_type = "Velocity", constraints = {
 Lights = { channel = { DcChannel = 3 }, signal_type = "Position", control_mode = "FirstOrder", constraints = { min = 0.0, max = 0.75 } }
 
 
-# [cameras."/dev/video2"]
-# name = "Front"
-# transform = { position = { x = 0.0, y = 1.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
-#
-# [cameras."/dev/video6"]
-# name = "Top"
-# transform = { position = { x = 0.0, y = 0.0, z = 1.0 }, rotation = { yaw = 0.0, pitch = -90.0, roll = 0.0 } }
-#
-# [cameras."/dev/video10"]
-# name = "A"
-# transform = { position = { x = 0.0, y = 0.0, z = -1.0 }, rotation = { yaw = 0.0, pitch = 90.0, roll = 0.0 } }
-#
-# [cameras."/dev/video14"]
-# name = "B"
-# transform = { position = { x = 0.0, y = -1.0, z = 0.0 }, rotation = { yaw = -180.0, pitch = 0.0, roll = 0.0 } }
-#
-# [cameras."/dev/video18"]
-# name = "C"
-# transform = { position = { x = 1.0, y = 0.0, z = 0.0 }, rotation = { yaw = -90.0, pitch = 0.0, roll = 0.0 } }
+[cameras."/dev/video2"]
+name = "Top Left"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+
+[cameras."/dev/video6"]
+name = "Top Right"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+
+[cameras."/dev/video10"]
+name = "Front Bottom"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+
+[cameras."/dev/video14"]
+name = "Bottom Right"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+
+[cameras."/dev/video18"]
+name = "Bottom Left"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+
+[cameras."/dev/video41"]
+name = "Front"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
