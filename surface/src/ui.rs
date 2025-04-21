@@ -10,10 +10,11 @@ use bevy_tokio_tasks::TokioTasksRuntime;
 use common::{
     bundles::MovementContributionBundle,
     components::{
-        Armed, CameraDefinition, CurrentDraw, DepthMeasurement, DepthTarget, DisableMovementApi,
-        GenericMotorId, MeasuredVoltage, MotorRawSignalRange, MotorSignal, MovementAxisMaximums,
-        MovementContribution, OrientationTarget, PidResult, Robot, RobotId, SystemCpuTotal,
-        SystemLoadAverage, SystemMemory, SystemTemperatures, TempertureMeasurement,
+        ActualMovement, Armed, CameraDefinition, CurrentDraw, DepthMeasurement, DepthTarget,
+        DisableMovementApi, GenericMotorId, MeasuredVoltage, MotorRawSignalRange, MotorSignal,
+        MovementAxisMaximums, MovementContribution, OrientationTarget, PidResult, Robot, RobotId,
+        SystemCpuTotal, SystemLoadAverage, SystemMemory, SystemTemperatures, TargetMovement,
+        TempertureMeasurement,
     },
     ecs_sync::{NetId, Replicate},
     events::{CalibrateSeaLevel, ResetServos, ResetYaw, ResyncCameras},
@@ -25,7 +26,7 @@ use egui::{
 };
 use egui_plot::{Line, Plot, PlotPoint};
 use leafwing_input_manager::input_map::InputMap;
-use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
+use motor_math::{glam::MovementGlam, solve::reverse::Axis};
 use tokio::net::lookup_host;
 
 use crate::{
@@ -48,6 +49,7 @@ impl Plugin for EguiUiPlugin {
                 hud.after(topbar),
                 movement_control.after(topbar),
                 pid_helper.after(topbar),
+                movement_debug.after(topbar),
                 pwm_control
                     .after(topbar)
                     .run_if(resource_exists::<PwmControl>),
@@ -83,6 +85,9 @@ pub enum TimerType {
 
 #[derive(Component)]
 pub struct MovementController;
+
+#[derive(Component)]
+pub struct MovementDebugger;
 
 #[derive(Component)]
 pub struct PidHelper;
@@ -224,6 +229,10 @@ fn topbar(
                         },
                         Replicate,
                     ));
+                }
+
+                if ui.button("Movement Debugger").clicked() {
+                    cmds.spawn((MovementDebugger, Replicate, RobotId(NetId::invalid())));
                 }
 
                 if ui.button("PID Helper").clicked() {
@@ -735,8 +744,8 @@ fn pwm_control(
     let mut open = true;
 
     egui::Window::new("PWM Control")
-        .current_pos(context.screen_rect().left_top())
-        .constrain_to(context.available_rect().shrink(20.0))
+        // .current_pos(context.screen_rect().left_top())
+        // .constrain_to(context.available_rect().shrink(20.0))
         .open(&mut open)
         .show(contexts.ctx_mut(), |ui| {
             if let Ok((robot, manual, robot_id)) = robots.get_single() {
@@ -899,6 +908,76 @@ fn movement_control(
         }
     }
 }
+fn movement_debug(
+    mut cmds: Commands,
+    mut contexts: EguiContexts,
+
+    mut controllers: Query<(Entity, &mut RobotId), (With<MovementDebugger>)>,
+
+    mut contributors: Query<(&Name, &MovementContribution, &RobotId), (Without<MovementDebugger>)>,
+    robots: Query<
+        (&Name, &RobotId, &TargetMovement, &ActualMovement),
+        (With<Robot>, Without<MovementDebugger>),
+    >,
+) {
+    for (contoller, mut selected_robot) in &mut controllers {
+        let mut open = true;
+
+        let context = contexts.ctx_mut();
+        egui::Window::new("Movement Debugger")
+            .id(Id::new(contoller))
+            .constrain_to(context.available_rect().shrink(20.0))
+            .open(&mut open)
+            .show(context, |ui| {
+                ui.label("Robot:");
+                let Some((robot_id, target_movement, actual_movement)) = ui
+                    .horizontal(|ui| {
+                        let mut data = None;
+                        for (name, robot_id, target_movement, actual_movement) in &robots {
+                            ui.selectable_value(&mut selected_robot.0, robot_id.0, name.as_str());
+
+                            if selected_robot.0 == robot_id.0 {
+                                data = Some((robot_id, target_movement, actual_movement));
+                            }
+                        }
+                        ui.selectable_value(&mut selected_robot.0, NetId::invalid(), "None");
+
+                        if selected_robot.0 != NetId::invalid() {
+                            data
+                        } else {
+                            None
+                        }
+                    })
+                    .inner
+                else {
+                    return;
+                };
+
+                ui.label(format!("Target: {target_movement:.2?}"));
+                ui.label(format!("Actual: {actual_movement:.2?}"));
+
+                let mut movement = MovementGlam::default();
+
+                for (name, contribution, other_robot_id) in contributors.iter() {
+                    if robot_id != other_robot_id {
+                        continue;
+                    }
+
+                    ui.label(format!("{}: {:.2?}", name.as_str(), contribution.0));
+                    movement += contribution.0;
+                }
+
+                ui.label(format!(
+                    "Unaccounted Movement: {:.2?}",
+                    target_movement.0 - movement
+                ));
+            });
+
+        if !open {
+            cmds.entity(contoller).despawn();
+        }
+    }
+}
 
 #[derive(Component, Default)]
 struct PidData(HashMap<PidAxis, PidDataEntry>);
@@ -1049,7 +1128,7 @@ fn pid_helper(
                         PidAxis::Yaw => "Stabalize Yaw",
                         PidAxis::Pitch => "Stabalize Pitch",
                         PidAxis::Roll => "Stabalize Roll",
-                        PidAxis::Depth => "Depth Hold",
+                        PidAxis::Depth => "Stabalize Depth",
                     };
 
                     let pid_result = pid_controllers.iter().find(|(name, _, robot_id)| {
@@ -1095,54 +1174,64 @@ fn pid_helper(
                     }
                 }
 
-                Plot::new("Pid Tuning Plot").height(300.0).show(ui, |plot| {
-                    for (axis, entry) in data.0.iter() {
-                        let (first, second) = entry.error.as_slices();
-                        plot.add(
-                            Line::new(format!("{axis:?}, error"), first)
-                                .stroke((1.5, Color32::BROWN)),
-                        );
-                        plot.add(
-                            Line::new(format!("{axis:?}, error"), second)
-                                .stroke((1.5, Color32::BROWN)),
-                        );
+                for (axis, entry) in data.0.iter() {
+                    ui.label(format!("{axis:?} Plot"));
+                    Plot::new(format!("Pid Tuning Plot {axis:?}"))
+                        .height(300.0)
+                        .show(ui, |plot| {
+                            let (first, second) = entry.error.as_slices();
+                            plot.add(
+                                Line::new(format!("{axis:?}, error"), first)
+                                    .stroke((1.5, Color32::BROWN)),
+                            );
+                            plot.add(
+                                Line::new(format!("{axis:?}, error"), second)
+                                    .stroke((1.5, Color32::BROWN)),
+                            );
 
-                        let (first, second) = entry.total.as_slices();
-                        plot.add(
-                            Line::new(format!("{axis:?}, total"), first)
-                                .stroke((1.5, Color32::BLACK)),
-                        );
-                        plot.add(
-                            Line::new(format!("{axis:?}, total"), second)
-                                .stroke((1.5, Color32::BLACK)),
-                        );
+                            let (first, second) = entry.total.as_slices();
+                            plot.add(
+                                Line::new(format!("{axis:?}, total"), first)
+                                    .stroke((1.5, Color32::BLACK)),
+                            );
+                            plot.add(
+                                Line::new(format!("{axis:?}, total"), second)
+                                    .stroke((1.5, Color32::BLACK)),
+                            );
 
-                        let (first, second) = entry.kp.as_slices();
-                        plot.add(
-                            Line::new(format!("{axis:?}, kp"), first).stroke((1.5, Color32::RED)),
-                        );
-                        plot.add(
-                            Line::new(format!("{axis:?}, kp"), second).stroke((1.5, Color32::RED)),
-                        );
+                            let (first, second) = entry.kp.as_slices();
+                            plot.add(
+                                Line::new(format!("{axis:?}, kp"), first)
+                                    .stroke((1.5, Color32::RED)),
+                            );
+                            plot.add(
+                                Line::new(format!("{axis:?}, kp"), second)
+                                    .stroke((1.5, Color32::RED)),
+                            );
 
-                        let (first, second) = entry.ki.as_slices();
-                        plot.add(
-                            Line::new(format!("{axis:?}, ki"), first).stroke((1.5, Color32::GREEN)),
-                        );
-                        plot.add(
-                            Line::new(format!("{axis:?}, ki"), second)
-                                .stroke((1.5, Color32::GREEN)),
-                        );
+                            let (first, second) = entry.ki.as_slices();
+                            plot.add(
+                                Line::new(format!("{axis:?}, ki"), first)
+                                    .stroke((1.5, Color32::GREEN)),
+                            );
+                            plot.add(
+                                Line::new(format!("{axis:?}, ki"), second)
+                                    .stroke((1.5, Color32::GREEN)),
+                            );
 
-                        let (first, second) = entry.kd.as_slices();
-                        plot.add(
-                            Line::new(format!("{axis:?}, kd"), first).stroke((1.5, Color32::BLUE)),
-                        );
-                        plot.add(
-                            Line::new(format!("{axis:?}, kd"), second).stroke((1.5, Color32::BLUE)),
-                        );
-                    }
-                });
+                            let (first, second) = entry.kd.as_slices();
+                            plot.add(
+                                Line::new(format!("{axis:?}, kd"), first)
+                                    .stroke((1.5, Color32::BLUE)),
+                            );
+                            plot.add(
+                                Line::new(format!("{axis:?}, kd"), second)
+                                    .stroke((1.5, Color32::BLUE)),
+                            );
+                        });
+
+                    ui.add_space(7.0);
+                }
 
                 let mut movement = contribution.0;
 
