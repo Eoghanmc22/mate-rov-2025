@@ -51,6 +51,7 @@ enum PwmEvent {
 fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<()> {
     let interval = Duration::from_secs_f32(1.0 / 100.0);
     let max_inactive = Duration::from_secs_f32(1.0 / 10.0);
+    let arming_duration = Duration::from_millis(1000);
 
     let (tx_data, rx_data) = channel::bounded(30);
 
@@ -77,6 +78,7 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
             let mut armed = Armed::Disarmed;
             let mut channel_pwms = STOP_PWMS;
             let mut last_arm_timestamp = Instant::now();
+            let mut last_rearm_timestamp = Instant::now();
 
             let mut do_shutdown = false;
 
@@ -89,8 +91,11 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
 
                     match event {
                         PwmEvent::Arm(Armed::Armed) => {
-                            armed = Armed::Armed;
                             last_arm_timestamp = Instant::now();
+                            if armed != Armed::Armed {
+                                last_rearm_timestamp = last_arm_timestamp;
+                            }
+                            armed = Armed::Armed;
                         }
                         PwmEvent::Arm(Armed::Disarmed) => {
                             armed = Armed::Disarmed;
@@ -121,6 +126,13 @@ fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<(
 
                     let _ = errors.send(anyhow!("Motors disarmed due to inactivity"));
                     armed = Armed::Disarmed;
+                    channel_pwms = STOP_PWMS;
+                }
+
+                // The escs like being sent 1500 us for a little bit before we start sending them
+                // the actual speeds
+                if matches!(armed, Armed::Armed) && last_rearm_timestamp.elapsed() < arming_duration
+                {
                     channel_pwms = STOP_PWMS;
                 }
 
