@@ -273,27 +273,31 @@ fn handle_peers(
     channels: Res<CameraChannels>,
     mut disconnected: RemovedComponents<Peer>,
     connected: Query<&Peer, Changed<Peer>>,
+    connected_all: Query<&Peer>,
     mut resync_events: EventReader<ResyncCameras>,
 ) {
-    let mut event = None;
+    let res: Result<(), crossbeam::channel::SendError<_>> = try {
+        for _resync in resync_events.read() {
+            let Ok(peer) = connected_all.get_single() else {
+                continue;
+            };
 
-    for _resync in resync_events.read() {
-        event = Some(CameraEvent::Resync);
-    }
-
-    for _disconnection in disconnected.read() {
-        event = Some(CameraEvent::LostPeer);
-    }
-
-    for peer in connected.iter() {
-        event = Some(CameraEvent::NewPeer(peer.addrs));
-    }
-
-    if let Some(event) = event {
-        let res = channels.0.send(event);
-        if let Err(_) = res {
-            error!("Camera thread dead");
+            // channels.0.send(CameraEvent::Resync)?;
+            channels.0.send(CameraEvent::LostPeer)?;
+            channels.0.send(CameraEvent::NewPeer(peer.addrs))?;
         }
+
+        for _disconnection in disconnected.read() {
+            channels.0.send(CameraEvent::LostPeer)?;
+        }
+
+        for peer in connected.iter() {
+            channels.0.send(CameraEvent::NewPeer(peer.addrs))?;
+        }
+    };
+
+    if let Err(_) = res {
+        error!("Camera thread dead");
     }
 }
 
