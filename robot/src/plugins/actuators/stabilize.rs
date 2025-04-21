@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::RobotConfig,
-    plugins::core::robot::{LocalRobot, LocalRobotMarker},
+    plugins::{
+        core::robot::{LocalRobot, LocalRobotMarker},
+        sensors::{depth, orientation},
+    },
 };
 
 pub struct StabilizePlugin;
@@ -104,10 +107,10 @@ fn stabalize_system(
     robot_query: Query<
         (
             &Armed,
-            &Orientation,
-            &OrientationTarget,
-            &DepthMeasurement,
-            &DepthTarget,
+            Option<&Orientation>,
+            Option<&OrientationTarget>,
+            Option<&DepthMeasurement>,
+            Option<&DepthTarget>,
         ),
         With<LocalRobotMarker>,
     >,
@@ -116,36 +119,55 @@ fn stabalize_system(
 ) {
     let (armed, orientation, orientation_target, depth, depth_target) = robot_query.single();
 
+    let mut orientation_error = orientation_target
+        .zip(orientation)
+        .map(|(orientation_target, orientation)| orientation_target.0 * orientation.0.inverse());
+    let mut depth_error = depth_target
+        .zip(depth)
+        .map(|(depth_target, depth)| depth_target.0 - depth.depth);
+
     if *armed != Armed::Armed {
-        for (entity, _config, _axis, mut state) in conntroller_query.iter_mut() {
+        orientation_error = None;
+        depth_error = None;
+    }
+
+    for (entity, config, axis, mut state) in conntroller_query.iter_mut() {
+        let needs_remove = 'pid_result: {
+            let Some(orientation) = orientation else {
+                break 'pid_result true;
+            };
+
+            let res = match axis {
+                PidAxis::Depth => depth_error
+                    .map(|depth_error| state.0.update(depth_error.0, config, time.delta())),
+                PidAxis::Yaw | PidAxis::Pitch | PidAxis::Roll => {
+                    orientation_error.map(|orientation_error| {
+                        let error = instant_twist(
+                            orientation_error,
+                            axis.get_unit_global_movement(orientation.0).torque,
+                        )
+                        .to_degrees();
+
+                        state.0.update(error, config, time.delta())
+                    })
+                }
+            };
+            if let Some(res) = res {
+                let movement = axis.get_unit_local_movement(orientation.0) * res.correction;
+                cmds.entity(entity)
+                    .insert((MovementContribution(movement), res));
+                false
+            } else {
+                true
+            }
+        };
+
+        if needs_remove {
             cmds.entity(entity)
                 .remove::<(MovementContribution, PidResult)>();
 
             state.0.reset_i();
         }
-        return;
-    }
-
-    let orientation_error = orientation_target.0 * orientation.0.inverse();
-    let depth_error = depth_target.0 - depth.depth;
-
-    for (entity, config, axis, mut state) in conntroller_query.iter_mut() {
-        let res = match axis {
-            PidAxis::Depth => state.0.update(depth_error.0, config, time.delta()),
-            PidAxis::Yaw | PidAxis::Pitch | PidAxis::Roll => {
-                let error = instant_twist(
-                    orientation_error,
-                    axis.get_unit_global_movement(orientation.0).torque,
-                )
-                .to_degrees();
-
-                state.0.update(error, config, time.delta())
-            }
-        };
-
-        let movement = axis.get_unit_local_movement(orientation.0) * res.correction;
-        cmds.entity(entity)
-            .insert((MovementContribution(movement), res));
     }
 }
 fn instant_twist(q: Quat, twist_axis: Vec3A) -> f32 {
