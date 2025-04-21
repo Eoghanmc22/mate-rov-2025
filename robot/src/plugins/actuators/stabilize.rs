@@ -166,7 +166,7 @@ fn stabalize_system(
             cmds.entity(entity)
                 .remove::<(MovementContribution, PidResult)>();
 
-            state.0.reset_i();
+            state.0.reset();
         }
     }
 }

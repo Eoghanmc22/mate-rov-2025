@@ -40,7 +40,15 @@ impl PidController {
         let i = cfg.ki * integral;
         let d = cfg.kd * derivative;
 
-        let correction = p + i + d;
+        let i = if error.abs() < config.i_zone {
+            i
+        } else {
+            self.integral = 0.0;
+
+            0.0
+        };
+
+        let correction = (p + i + d).clamp(-config.max_output, config.max_output);
 
         PidResult {
             error,
@@ -51,8 +59,8 @@ impl PidController {
         }
     }
 
-    pub fn reset_i(&mut self) {
-        self.integral = 0.0;
+    pub fn reset(&mut self) {
+        *self = Default::default();
     }
 }
 

@@ -13,7 +13,9 @@ pub struct PidConfig {
     pub ki: f32,
     pub kd: f32,
 
+    pub i_zone: f32,
     pub max_integral: f32,
+    pub max_output: f32,
 }
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
