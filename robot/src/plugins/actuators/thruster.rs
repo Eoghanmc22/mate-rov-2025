@@ -166,7 +166,7 @@ fn accumulate_movements(
     }
 
     let forces = solve::reverse::reverse_solve(total_movement.into(), thruster_config);
-    let motor_cmds = solve::reverse::forces_to_cmds(forces, thruster_config, &motor_data.0);
+    let motor_cmds = solve::reverse::forces_to_cmds(&forces, thruster_config, &motor_data.0);
     let forces = motor_cmds
         .into_iter()
         .map(|(motor, cmd)| (motor, Newtons(cmd.force as _)))

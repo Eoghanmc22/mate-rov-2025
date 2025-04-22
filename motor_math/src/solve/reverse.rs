@@ -45,7 +45,7 @@ pub fn reverse_solve<D: Number, MotorId: Hash + Ord + Clone + Debug>(
 
 #[instrument(level = "trace", skip(motor_config, motor_data), ret)]
 pub fn forces_to_cmds<D: Number, MotorId: Hash + Ord + Clone + Debug>(
-    forces: HashMap<MotorId, D>,
+    forces: &HashMap<MotorId, D>,
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
 ) -> HashMap<MotorId, MotorRecord<D>> {
@@ -54,7 +54,7 @@ pub fn forces_to_cmds<D: Number, MotorId: Hash + Ord + Clone + Debug>(
 
 #[instrument(level = "trace", skip(motor_config, motor_data), ret)]
 pub fn forces_to_cmds_extrapolated<D: Number, MotorId: Hash + Ord + Clone + Debug>(
-    forces: HashMap<MotorId, D>,
+    forces: &HashMap<MotorId, D>,
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
 ) -> HashMap<MotorId, MotorRecord<D>> {
@@ -62,7 +62,7 @@ pub fn forces_to_cmds_extrapolated<D: Number, MotorId: Hash + Ord + Clone + Debu
 }
 
 fn forces_to_cmds_impl<D: Number, MotorId: Hash + Ord + Clone + Debug>(
-    forces: HashMap<MotorId, D>,
+    forces: &HashMap<MotorId, D>,
     motor_config: &MotorConfig<MotorId, D>,
     motor_data: &MotorData,
     extrapolate: bool,
@@ -71,7 +71,7 @@ fn forces_to_cmds_impl<D: Number, MotorId: Hash + Ord + Clone + Debug>(
     for (motor_id, force) in forces {
         let motor = motor_config.motor(&motor_id).expect("Bad motor id");
         let data = motor_data.lookup_by_force(
-            force,
+            *force,
             Interpolation::LerpDirection(motor.direction),
             extrapolate,
         );
@@ -367,7 +367,7 @@ pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
         let guess_magnitude = 15.0;
         movement *= guess_magnitude.into();
 
-        let forces = reverse_solve(movement, motor_config);
+        let mut forces = reverse_solve(movement, motor_config);
 
         // TODO: Is this needed?
         // let cmds = dbg!(forces_to_cmds(forces, motor_config, motor_data));
@@ -384,11 +384,19 @@ pub fn axis_maximums<D: Number, MotorId: Hash + Ord + Clone + Debug>(
         // TODO: Isnt this always true???
         let has_axis_epsilon = (0.05 as FloatType).max(epsilon);
         if (actual_magnitude - guess_magnitude).abs() < has_axis_epsilon {
-            let cmds = forces_to_cmds_extrapolated(forces, motor_config, motor_data);
-            let scale =
-                binary_search_force_ratio(&cmds, motor_config, motor_data, amperage_cap, epsilon);
+            let positive_scale = {
+                let cmds = forces_to_cmds_extrapolated(&forces, motor_config, motor_data);
+                binary_search_force_ratio(&cmds, motor_config, motor_data, amperage_cap, epsilon)
+            };
+            let negative_scale = {
+                // we can mutate `forces` inplace since it isnt used after this
+                forces.values_mut().for_each(|it| *it *= -D::one());
 
-            let value = scale * guess_magnitude;
+                let cmds = forces_to_cmds_extrapolated(&forces, motor_config, motor_data);
+                binary_search_force_ratio(&cmds, motor_config, motor_data, amperage_cap, epsilon)
+            };
+
+            let value = positive_scale.max(negative_scale) * guess_magnitude;
 
             (axis, value)
         } else {

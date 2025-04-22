@@ -39,7 +39,7 @@ mod tests {
 
         let start = Instant::now();
         let forces = reverse::reverse_solve(movement, &motor_config);
-        let motor_cmds = reverse::forces_to_cmds(forces, &motor_config, &motor_data);
+        let motor_cmds = reverse::forces_to_cmds(&forces, &motor_config, &motor_data);
         let elapsed = start.elapsed();
 
         println!("motor_cmds: {motor_cmds:#?} in {}us", elapsed.as_micros());
@@ -82,7 +82,7 @@ mod tests {
 
         let start = Instant::now();
         let forces = reverse::reverse_solve(movement, &motor_config);
-        let motor_cmds = reverse::forces_to_cmds(forces, &motor_config, &motor_data);
+        let motor_cmds = reverse::forces_to_cmds(&forces, &motor_config, &motor_data);
         let elapsed = start.elapsed();
 
         println!("motor_cmds: {motor_cmds:#?} in {}us", elapsed.as_micros());
@@ -180,7 +180,7 @@ mod tests {
 
         let start = Instant::now();
         let forces = reverse::reverse_solve(movement, &motor_config);
-        let motor_cmds = reverse::forces_to_cmds(forces, &motor_config, &motor_data);
+        let motor_cmds = reverse::forces_to_cmds(&forces, &motor_config, &motor_data);
         let elapsed = start.elapsed();
 
         println!("motor_cmds: {motor_cmds:#?} in {}us", elapsed.as_micros());
@@ -218,7 +218,7 @@ mod tests {
 
         b.iter(|| {
             let forces = reverse::reverse_solve(movement, &motor_config);
-            reverse::forces_to_cmds(forces, &motor_config, &motor_data)
+            reverse::forces_to_cmds(&forces, &motor_config, &motor_data)
         });
     }
 
@@ -247,7 +247,7 @@ mod tests {
 
         b.iter(|| {
             let forces = reverse::reverse_solve(movement, &motor_config);
-            reverse::forces_to_cmds(forces, &motor_config, &motor_data)
+            reverse::forces_to_cmds(&forces, &motor_config, &motor_data)
         });
     }
 }
