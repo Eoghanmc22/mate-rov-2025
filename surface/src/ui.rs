@@ -14,11 +14,12 @@ use common::{
         DisableMovementApi, GenericMotorId, MeasuredVoltage, MotorRawSignalRange, MotorSignal,
         MovementAxisMaximums, MovementContribution, OrientationTarget, PidResult, Robot, RobotId,
         SystemCpuTotal, SystemLoadAverage, SystemMemory, SystemTemperatures, TargetMovement,
-        TempertureMeasurement,
+        TempertureMeasurement, ThrusterDefinition,
     },
     ecs_sync::{NetId, Replicate},
     events::{CalibrateSeaLevel, ResetServos, ResetYaw, ResyncCameras},
     sync::{ConnectToPeer, DisconnectPeer, Latency, MdnsPeers, Peer},
+    types::units::Amperes,
 };
 use egui::{
     load::SizedTexture, text::LayoutJob, widgets, Align, Color32, Id, Label, Layout, RichText,
@@ -50,6 +51,7 @@ impl Plugin for EguiUiPlugin {
                 movement_control.after(topbar),
                 pid_helper.after(topbar),
                 movement_debug.after(topbar),
+                current_draw_debug.after(topbar),
                 pwm_control
                     .after(topbar)
                     .run_if(resource_exists::<PwmControl>),
@@ -88,6 +90,9 @@ pub struct MovementController;
 
 #[derive(Component)]
 pub struct MovementDebugger;
+
+#[derive(Component)]
+pub struct CurrentDrawDebugger;
 
 #[derive(Component)]
 pub struct PidHelper;
@@ -233,6 +238,10 @@ fn topbar(
 
                 if ui.button("Movement Debugger").clicked() {
                     cmds.spawn((MovementDebugger, Replicate, RobotId(NetId::invalid())));
+                }
+
+                if ui.button("Current Draw Debugger").clicked() {
+                    cmds.spawn((CurrentDrawDebugger, Replicate, RobotId(NetId::invalid())));
                 }
 
                 if ui.button("PID Helper").clicked() {
@@ -908,6 +917,7 @@ fn movement_control(
         }
     }
 }
+
 fn movement_debug(
     mut cmds: Commands,
     mut contexts: EguiContexts,
@@ -971,6 +981,102 @@ fn movement_debug(
                     "Unaccounted Movement: {:.2?}",
                     target_movement.0 - movement
                 ));
+            });
+
+        if !open {
+            cmds.entity(contoller).despawn();
+        }
+    }
+}
+
+fn current_draw_debug(
+    mut cmds: Commands,
+    mut contexts: EguiContexts,
+
+    mut controllers: Query<(Entity, &mut RobotId), (With<CurrentDrawDebugger>)>,
+
+    mut components: Query<
+        (&Name, &CurrentDraw, &RobotId, Option<&ThrusterDefinition>),
+        (Without<Robot>, Without<CurrentDrawDebugger>),
+    >,
+    robots: Query<
+        (&Name, &RobotId, Option<&CurrentDraw>),
+        (With<Robot>, Without<CurrentDrawDebugger>),
+    >,
+) {
+    for (contoller, mut selected_robot) in &mut controllers {
+        let mut open = true;
+
+        let context = contexts.ctx_mut();
+        egui::Window::new("Current Draw Debugger")
+            .id(Id::new(contoller))
+            .constrain_to(context.available_rect().shrink(20.0))
+            .open(&mut open)
+            .show(context, |ui| {
+                ui.label("Robot:");
+                let Some((robot_id, current_draw)) = ui
+                    .horizontal(|ui| {
+                        let mut data = None;
+                        for (name, robot_id, current_draw) in &robots {
+                            ui.selectable_value(&mut selected_robot.0, robot_id.0, name.as_str());
+
+                            if selected_robot.0 == robot_id.0 {
+                                data = Some((robot_id, current_draw));
+                            }
+                        }
+                        ui.selectable_value(&mut selected_robot.0, NetId::invalid(), "None");
+
+                        if selected_robot.0 != NetId::invalid() {
+                            data
+                        } else {
+                            None
+                        }
+                    })
+                    .inner
+                else {
+                    return;
+                };
+
+                if let Some(current_draw) = current_draw {
+                    ui.label(format!("Actual Current Draw: {:.2?}", current_draw.0));
+                }
+
+                let mut current_draw_thrusters = Amperes::ZERO;
+                let mut current_draw_other = Amperes::ZERO;
+
+                for (name, current_draw, other_robot_id, thruster_definition) in components.iter() {
+                    if robot_id != other_robot_id {
+                        continue;
+                    }
+
+                    ui.label(format!("{}: {:.2?}", name.as_str(), current_draw.0));
+
+                    if thruster_definition.is_some() {
+                        current_draw_thrusters += current_draw.0;
+                    } else {
+                        current_draw_other += current_draw.0;
+                    }
+                }
+
+                ui.label(format!(
+                    "Thruster Current Draw: {:.2?}",
+                    current_draw_thrusters
+                ));
+                ui.label(format!("Other Current Draw: {:.2?}", current_draw_other));
+
+                let total_predicted = current_draw_thrusters + current_draw_other;
+                ui.label(format!(
+                    "Total Predicted Current Draw: {:.2?}",
+                    total_predicted
+                ));
+
+                if let Some(current_draw) = current_draw {
+                    ui.label(format!("Actual Current Draw: {:.2?}", current_draw.0));
+                    ui.label(format!(
+                        "Unaccounted Current Draw: {:.2?}",
+                        current_draw.0 - total_predicted
+                    ));
+                }
             });
 
         if !open {
