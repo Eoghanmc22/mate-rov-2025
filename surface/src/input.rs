@@ -88,7 +88,7 @@ impl InputInterpolation {
 
     pub const fn precision() -> Self {
         Self {
-            depth_mps: 0.1,
+            depth_mps: 0.2,
             trim_dps: 60.0,
             servo_rate: 1.0,
             power: 3.0,
@@ -125,13 +125,13 @@ pub enum Action {
     #[actionlike(Axis)]
     SwayInverted,
 
-    #[actionlike(Axis)]
+    // #[actionlike(Axis)]
     Pitch,
-    #[actionlike(Axis)]
+    // #[actionlike(Axis)]
     PitchInverted,
-    #[actionlike(Axis)]
+    // #[actionlike(Axis)]
     Roll,
-    #[actionlike(Axis)]
+    // #[actionlike(Axis)]
     RollInverted,
     #[actionlike(Axis)]
     Yaw,
@@ -317,11 +317,13 @@ fn movement(
             * interpolation.translate_gain.z;
 
         let x_rot = interpolation.interpolate_input(
-            action_state.value(&Action::Pitch) - action_state.value(&Action::PitchInverted),
+            action_state.button_value(&Action::Pitch)
+                - action_state.button_value(&Action::PitchInverted),
         ) * maximums[&Axis::XRot].0
             * interpolation.torque_gain.x;
         let y_rot = interpolation.interpolate_input(
-            action_state.value(&Action::Roll) - action_state.value(&Action::RollInverted),
+            action_state.button_value(&Action::Roll)
+                - action_state.button_value(&Action::RollInverted),
         ) * maximums[&Axis::YRot].0
             * interpolation.torque_gain.y;
         let z_rot = interpolation.interpolate_input(
@@ -493,10 +495,12 @@ fn trim_orientation(
 ) {
     for (robot, action_state, interpolation) in &inputs {
         let pitch = interpolation.interpolate_input(
-            action_state.value(&Action::Pitch) - action_state.value(&Action::PitchInverted),
+            action_state.button_value(&Action::Pitch)
+                - action_state.button_value(&Action::PitchInverted),
         );
         let roll = interpolation.interpolate_input(
-            action_state.value(&Action::Roll) - action_state.value(&Action::RollInverted),
+            action_state.button_value(&Action::Roll)
+                - action_state.button_value(&Action::RollInverted),
         );
         let yaw = interpolation.interpolate_input(
             -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
