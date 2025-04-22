@@ -3,6 +3,7 @@ use bevy::{
     reflect::{prelude::ReflectDefault, Reflect, ReflectDeserialize, ReflectSerialize},
 };
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 use crate::adapters::serde::ReflectSerdeAdapter;
 
@@ -27,4 +28,60 @@ pub struct PidResult {
     pub d: f32,
 
     pub correction: f32,
+}
+
+#[derive(Component, Clone, Copy, Debug, Serialize, Deserialize, Reflect, Default)]
+#[reflect(Serialize, Deserialize, Debug, Default)]
+pub struct PidController {
+    last_error: Option<f32>,
+    integral: f32,
+}
+
+impl PidController {
+    pub fn new() -> Self {
+        Self {
+            last_error: None,
+            integral: 0.0,
+        }
+    }
+
+    pub fn update(&mut self, error: f32, config: &PidConfig, interval: Duration) -> PidResult {
+        let cfg = config;
+        let interval = interval.as_secs_f32();
+
+        self.integral += error * interval;
+        self.integral = self.integral.clamp(-cfg.max_integral, cfg.max_integral);
+
+        let proportional = error;
+        let integral = self.integral;
+        let derivative = (error - self.last_error.unwrap_or(error)) / interval;
+
+        self.last_error = Some(error);
+
+        let p = cfg.kp * proportional;
+        let i = cfg.ki * integral;
+        let d = cfg.kd * derivative;
+
+        let i = if error.abs() < config.i_zone {
+            i
+        } else {
+            self.integral = 0.0;
+
+            0.0
+        };
+
+        let correction = (p + i + d).clamp(-config.max_output, config.max_output);
+
+        PidResult {
+            error,
+            p,
+            i,
+            d,
+            correction,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        *self = Default::default();
+    }
 }

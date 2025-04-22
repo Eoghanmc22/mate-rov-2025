@@ -5,10 +5,9 @@ use common::{
     bundles::MovementContributionBundle,
     components::{
         Armed, DepthMeasurement, DepthTarget, MovementContribution, Orientation, OrientationTarget,
-        PidConfig, PidResult, RobotId,
+        PidConfig, PidController, PidResult, RobotId,
     },
     ecs_sync::Replicate,
-    types::utils::PidController,
 };
 use glam::{vec3a, Vec3A};
 use motor_math::glam::MovementGlam;
@@ -16,10 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     config::RobotConfig,
-    plugins::{
-        core::robot::{LocalRobot, LocalRobotMarker},
-        sensors::{depth, orientation},
-    },
+    plugins::core::robot::{LocalRobot, LocalRobotMarker},
 };
 
 pub struct StabilizePlugin;
@@ -30,9 +26,6 @@ impl Plugin for StabilizePlugin {
         app.add_systems(Update, stabalize_system);
     }
 }
-
-#[derive(Component, Default)]
-struct PidState(PidController);
 
 #[derive(Component, Debug, Hash, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
 pub enum PidAxis {
@@ -96,7 +89,7 @@ fn setup_stabalize(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<Robot
             },
             pid_config.clone(),
             *axis,
-            PidState::default(),
+            PidController::default(),
             Replicate,
         ));
     }
@@ -114,7 +107,7 @@ fn stabalize_system(
         ),
         With<LocalRobotMarker>,
     >,
-    mut conntroller_query: Query<(Entity, &PidConfig, &PidAxis, &mut PidState)>,
+    mut conntroller_query: Query<(Entity, &PidConfig, &PidAxis, &mut PidController)>,
     time: Res<Time<Real>>,
 ) {
     let (armed, orientation, orientation_target, depth, depth_target) = robot_query.single();
@@ -138,8 +131,9 @@ fn stabalize_system(
             };
 
             let res = match axis {
-                PidAxis::Depth => depth_error
-                    .map(|depth_error| state.0.update(depth_error.0, config, time.delta())),
+                PidAxis::Depth => {
+                    depth_error.map(|depth_error| state.update(depth_error.0, config, time.delta()))
+                }
                 PidAxis::Yaw | PidAxis::Pitch | PidAxis::Roll => {
                     orientation_error.map(|orientation_error| {
                         let error = instant_twist(
@@ -148,7 +142,7 @@ fn stabalize_system(
                         )
                         .to_degrees();
 
-                        state.0.update(error, config, time.delta())
+                        state.update(error, config, time.delta())
                     })
                 }
             };
@@ -166,7 +160,7 @@ fn stabalize_system(
             cmds.entity(entity)
                 .remove::<(MovementContribution, PidResult)>();
 
-            state.0.reset();
+            state.reset();
         }
     }
 }

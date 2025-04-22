@@ -50,6 +50,7 @@ components! {
     pid::{
         PidConfig,
         PidResult,
+        PidController,
     },
 
     power::{
