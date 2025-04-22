@@ -24,7 +24,7 @@ bevy = { version = "0.15", default-features = false, features = ["serialize"] }
 bevy_reflect = "0.15"
 
 # Bevy plugins
-leafwing-input-manager = "0.16"
+leafwing-input-manager = { version = "0.16", features = ["egui", "ui"] }
 bevy_panorbit_camera = "0.25"
 bevy-tokio-tasks = "0.15"
 
