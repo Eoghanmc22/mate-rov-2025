@@ -22,13 +22,16 @@ pub struct RobotConfig {
 
     pub motor_amperage_budget: f32,
     pub jerk_limit: f32,
+    #[serde(default)]
     pub center_of_mass: Vec3A,
 
+    #[serde(default)]
     pub imu_offset: ConfigRotation,
 
     #[serde(default)]
     pub cameras: HashMap<String, CameraDefinition>,
 
+    #[serde(default)]
     pub pid_configs: HashMap<PidAxis, PidConfig>,
 }
 
@@ -293,7 +296,7 @@ impl ConfigPosition {
     }
 }
 
-#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
+#[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConfigRotation {
     yaw: f32,
     pitch: f32,
