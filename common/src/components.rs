@@ -2,7 +2,7 @@ use crate::ecs_sync::AppReplicateExt;
 use bevy::prelude::*;
 
 macro_rules! components {
-    ($($mod:ident :: { $($name:ident),* }),*) => {
+    ($($mod:ident :: { $($name:ident),* $(,)? }),* $(,)?) => {
         pub fn register_components(app: &mut App) {
             $(
                 $(
@@ -26,12 +26,12 @@ components! {
         Robot,
         Surface,
         Armed,
-        RobotId
+        RobotId,
     },
 
     control::{
         DepthTarget,
-        OrientationTarget
+        OrientationTarget,
     },
 
     motor::{
@@ -44,17 +44,17 @@ components! {
         MotorTargets,
         MotorSlewRate,
         MotorContribution,
-        GenericMotorId
+        GenericMotorId,
     },
 
     pid::{
         PidConfig,
-        PidResult
+        PidResult,
     },
 
     power::{
         MeasuredVoltage,
-        CurrentDraw
+        CurrentDraw,
     },
 
     sensor::{
@@ -66,7 +66,7 @@ components! {
         DepthSettings,
         TempertureMeasurement,
         Leak,
-        CameraDefinition
+        CameraDefinition,
     },
 
     system_monitor::{
@@ -79,7 +79,7 @@ components! {
         SystemTemperatures,
         SystemDisks,
         SystemUptime,
-        SystemOs
+        SystemOs,
     },
 
     thruster::{
@@ -97,6 +97,6 @@ components! {
         ThrusterDefinition,
         Thrusters,
         ThrustContribution,
-        JerkLimit
-    }
+        JerkLimit,
+    },
 }
