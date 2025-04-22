@@ -84,6 +84,14 @@ pub enum MotorContributionMode {
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
 pub struct MotorTargets(pub StableHashMap<GenericMotorId, f32>);
 
+/// Repersents the max allowed change in motor signal per second.
+// NOTE: In the current impl, this is only respected by the servo impl. see `JerkLimit` for
+// thruster equivalent
+#[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq)]
+#[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(transparent)]
+pub struct MotorSlewRate(pub MotorSignal);
+
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
 #[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq, Default)]
 #[reflect(from_reflect = false)]

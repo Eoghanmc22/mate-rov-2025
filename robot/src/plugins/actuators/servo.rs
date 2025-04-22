@@ -4,8 +4,8 @@ use common::{
     bundles::{ActuatorBundle, MotorBundle},
     components::{
         DisableMovementApi, GenericMotorId, MotorCameraReference, MotorContribution,
-        MotorContributionMode, MotorRawSignalRange, MotorSignal, MotorSignalType, MotorTargets,
-        Motors, RobotId,
+        MotorContributionMode, MotorRawSignalRange, MotorSignal, MotorSignalType, MotorSlewRate,
+        MotorTargets, Motors, RobotId,
     },
     ecs_sync::{NetId, Replicate},
     events::{ResetServo, ResetServos},
@@ -52,6 +52,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
             ref constraints,
             signal_type,
             control_mode,
+            slew_rate,
         },
     ) in servos
     {
@@ -92,6 +93,9 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
                 camera: camera.to_owned().into(),
             });
         }
+        if let Some(slew_rate) = slew_rate {
+            entity.insert(slew_rate);
+        }
     }
 }
 
@@ -108,7 +112,9 @@ fn handle_servo_input(
     servos: Query<(
         Entity,
         &Name,
+        Option<&MotorSignal>,
         &MotorSignalType,
+        Option<&MotorSlewRate>,
         &MotorContributionMode,
         &GenericMotorId,
         &RobotId,
@@ -131,14 +137,14 @@ fn handle_servo_input(
         }
 
         for (motor, input) in &servo_contribution.0 {
-            *all_inputs.entry(motor.clone()).or_default() += *input;
+            *all_inputs.entry(motor).or_default() += *input;
         }
     }
 
     let servos_by_id = servos
         .iter()
-        .map(|it| (it.4, it))
-        .collect::<HashMap<_, _>>();
+        .map(|it| (*it.6, it))
+        .collect::<HashMap<GenericMotorId, _>>();
 
     let mut full_reset = false;
 
@@ -151,38 +157,57 @@ fn handle_servo_input(
     let mut should_reset = HashSet::default();
 
     for event in reset_single.read() {
-        new_positions.insert(event.0.clone(), 0.0);
-        should_reset.insert(event.0.clone());
+        new_positions.insert(event.0, 0.0);
+        should_reset.insert(event.0);
     }
 
     new_positions.extend(all_inputs.into_iter().flat_map(|(id, input)| {
-        let (_, _, _, mode, _, _) = servos_by_id.get(&id)?;
+        // This is terrifying
+        let (_, _, _, _, _, mode, _, _) = servos_by_id.get(id)?;
 
         // TODO: Check if this is even right
         match mode {
-            MotorContributionMode::ZerothOrder => Some((id, input)),
+            MotorContributionMode::ZerothOrder => Some((*id, input)),
             MotorContributionMode::FirstOrder => {
-                let last_position = if !full_reset && !should_reset.contains(&id) {
-                    last_positions.0.get(&id).copied().unwrap_or(0.0)
+                let last_position = if !full_reset && !should_reset.contains(id) {
+                    last_positions.0.get(id).copied().unwrap_or(0.0)
                 } else {
                     0.0
                 };
                 Some((
-                    id,
+                    *id,
                     (last_position + input * time.delta_secs()).clamp(-1.0, 1.0),
                 ))
             }
         }
     }));
 
-    for (id, position) in &new_positions {
-        let Some((servo, ..)) = servos_by_id.get(&*id) else {
+    for (id, &position) in &new_positions {
+        let Some((servo, _, last_signal, _, slew_rate, ..)) = servos_by_id.get(id) else {
             continue;
+        };
+
+        // TODO: make this implementation more flexable (ie support raw signals)
+        let position = if let (
+            Some(&MotorSignal::Percent(last_position)),
+            Some(&MotorSlewRate(MotorSignal::Percent(slew_rate))),
+        ) = (last_signal, slew_rate)
+        {
+            let slew_rate = slew_rate * time.delta_secs();
+            let delta = position - last_position;
+
+            if delta.abs() > slew_rate {
+                last_position + delta.clamp(-slew_rate, slew_rate)
+            } else {
+                position
+            }
+        } else {
+            position
         };
 
         // let micros = 1500.0 + 400.0 * position.clamp(-1.0, 1.0);
 
-        cmds.entity(*servo).insert(MotorSignal::Percent(*position));
+        cmds.entity(*servo).insert(MotorSignal::Percent(position));
     }
 
     cmds.entity(robot).insert(MotorTargets(new_positions));

@@ -63,6 +63,7 @@ components! {
     MotorRawSignalRange,
     MotorContributionMode,
     MotorTargets,
+    MotorSlewRate,
     MotorContribution,
     GenericMotorId,
 

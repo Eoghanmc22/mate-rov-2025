@@ -118,6 +118,7 @@ pub struct ActuatorBundle {
     pub signal_type: MotorSignalType,
     pub signal_range: MotorRawSignalRange,
     // pub camera_ref: Option<MotorCameraReference>,
+    // pub slew_rate: Option<MotorSlewRate>,
     pub robot: RobotId,
 }
 

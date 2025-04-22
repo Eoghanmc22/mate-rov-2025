@@ -73,6 +73,7 @@ mod thruster_api {
     #[reflect(from_reflect = false)]
     pub struct ThrustContribution(pub StableHashMap<ErasedMotorId, Newtons>);
 
+    /// Units of newtons per second
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
     #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
     pub struct JerkLimit(pub f32);
