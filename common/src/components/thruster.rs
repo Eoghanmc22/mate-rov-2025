@@ -2,6 +2,7 @@ use bevy::{
     ecs::component::Component,
     reflect::{prelude::ReflectDefault, Reflect, ReflectDeserialize, ReflectSerialize},
 };
+use glam::Vec3A;
 use motor_math::{
     glam::{MovementGlam, ThrusterGlam},
     solve::reverse::Axis,
@@ -33,6 +34,10 @@ mod movement_api {
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
     #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq, Default)]
     pub struct MovementContribution(pub MovementGlam);
+
+    #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
+    #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq, Default)]
+    pub struct MovementContributionOriginOfControl(pub Vec3A);
 
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
     #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]

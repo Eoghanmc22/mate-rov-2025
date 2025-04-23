@@ -88,6 +88,7 @@ components! {
         TargetMovement,
         ActualMovement,
         MovementContribution,
+        MovementContributionOriginOfControl,
         MovementAxisMaximums,
         MovementCurrentCap,
         DisableMovementApi,

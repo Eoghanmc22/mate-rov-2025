@@ -1,4 +1,4 @@
-use std::{borrow::Cow, mem};
+use std::borrow::Cow;
 
 use ahash::HashSet;
 use bevy::{
@@ -10,13 +10,11 @@ use common::{
     components::{
         Armed, DepthMeasurement, DepthTarget, GenericMotorId, MotorContribution, Motors,
         MovementAxisMaximums, MovementContribution, Orientation, OrientationTarget, Robot, RobotId,
-        Thrusters,
     },
     ecs_sync::{NetId, Replicate},
     events::ResetServo,
     types::units::Meters,
 };
-use egui::TextBuffer;
 use leafwing_input_manager::{
     action_state::ActionState, input_map::InputMap, plugin::InputManagerPlugin, Actionlike,
     InputManagerBundle,
@@ -68,6 +66,8 @@ pub struct InputInterpolation {
     translate_gain: Vec3A,
     torque_gain: Vec3A,
     torque_gain_stabalize: Vec3A,
+
+    control_origin: Vec3A,
 }
 
 impl InputInterpolation {
@@ -85,6 +85,7 @@ impl InputInterpolation {
             translate_gain: vec3a(1.0, 1.0, 1.0),
             torque_gain: vec3a(1.0, 1.0, 0.5),
             torque_gain_stabalize: vec3a(1.0, 1.0, 0.1),
+            control_origin: Vec3A::ZERO,
         }
     }
 
@@ -98,6 +99,7 @@ impl InputInterpolation {
             translate_gain: vec3a(1.0, 1.0, 1.0),
             torque_gain: vec3a(1.0, 1.0, 0.5),
             torque_gain_stabalize: vec3a(1.0, 1.0, 0.1),
+            control_origin: Vec3A::new(0.0, 0.3, 0.0),
         }
     }
 }
@@ -379,7 +381,9 @@ fn movement(
 
         let movement = MovementGlam { force, torque };
 
-        cmds.entity(entity).insert(MovementContribution(movement));
+        cmds.entity(entity).insert(MovementContribution(
+            movement.with_origin(interpolation.control_origin),
+        ));
     }
 }
 

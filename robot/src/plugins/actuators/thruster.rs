@@ -7,8 +7,8 @@ use common::{
     components::{
         ActualForce, ActualMovement, Armed, CurrentDraw, DisableMovementApi, GenericMotorId,
         JerkLimit, MotorRawSignalRange, MotorSignal, MotorSignalType, MovementAxisMaximums,
-        MovementContribution, MovementCurrentCap, RobotId, TargetForce, TargetMovement,
-        ThrustContribution, ThrusterDefinition, Thrusters,
+        MovementContribution, MovementContributionOriginOfControl, MovementCurrentCap, RobotId,
+        TargetForce, TargetMovement, ThrustContribution, ThrusterDefinition, Thrusters,
     },
     ecs_sync::{NetId, Replicate},
     types::units::{Amperes, Newtons},
@@ -26,7 +26,10 @@ use stable_hashmap::StableHashMap;
 
 use crate::{
     config::{MotorConfigDefinition, RobotConfig},
-    plugins::core::robot::{LocalRobot, LocalRobotMarker},
+    plugins::{
+        core::robot::{LocalRobot, LocalRobotMarker},
+        sensors::orientation,
+    },
 };
 
 pub struct ThrusterPlugin;
@@ -148,7 +151,11 @@ fn accumulate_movements(
         (Entity, &NetId, &Thrusters),
         (With<LocalRobotMarker>, Without<DisableMovementApi>),
     >,
-    movements: Query<(&RobotId, &MovementContribution)>,
+    movements: Query<(
+        &RobotId,
+        &MovementContribution,
+        Option<&MovementContributionOriginOfControl>,
+    )>,
 
     motor_data: Res<MotorDataRes>,
 ) {
@@ -159,9 +166,15 @@ fn accumulate_movements(
 
     let mut total_movement = MovementGlam::default();
 
-    for (RobotId(robot_net_id), movement) in &movements {
+    for (RobotId(robot_net_id), movement, origin) in &movements {
         if robot_net_id == net_id {
-            total_movement += movement.0;
+            let movement = if let Some(origin) = origin {
+                movement.0.with_origin(origin.0)
+            } else {
+                movement.0
+            };
+
+            total_movement += movement;
         }
     }
 

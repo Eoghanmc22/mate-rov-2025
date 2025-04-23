@@ -117,6 +117,37 @@ pub struct MovementGlam {
     pub torque: Vec3A,
 }
 
+impl MovementGlam {
+    /// Modifies the movement such that the origin of rotation is at point `p`
+    ///
+    /// when the force on the provided movement is zero, this functions creates a new movement such
+    /// that the point `p` stays fixed and the robot orbits about `p`
+    pub fn with_origin(self, p: Vec3A) -> Self {
+        let eps = 1e-9_f32;
+        if p.length_squared() < eps {
+            // p is near zero => no orbit offset
+            return self;
+        }
+
+        let tau_parallel = self.torque.project_onto(p);
+        let tau_perp = self.torque - tau_parallel;
+
+        // We want the net torque about p to be desired_tau_perp + desired_tau_par
+        // but for the portion parallel to p, we can store it as torque at origin
+        // (since p × F for any F orthonormal to p won't generate a parallel torque).
+        //
+        // So let torque_at_origin = tau_parallel, ignoring mass/inertia again.
+        // Then for the perpendicular portion, solve p × F = -tau_perp:
+
+        let f = -p.cross(tau_perp) / p.length_squared();
+
+        Self {
+            force: self.force + f,
+            torque: tau_parallel, // store the parallel part as the origin torque
+        }
+    }
+}
+
 impl<N: Number> From<Movement<N>> for MovementGlam {
     fn from(value: Movement<N>) -> Self {
         let Movement { force, torque } = value;
