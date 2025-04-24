@@ -9,7 +9,6 @@ use bevy::{
     prelude::App,
     transform::components::Transform,
 };
-use ctrlc::CtrlCPlugin;
 use ecs_sync::{
     apply_changes::ChangeApplicationPlugin, detect_changes::ChangeDetectionPlugin, AppReplicateExt,
     NetId, Replicate,
@@ -17,12 +16,12 @@ use ecs_sync::{
 use error::ErrorPlugin;
 use git::GitMetadata;
 use over_run::OverRunPligin;
+use signal_handler::SignalPlugin;
 use sync::{Latency, SyncPlugin, SyncRole};
 
 pub mod adapters;
 pub mod bundles;
 pub mod components;
-pub mod ctrlc;
 pub mod ecs_sync;
 pub mod error;
 pub mod events;
@@ -30,6 +29,7 @@ pub mod git;
 pub mod over_run;
 pub mod protocol;
 pub mod reflect;
+pub mod signal_handler;
 pub mod sync;
 pub mod types;
 
@@ -71,7 +71,7 @@ impl PluginGroup for CommonPlugins {
             .add(CommunicationTypes)
             .add(ChangeDetectionPlugin)
             .add(ChangeApplicationPlugin)
-            .add(CtrlCPlugin)
+            .add(SignalPlugin)
             .add(ErrorPlugin)
             .add(OverRunPligin)
     }

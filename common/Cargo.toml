@@ -27,7 +27,7 @@ tracing = { workspace = true }
 rand = { workspace = true }
 ahash = { workspace = true }
 
-ctrlc = { workspace = true }
+signal-hook = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
