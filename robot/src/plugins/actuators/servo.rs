@@ -13,7 +13,7 @@ use common::{
 use motor_math::motor_preformance::MotorData;
 
 use crate::{
-    config::{RobotConfig, Servo},
+    config::{ConfigServo, RobotConfig},
     plugins::core::robot::{LocalRobot, LocalRobotMarker},
 };
 
@@ -46,7 +46,7 @@ fn create_servos(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
 
     for (
         name,
-        &Servo {
+        &ConfigServo {
             channel,
             ref camera,
             ref constraints,

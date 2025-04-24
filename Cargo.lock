@@ -6720,6 +6720,7 @@ dependencies = [
  "serde",
  "stable_hashmap",
  "sysinfo 0.29.11",
+ "thiserror 2.0.12",
  "tokio",
  "toml",
  "tracing",

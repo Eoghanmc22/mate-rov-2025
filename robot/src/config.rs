@@ -29,7 +29,7 @@ pub struct RobotConfig {
     pub imu_offset: ConfigRotation,
 
     #[serde(default)]
-    pub cameras: HashMap<String, CameraDefinition>,
+    pub camera_config: CameraConfigDefinition,
 
     #[serde(default)]
     pub pid_configs: HashMap<PidAxis, PidConfig>,
@@ -242,33 +242,38 @@ impl MotorConfigDefinition {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ServoConfigDefinition {
-    pub servos: HashMap<String, Servo>,
+    pub servos: HashMap<String, ConfigServo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Servo {
+pub struct ConfigServo {
     pub channel: LocalMotorId,
     pub signal_type: MotorSignalType,
     // pub cameras: HashSet<String>,
     pub camera: Option<String>,
-    pub constraints: Option<ServoConstraints>,
+    pub constraints: Option<ConfigServoConstraints>,
     pub control_mode: Option<MotorContributionMode>,
     pub slew_rate: Option<MotorSlewRate>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServoConstraints {
+pub struct ConfigServoConstraints {
     pub min: f32,
     pub max: f32,
 }
 
-#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
-pub struct CameraDefinition {
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CameraConfigDefinition {
+    pub cameras: HashMap<String, ConfigCamera>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigCamera {
     pub name: String,
     pub transform: ConfigTransform,
 }
 
-#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigTransform {
     position: ConfigPosition,
     rotation: ConfigRotation,
@@ -281,7 +286,7 @@ impl ConfigTransform {
     }
 }
 
-#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigPosition {
     x: f32,
     y: f32,
@@ -296,7 +301,7 @@ impl ConfigPosition {
     }
 }
 
-#[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConfigRotation {
     yaw: f32,
     pitch: f32,
