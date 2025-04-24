@@ -351,7 +351,7 @@ fn net_read(
 
                 peers.by_addrs.remove(&peer.addrs);
 
-                cmds.entity(entity).despawn();
+                // cmds.entity(entity).despawn();
                 if let Some(owned_entities) = entity_map.forign_owned.remove(&token) {
                     for entity in owned_entities {
                         let forign = entity_map.local_to_forign.remove(&entity);
@@ -399,6 +399,7 @@ fn spawn_peer_entities(
     mut cmds: Commands,
     frame: Res<FrameCount>,
     mut peers: ResMut<Peers>,
+    mut entity_map: ResMut<EntityMap>,
     query: Query<(Entity, &ForignOwned), Added<Singleton>>,
 ) {
     let peers = &mut *peers;
@@ -434,6 +435,12 @@ fn spawn_peer_entities(
 
             peers.by_token.insert(token, entity);
             peers.by_addrs.insert(addrs, entity);
+
+            entity_map
+                .forign_owned
+                .entry(token)
+                .or_default()
+                .insert(entity);
         });
 }
 
