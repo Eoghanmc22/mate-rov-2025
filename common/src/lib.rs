@@ -1,5 +1,5 @@
 //! Code shared between both the surface and robot projects
-#![feature(try_blocks, hash_extract_if)]
+#![feature(try_blocks)]
 #![allow(clippy::type_complexity)]
 
 use bevy::{
