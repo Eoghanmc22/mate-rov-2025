@@ -178,7 +178,8 @@ fn setup_networking(
 
             // Set up mdns service broadcasting
             let hostname = hostname::get().context("Lookup hostname")?;
-            let hostname = dbg!(hostname.to_str().unwrap());
+            let hostname = hostname.to_str().unwrap();
+            info!("Device hostname: {hostname}");
             let instance_name = &name.0;
 
             let service_info = ServiceInfo::new(
