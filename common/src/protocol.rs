@@ -5,11 +5,12 @@ use bincode::{DefaultOptions, Options};
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
-use crate::ecs_sync::SerializedChange;
+use crate::{ecs_sync::SerializedChange, git::GitMetadata};
 
 /// Representation of all messages that can be communicated between peers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Protocol {
+    GitMetadata(GitMetadata),
     EcsUpdate(SerializedChange),
     /// Asks the peer to reply with a Pong, used to measure communication latency
     Ping {

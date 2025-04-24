@@ -2,6 +2,7 @@
 name = "common"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
 
 [dependencies]
 motor_math = { workspace = true, features = ["glam"] }
@@ -27,6 +28,10 @@ rand = { workspace = true }
 ahash = { workspace = true }
 
 ctrlc = { workspace = true }
+
+[build-dependencies]
+anyhow = { workspace = true }
+vergen-gix = { workspace = true }
 
 [features]
 tracy_frame_mark = []

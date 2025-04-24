@@ -15,6 +15,7 @@ use ecs_sync::{
     NetId, Replicate,
 };
 use error::ErrorPlugin;
+use git::GitMetadata;
 use over_run::OverRunPligin;
 use sync::{Latency, SyncPlugin, SyncRole};
 
@@ -25,6 +26,7 @@ pub mod ctrlc;
 pub mod ecs_sync;
 pub mod error;
 pub mod events;
+pub mod git;
 pub mod over_run;
 pub mod protocol;
 pub mod reflect;
@@ -41,7 +43,8 @@ impl Plugin for CommunicationTypes {
 
         app.register_type::<NetId>()
             .register_type::<Replicate>()
-            .register_type::<Latency>();
+            .register_type::<Latency>()
+            .register_type::<GitMetadata>();
         // .register_type::<Peer>();
 
         app.replicate::<Transform>().replicate_reflect::<Name>();

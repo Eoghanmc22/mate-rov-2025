@@ -11,6 +11,7 @@ use crate::{
         ForignOwned, NetId, NetTypeId, SerializationSettings, SerializedChange,
         SerializedChangeInEvent, SerializedChangeOutEvent,
     },
+    git::GitMetadata,
     protocol::Protocol,
     InstanceName,
 };
@@ -81,7 +82,7 @@ pub struct Peers {
     by_addrs: HashMap<SocketAddr, Entity>,
 
     // In frames
-    pending: HashMap<NetToken, (SocketAddr, u32)>,
+    pending: HashMap<NetToken, (SocketAddr, u32, Option<GitMetadata>)>,
 
     // TODO: This is kinda bad
     pub(crate) valid_tokens: HashSet<NetToken>,
@@ -281,7 +282,7 @@ fn net_read(
                 info!(?token, ?addrs, "Peer connected");
 
                 new_peers.send(SyncPeer(token));
-                peers.pending.insert(token, (addrs, frame.0));
+                peers.pending.insert(token, (addrs, frame.0, None));
 
                 peers.valid_tokens.insert(token);
             }
@@ -314,6 +315,19 @@ fn net_read(
 
                     latency.last_acknowledged = sent.into();
                     latency.ping = Some(frame.wrapping_sub(sent));
+                }
+                Protocol::GitMetadata(git_metadata) => {
+                    if Some(&git_metadata) != GitMetadata::new().as_ref() {
+                        warn!("Git metadata mismatch with peer!");
+                    } else {
+                        info!("Git metadata matches with peer");
+                    }
+
+                    let Some(pending_peer) = peers.pending.get_mut(&token) else {
+                        error!("Got git metadata for a peer that is not pending");
+                        continue;
+                    };
+                    pending_peer.2 = Some(git_metadata);
                 }
             },
             NetEvent::Error(token, error) => {
@@ -393,9 +407,13 @@ fn spawn_peer_entities(
         let token = NetToken(owner.0);
         let data = peers.pending.remove(&token);
 
-        if let Some((addrs, _)) = data {
-            cmds.entity(entity)
-                .insert((Peer { addrs, token }, Latency::default()));
+        if let Some((addrs, _, git_meta)) = data {
+            let mut entity_cmds = cmds.entity(entity);
+            entity_cmds.insert((Peer { addrs, token }, Latency::default()));
+
+            if let Some(git_meta) = git_meta {
+                entity_cmds.insert(git_meta);
+            }
 
             peers.by_token.insert(token, entity);
             peers.by_addrs.insert(addrs, entity);
@@ -405,9 +423,14 @@ fn spawn_peer_entities(
     let frame = frame.0;
     peers
         .pending
-        .extract_if(|_, (_, time)| frame.wrapping_sub(*time) > SINGLETON_DEADLINE)
-        .for_each(|(token, (addrs, _))| {
-            let entity = cmds.spawn((Peer { addrs, token }, Latency::default())).id();
+        .extract_if(|_, (_, time, _)| frame.wrapping_sub(*time) > SINGLETON_DEADLINE)
+        .for_each(|(token, (addrs, _, git_meta))| {
+            let mut entity_cmds = cmds.spawn((Peer { addrs, token }, Latency::default()));
+            let entity = entity_cmds.id();
+
+            if let Some(git_meta) = git_meta {
+                entity_cmds.insert(git_meta);
+            }
 
             peers.by_token.insert(token, entity);
             peers.by_addrs.insert(addrs, entity);
@@ -577,6 +600,17 @@ fn sync_new_peers(
     mut errors: EventWriter<ErrorEvent>,
 ) {
     'outer: for &SyncPeer(peer) in new_peers.read() {
+        if let Some(git_meta) = GitMetadata::new() {
+            let rst = net.0.send_packet(peer, Protocol::GitMetadata(git_meta));
+
+            if rst.is_err() {
+                errors.send(anyhow!("Could not send sync packet").into());
+                continue 'outer;
+            }
+        } else {
+            error!("Could not send git metadata to peer");
+        }
+
         for entity in deltas.entities.keys() {
             let rst = net.0.send_packet(
                 peer,

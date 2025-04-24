@@ -5,4 +5,5 @@ fn main() {
             println!("cargo:rustc-cfg=rpi");
         }
     }
+    println!("cargo:rerun-if-changed=build.rs");
 }

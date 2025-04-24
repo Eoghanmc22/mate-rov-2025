@@ -76,9 +76,9 @@ ahash = "0.8"
 time = { version = "0.3", features = ["local-offset", "formatting"] }
 opencv = "0.94"
 itertools = "0.14"
-# *brings in all of tokio for a single function*
 tokio = { version = "1", features = ["full"] }
 crossbeam = "0.8"
+vergen-gix = "1"
 
 
 # Enable a small amount of optimization in debug mode
