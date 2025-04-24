@@ -81,12 +81,8 @@ crossbeam = "0.8"
 vergen-gix = "1"
 
 
-# Enable a small amount of optimization in debug mode
+# Enable code optimization in debug
 [profile.dev]
-opt-level = 1
-
-# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
-[profile.dev.package."*"]
 opt-level = 3
 
 [profile.release]
