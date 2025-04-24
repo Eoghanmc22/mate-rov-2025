@@ -103,7 +103,7 @@ pub struct Latency {
 }
 
 #[derive(Resource)]
-pub struct MdnsDaemon(ServiceDaemon);
+pub struct MdnsDaemon(ServiceDaemon, Option<String>);
 
 #[derive(Resource)]
 pub struct MdnsBrowse(flume::Receiver<ServiceEvent>);
@@ -164,7 +164,7 @@ fn setup_networking(
 
     let mdns = ServiceDaemon::new().context("Could not create mdns daemon")?;
 
-    match &*role {
+    let service_name = match &*role {
         SyncRole::Server { port } => {
             // Bind server socket
             let bind = (Ipv4Addr::new(0, 0, 0, 0), *port)
@@ -192,9 +192,13 @@ fn setup_networking(
             .context("Create service info")?
             .enable_addr_auto();
 
+            let full_name = service_info.get_fullname().to_owned();
+
             info!("Begin broadcasting service");
             mdns.register(service_info)
                 .context("Register mdns service")?;
+
+            Some(full_name)
         }
         SyncRole::Client => {
             // Set up mdns service discovery
@@ -202,10 +206,12 @@ fn setup_networking(
             let mdns_events = mdns.browse(SERVICE_TYPE).context("Begin search for peer")?;
             cmds.insert_resource(MdnsBrowse(mdns_events));
             cmds.init_resource::<MdnsPeers>();
-        }
-    }
 
-    cmds.insert_resource(MdnsDaemon(mdns));
+            None
+        }
+    };
+
+    cmds.insert_resource(MdnsDaemon(mdns, service_name));
 
     Ok(())
 }
@@ -462,6 +468,12 @@ fn shutdown(
         }
 
         if let Some(mdns) = &mdns {
+            if let Some(full_name) = &mdns.1 {
+                let rst = mdns.0.unregister(full_name);
+                if rst.is_err() {
+                    errors.send(anyhow!("Could not mdns daemon").into());
+                }
+            }
             let rst = mdns.0.shutdown();
             if rst.is_err() {
                 errors.send(anyhow!("Could not mdns daemon").into());
