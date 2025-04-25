@@ -67,6 +67,7 @@ pub struct InputInterpolation {
 
     translate_gain: Vec3A,
     torque_gain: Vec3A,
+    torque_gain_stabalize: Vec3A,
 }
 
 impl InputInterpolation {
@@ -83,6 +84,7 @@ impl InputInterpolation {
             scale: 0.8,
             translate_gain: vec3a(1.0, 1.0, 1.0),
             torque_gain: vec3a(1.0, 1.0, 0.5),
+            torque_gain_stabalize: vec3a(1.0, 1.0, 0.1),
         }
     }
 
@@ -95,6 +97,7 @@ impl InputInterpolation {
             scale: 0.3,
             translate_gain: vec3a(1.0, 1.0, 1.0),
             torque_gain: vec3a(1.0, 1.0, 0.5),
+            torque_gain_stabalize: vec3a(1.0, 1.0, 0.1),
         }
     }
 }
@@ -303,6 +306,12 @@ fn movement(
             continue;
         };
 
+        let torque_gain = if orientation_target.is_some() {
+            interpolation.torque_gain_stabalize
+        } else {
+            interpolation.torque_gain
+        };
+
         let x = interpolation.interpolate_input(
             action_state.value(&Action::Sway) - action_state.value(&Action::SwayInverted),
         ) * maximums[&Axis::X].0
@@ -320,16 +329,16 @@ fn movement(
             action_state.button_value(&Action::Pitch)
                 - action_state.button_value(&Action::PitchInverted),
         ) * maximums[&Axis::XRot].0
-            * interpolation.torque_gain.x;
+            * torque_gain.x;
         let y_rot = interpolation.interpolate_input(
             action_state.button_value(&Action::Roll)
                 - action_state.button_value(&Action::RollInverted),
         ) * maximums[&Axis::YRot].0
-            * interpolation.torque_gain.y;
+            * torque_gain.y;
         let z_rot = interpolation.interpolate_input(
             -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
         ) * maximums[&Axis::ZRot].0
-            * interpolation.torque_gain.z;
+            * torque_gain.z;
 
         // TODO: We should never zero the z input, this should instead allow switching between
         // interperting z as local vs global
