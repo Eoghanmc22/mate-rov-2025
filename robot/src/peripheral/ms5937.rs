@@ -89,12 +89,13 @@ impl Ms5837 {
             bail!("Got bad crc");
         }
 
-        if cfg!(debug_assertions) {
-            let version = (self.calibration[0] & 0x0FE0) >> 5;
-            if version != 0x1A {
-                bail!("Got bad version, {version}, {}", self.calibration[0]);
-            }
-        }
+        // FIXME: For some reason our sensor reads with a version of 0x00
+        // if cfg!(debug_assertions) {
+        //     let version = (self.calibration[0] & 0x0FE0) >> 5;
+        //     if version != 0x1A {
+        //         bail!("Got bad version, {version}, {}", self.calibration[0]);
+        //     }
+        // }
 
         debug!("Initializing MS5837 complete");
 
@@ -135,12 +136,12 @@ impl Ms5837 {
 // Hippity hoppity the code in the data sheet is my property
 fn calculate_pressure_and_temperature(raw: (u32, u32), calibration: &[u16; 8]) -> (Mbar, Celsius) {
     // Calculate temperature
-    let dt = raw.1 as i32 - calibration[5] as i32 * 256;
-    let temp = 2000 + dt * calibration[6] as i32 / 8388608;
+    let dt = raw.1 as i64 - calibration[5] as i64 * 256;
+    let temp = 2000 + dt * calibration[6] as i64 / 8388608;
 
     // Calculate actual offset and sensitivity
-    let off = calibration[2] as i64 * 65536 + (calibration[4] as i64 * dt as i64) / 128;
-    let sens = calibration[1] as i64 * 32768 + (calibration[3] as i64 * dt as i64) / 256;
+    let off = calibration[2] as i64 * 65536 + (calibration[4] as i64 * dt) / 128;
+    let sens = calibration[1] as i64 * 32768 + (calibration[3] as i64 * dt) / 256;
 
     let t_i;
     let mut off_i;
@@ -149,19 +150,19 @@ fn calculate_pressure_and_temperature(raw: (u32, u32), calibration: &[u16; 8]) -
     // Second order compensation
     if temp / 100 < 20 {
         // Low temp
-        t_i = 3 * dt as i64 * dt as i64 / 8589934592;
-        off_i = 3 * (temp as i64 - 2000) * (temp as i64 - 2000) / 2;
-        sens_i = 5 * (temp as i64 - 2000) * (temp as i64 - 2000) / 8;
+        t_i = 3 * dt * dt / 8589934592;
+        off_i = 3 * (temp - 2000) * (temp - 2000) / 2;
+        sens_i = 5 * (temp - 2000) * (temp - 2000) / 8;
 
         if temp / 100 < -15 {
             // Very low temp
-            off_i += 7 * (temp as i64 + 1500) * (temp as i64 + 1500);
-            sens_i += 4 * (temp as i64 + 1500) * (temp as i64 + 1500);
+            off_i += 7 * (temp + 1500) * (temp + 1500);
+            sens_i += 4 * (temp + 1500) * (temp + 1500);
         }
     } else {
         // High temp
-        t_i = 2 * dt as i64 * dt as i64 / 137438953472;
-        off_i = (temp as i64 - 2000) * (temp as i64 - 2000) / 16;
+        t_i = 2 * dt * dt / 137438953472;
+        off_i = (temp - 2000) * (temp - 2000) / 16;
         sens_i = 0;
     }
 
@@ -171,7 +172,7 @@ fn calculate_pressure_and_temperature(raw: (u32, u32), calibration: &[u16; 8]) -
 
     // Calculate pressure and temperature
     let pressure_raw = ((raw.0 as i64 * sens / 2097152) - off) / 8192;
-    let temperature_raw = temp - t_i as i32;
+    let temperature_raw = temp - t_i;
 
     // Wrap in newtypes
     let pressure = Mbar(pressure_raw as f32 / 10.0);

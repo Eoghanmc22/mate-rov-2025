@@ -158,7 +158,7 @@ fn start_dc_motor_thread(
                     un_acked_pings = 0;
                 }
 
-                tx_id += 1;
+                tx_id = tx_id.wrapping_add(1);
 
                 // TODO: explode if un_acked_pings passes a threshold
             }
