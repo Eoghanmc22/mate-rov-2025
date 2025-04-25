@@ -97,4 +97,12 @@ impl PidController {
     pub fn reset(&mut self) {
         *self = Default::default();
     }
+
+    pub fn last_error(&self) -> f32 {
+        self.last_error.unwrap_or_default()
+    }
+
+    pub fn integral(&self) -> f32 {
+        self.integral
+    }
 }

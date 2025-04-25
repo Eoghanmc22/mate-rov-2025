@@ -12,9 +12,9 @@ use common::{
     components::{
         ActualMovement, Armed, CameraDefinition, CurrentDraw, DepthMeasurement, DepthTarget,
         DisableMovementApi, GenericMotorId, MeasuredVoltage, MotorRawSignalRange, MotorSignal,
-        MovementAxisMaximums, MovementContribution, OrientationTarget, PidResult, Robot, RobotId,
-        SystemCpuTotal, SystemLoadAverage, SystemMemory, SystemTemperatures, TargetMovement,
-        TempertureMeasurement, ThrusterDefinition,
+        MovementAxisMaximums, MovementContribution, OrientationTarget, PidController, PidResult,
+        Robot, RobotId, SystemCpuTotal, SystemLoadAverage, SystemMemory, SystemTemperatures,
+        TargetMovement, TempertureMeasurement, ThrusterDefinition,
     },
     ecs_sync::{NetId, Replicate},
     events::{CalibrateSeaLevel, ResetServos, ResetYaw, ResyncCameras},
@@ -1086,7 +1086,15 @@ fn current_draw_debug(
 }
 
 #[derive(Component, Default)]
-struct PidData(HashMap<PidAxis, PidDataEntry>);
+struct PidData {
+    log: HashMap<PidAxis, PidDataEntry>,
+    show_total: bool,
+    show_error: bool,
+    show_filtered_error: bool,
+    show_kp: bool,
+    show_ki: bool,
+    show_kd: bool,
+}
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 enum PidAxis {
@@ -1098,6 +1106,7 @@ enum PidAxis {
 
 struct PidDataEntry {
     error: VecDeque<PlotPoint>,
+    filtered_error: VecDeque<PlotPoint>,
     total: VecDeque<PlotPoint>,
     kp: VecDeque<PlotPoint>,
     ki: VecDeque<PlotPoint>,
@@ -1108,6 +1117,7 @@ impl Default for PidDataEntry {
     fn default() -> Self {
         Self {
             error: VecDeque::with_capacity(PID_SAMPLES + 5),
+            filtered_error: VecDeque::with_capacity(PID_SAMPLES + 5),
             total: VecDeque::with_capacity(PID_SAMPLES + 5),
             kp: VecDeque::with_capacity(PID_SAMPLES + 5),
             ki: VecDeque::with_capacity(PID_SAMPLES + 5),
@@ -1140,7 +1150,7 @@ fn pid_helper(
         (With<PidHelper>, Without<Robot>),
     >,
 
-    pid_controllers: Query<(&Name, &PidResult, &RobotId), Without<PidData>>,
+    pid_controllers: Query<(&Name, &PidResult, &PidController, &RobotId), Without<PidData>>,
 
     robots: Query<(&Name, &RobotId, &MovementAxisMaximums), With<Robot>>,
     // motors: Query<(Entity, Option<&PwmSignal>, &PwmChannel, &RobotId)>,
@@ -1179,10 +1189,17 @@ fn pid_helper(
                     return;
                 };
 
+                ui.toggle_value(&mut data.show_total, "Show Total");
+                ui.toggle_value(&mut data.show_error, "Show Error");
+                ui.toggle_value(&mut data.show_filtered_error, "Show Filtered");
+                ui.toggle_value(&mut data.show_kp, "Show kp");
+                ui.toggle_value(&mut data.show_ki, "Show ki");
+                ui.toggle_value(&mut data.show_kd, "Show kd");
+
                 ui.horizontal(|ui| {
-                    let yaw = ui.selectable_label(data.0.contains_key(&PidAxis::Yaw), "Yaw");
+                    let yaw = ui.selectable_label(data.log.contains_key(&PidAxis::Yaw), "Yaw");
                     if yaw.clicked() {
-                        match data.0.entry(PidAxis::Yaw) {
+                        match data.log.entry(PidAxis::Yaw) {
                             Entry::Occupied(occupied_entry) => {
                                 occupied_entry.remove();
                             }
@@ -1192,9 +1209,10 @@ fn pid_helper(
                         }
                     }
 
-                    let pitch = ui.selectable_label(data.0.contains_key(&PidAxis::Pitch), "Pitch");
+                    let pitch =
+                        ui.selectable_label(data.log.contains_key(&PidAxis::Pitch), "Pitch");
                     if pitch.clicked() {
-                        match data.0.entry(PidAxis::Pitch) {
+                        match data.log.entry(PidAxis::Pitch) {
                             Entry::Occupied(occupied_entry) => {
                                 occupied_entry.remove();
                             }
@@ -1204,9 +1222,9 @@ fn pid_helper(
                         }
                     }
 
-                    let roll = ui.selectable_label(data.0.contains_key(&PidAxis::Roll), "Roll");
+                    let roll = ui.selectable_label(data.log.contains_key(&PidAxis::Roll), "Roll");
                     if roll.clicked() {
-                        match data.0.entry(PidAxis::Roll) {
+                        match data.log.entry(PidAxis::Roll) {
                             Entry::Occupied(occupied_entry) => {
                                 occupied_entry.remove();
                             }
@@ -1216,9 +1234,10 @@ fn pid_helper(
                         }
                     }
 
-                    let depth = ui.selectable_label(data.0.contains_key(&PidAxis::Depth), "Depth");
+                    let depth =
+                        ui.selectable_label(data.log.contains_key(&PidAxis::Depth), "Depth");
                     if depth.clicked() {
-                        match data.0.entry(PidAxis::Depth) {
+                        match data.log.entry(PidAxis::Depth) {
                             Entry::Occupied(occupied_entry) => {
                                 occupied_entry.remove();
                             }
@@ -1229,7 +1248,7 @@ fn pid_helper(
                     }
                 });
 
-                for (axis, entry) in data.0.iter_mut() {
+                for (axis, entry) in data.log.iter_mut() {
                     let controller_name = match axis {
                         PidAxis::Yaw => "Stabalize Yaw",
                         PidAxis::Pitch => "Stabalize Pitch",
@@ -1237,13 +1256,17 @@ fn pid_helper(
                         PidAxis::Depth => "Stabalize Depth",
                     };
 
-                    let pid_result = pid_controllers.iter().find(|(name, _, robot_id)| {
+                    let pid_result = pid_controllers.iter().find(|(name, _, _, robot_id)| {
                         **robot_id == *selected_robot && name.as_str() == controller_name
                     });
-                    if let Some((_, pid_result, _)) = pid_result {
+                    if let Some((_, pid_result, pid_controller, _)) = pid_result {
                         entry
                             .error
                             .push_back(PlotPoint::new(time.elapsed_secs_f64(), pid_result.error));
+                        entry.filtered_error.push_back(PlotPoint::new(
+                            time.elapsed_secs_f64(),
+                            pid_controller.last_error(),
+                        ));
                         entry.total.push_back(PlotPoint::new(
                             time.elapsed_secs_f64(),
                             pid_result.correction,
@@ -1260,6 +1283,10 @@ fn pid_helper(
 
                         while entry.error.len() > PID_SAMPLES {
                             entry.error.pop_front();
+                        }
+
+                        while entry.filtered_error.len() > PID_SAMPLES {
+                            entry.filtered_error.pop_front();
                         }
 
                         while entry.total.len() > PID_SAMPLES {
@@ -1280,60 +1307,82 @@ fn pid_helper(
                     }
                 }
 
-                for (axis, entry) in data.0.iter() {
+                for (axis, entry) in data.log.iter() {
                     ui.label(format!("{axis:?} Plot"));
                     Plot::new(format!("Pid Tuning Plot {axis:?}"))
                         .height(300.0)
                         .show(ui, |plot| {
-                            let (first, second) = entry.error.as_slices();
-                            plot.add(
-                                Line::new(format!("{axis:?}, error"), first)
-                                    .stroke((1.5, Color32::BROWN)),
-                            );
-                            plot.add(
-                                Line::new(format!("{axis:?}, error"), second)
-                                    .stroke((1.5, Color32::BROWN)),
-                            );
+                            if data.show_error {
+                                let (first, second) = entry.error.as_slices();
+                                plot.add(
+                                    Line::new(format!("{axis:?}, error"), first)
+                                        .stroke((1.5, Color32::BROWN)),
+                                );
+                                plot.add(
+                                    Line::new(format!("{axis:?}, error"), second)
+                                        .stroke((1.5, Color32::BROWN)),
+                                );
+                            }
 
-                            let (first, second) = entry.total.as_slices();
-                            plot.add(
-                                Line::new(format!("{axis:?}, total"), first)
-                                    .stroke((1.5, Color32::BLACK)),
-                            );
-                            plot.add(
-                                Line::new(format!("{axis:?}, total"), second)
-                                    .stroke((1.5, Color32::BLACK)),
-                            );
+                            if data.show_filtered_error {
+                                let (first, second) = entry.filtered_error.as_slices();
+                                plot.add(
+                                    Line::new(format!("{axis:?}, filtered error"), first)
+                                        .stroke((1.5, Color32::BROWN)),
+                                );
+                                plot.add(
+                                    Line::new(format!("{axis:?}, filtered error"), second)
+                                        .stroke((1.5, Color32::BROWN)),
+                                );
+                            }
 
-                            let (first, second) = entry.kp.as_slices();
-                            plot.add(
-                                Line::new(format!("{axis:?}, kp"), first)
-                                    .stroke((1.5, Color32::RED)),
-                            );
-                            plot.add(
-                                Line::new(format!("{axis:?}, kp"), second)
-                                    .stroke((1.5, Color32::RED)),
-                            );
+                            if data.show_total {
+                                let (first, second) = entry.total.as_slices();
+                                plot.add(
+                                    Line::new(format!("{axis:?}, total"), first)
+                                        .stroke((1.5, Color32::BLACK)),
+                                );
+                                plot.add(
+                                    Line::new(format!("{axis:?}, total"), second)
+                                        .stroke((1.5, Color32::BLACK)),
+                                );
+                            }
 
-                            let (first, second) = entry.ki.as_slices();
-                            plot.add(
-                                Line::new(format!("{axis:?}, ki"), first)
-                                    .stroke((1.5, Color32::GREEN)),
-                            );
-                            plot.add(
-                                Line::new(format!("{axis:?}, ki"), second)
-                                    .stroke((1.5, Color32::GREEN)),
-                            );
+                            if data.show_kp {
+                                let (first, second) = entry.kp.as_slices();
+                                plot.add(
+                                    Line::new(format!("{axis:?}, kp"), first)
+                                        .stroke((1.5, Color32::RED)),
+                                );
+                                plot.add(
+                                    Line::new(format!("{axis:?}, kp"), second)
+                                        .stroke((1.5, Color32::RED)),
+                                );
+                            }
 
-                            let (first, second) = entry.kd.as_slices();
-                            plot.add(
-                                Line::new(format!("{axis:?}, kd"), first)
-                                    .stroke((1.5, Color32::BLUE)),
-                            );
-                            plot.add(
-                                Line::new(format!("{axis:?}, kd"), second)
-                                    .stroke((1.5, Color32::BLUE)),
-                            );
+                            if data.show_ki {
+                                let (first, second) = entry.ki.as_slices();
+                                plot.add(
+                                    Line::new(format!("{axis:?}, ki"), first)
+                                        .stroke((1.5, Color32::GREEN)),
+                                );
+                                plot.add(
+                                    Line::new(format!("{axis:?}, ki"), second)
+                                        .stroke((1.5, Color32::GREEN)),
+                                );
+                            }
+
+                            if data.show_kd {
+                                let (first, second) = entry.kd.as_slices();
+                                plot.add(
+                                    Line::new(format!("{axis:?}, kd"), first)
+                                        .stroke((1.5, Color32::BLUE)),
+                                );
+                                plot.add(
+                                    Line::new(format!("{axis:?}, kd"), second)
+                                        .stroke((1.5, Color32::BLUE)),
+                                );
+                            }
                         });
 
                     ui.add_space(7.0);
