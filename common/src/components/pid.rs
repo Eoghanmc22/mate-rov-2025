@@ -14,6 +14,8 @@ pub struct PidConfig {
     pub ki: f32,
     pub kd: f32,
 
+    pub d_alpha: f32,
+
     pub i_zone: f32,
     pub max_integral: f32,
     pub max_output: f32,
@@ -34,6 +36,7 @@ pub struct PidResult {
 #[reflect(Serialize, Deserialize, Debug, Default)]
 pub struct PidController {
     last_error: Option<f32>,
+    last_derivative: Option<f32>,
     integral: f32,
 }
 
@@ -41,6 +44,7 @@ impl PidController {
     pub fn new() -> Self {
         Self {
             last_error: None,
+            last_derivative: None,
             integral: 0.0,
         }
     }
@@ -54,8 +58,13 @@ impl PidController {
 
         let proportional = error;
         let integral = self.integral;
-        let derivative = (error - self.last_error.unwrap_or(error)) / interval;
+        let mut derivative = (error - self.last_error.unwrap_or(error)) / interval;
 
+        if let Some(last_derivative) = self.last_derivative {
+            derivative = derivative * config.d_alpha + last_derivative * (1.0 - config.d_alpha);
+        }
+
+        self.last_derivative = Some(derivative);
         self.last_error = Some(error);
 
         let p = cfg.kp * proportional;
