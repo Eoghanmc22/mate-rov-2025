@@ -59,13 +59,14 @@ pub struct SelectedServo {
 #[derive(Component, Debug, Clone, Copy, Reflect, PartialEq)]
 pub struct InputInterpolation {
     depth_mps: f32,
-    trim_dps: f32,
+    trim_dps: Vec3A,
     servo_rate: f32,
 
     power: f32,
     scale: f32,
 
     translate_gain: Vec3A,
+    translate_gain_depth_hold: Vec3A,
     torque_gain: Vec3A,
     torque_gain_stabalize: Vec3A,
 }
@@ -78,26 +79,28 @@ impl InputInterpolation {
     pub const fn normal() -> Self {
         Self {
             depth_mps: 0.3,
-            trim_dps: 100.0,
+            trim_dps: vec3a(35.0, 35.0, 100.0),
             servo_rate: 1.5,
             power: 3.0,
             scale: 0.8,
             translate_gain: vec3a(1.0, 1.0, 1.0),
+            translate_gain_depth_hold: vec3a(1.0, 1.0, 0.1),
             torque_gain: vec3a(1.0, 1.0, 0.5),
-            torque_gain_stabalize: vec3a(1.0, 1.0, 0.1),
+            torque_gain_stabalize: vec3a(0.0, 0.0, 0.0),
         }
     }
 
     pub const fn precision() -> Self {
         Self {
             depth_mps: 0.2,
-            trim_dps: 60.0,
+            trim_dps: vec3a(25.0, 25.0, 60.0),
             servo_rate: 1.0,
             power: 3.0,
             scale: 0.3,
             translate_gain: vec3a(1.0, 1.0, 1.0),
+            translate_gain_depth_hold: vec3a(1.0, 1.0, 0.0),
             torque_gain: vec3a(1.0, 1.0, 0.5),
-            torque_gain_stabalize: vec3a(1.0, 1.0, 0.1),
+            torque_gain_stabalize: vec3a(0.0, 0.0, 0.0),
         }
     }
 }
@@ -306,6 +309,12 @@ fn movement(
             continue;
         };
 
+        let translate_gain = if depth_target.is_some() {
+            interpolation.translate_gain_depth_hold
+        } else {
+            interpolation.translate_gain
+        };
+
         let torque_gain = if orientation_target.is_some() {
             interpolation.torque_gain_stabalize
         } else {
@@ -315,15 +324,15 @@ fn movement(
         let x = interpolation.interpolate_input(
             action_state.value(&Action::Sway) - action_state.value(&Action::SwayInverted),
         ) * maximums[&Axis::X].0
-            * interpolation.translate_gain.x;
+            * translate_gain.x;
         let y = interpolation.interpolate_input(
             action_state.value(&Action::Surge) - action_state.value(&Action::SurgeInverted),
         ) * maximums[&Axis::Y].0
-            * interpolation.translate_gain.y;
+            * translate_gain.y;
         let z = interpolation.interpolate_input(
             action_state.value(&Action::Heave) - action_state.value(&Action::HeaveInverted),
         ) * maximums[&Axis::Z].0
-            * interpolation.translate_gain.z;
+            * translate_gain.z;
 
         let x_rot = interpolation.interpolate_input(
             action_state.button_value(&Action::Pitch)
@@ -359,11 +368,11 @@ fn movement(
                     // yaw *= Quat::from_rotation_y(180f32.to_radians()).inverse();
                 }
 
-                let world_force = yaw * vec3a(x, y, 0.0);
+                let world_force = yaw * vec3a(x, y, z);
 
                 orientation.0.inverse() * world_force
             } else {
-                vec3a(x, y, 0.0)
+                vec3a(x, y, z)
             }
         } else {
             vec3a(x, y, z)
@@ -525,17 +534,17 @@ fn trim_orientation(
             };
 
             if pitch.abs() >= 0.05 {
-                let input = pitch * interpolation.trim_dps * time.delta_secs();
+                let input = pitch * interpolation.trim_dps.x * time.delta_secs();
                 orientation_target = orientation_target * Quat::from_rotation_x(input.to_radians());
             }
 
             if roll.abs() >= 0.05 {
-                let input = roll * interpolation.trim_dps * time.delta_secs();
+                let input = roll * interpolation.trim_dps.y * time.delta_secs();
                 orientation_target = orientation_target * Quat::from_rotation_y(input.to_radians());
             }
 
             if yaw.abs() >= 0.05 {
-                let input = yaw * interpolation.trim_dps * time.delta_secs();
+                let input = yaw * interpolation.trim_dps.z * time.delta_secs();
                 orientation_target = Quat::from_rotation_z(input.to_radians()) * orientation_target;
             }
 
