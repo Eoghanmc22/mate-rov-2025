@@ -286,11 +286,10 @@ fn handle_video_processors(
 
 /// Generates the gstreamer pipeline to recieve data from `camera`
 fn gen_src(camera: &CameraDefinition) -> String {
-    let ip = camera.location.ip();
-    let port = camera.location.port();
-
-    format!("udpsrc address={ip} port={port} caps=application/x-rtp,payload=96 ! rtph264depay ! avdec_h264 discard-corrupted-frames=true ! videoconvert ! video/x-raw,format=BGR ! appsink async=false sync=false drop=1")
-    // format!("udpsrc address={ip} port={port} caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=H264,a-framerate=30,payload=96 ! rtph264depay ! h264parse ! vaapih264dec ! videoconvert ! video/x-raw,format=BGR ! appsink drop=1")
+    format!(
+        "{} ! videoconvert ! video/x-raw,format=BGR ! appsink async=false sync=false drop=1",
+        camera.preliminary_pipeline
+    )
 }
 
 /// Efficiently converts opencv `Mat`s to bevy `Image`s

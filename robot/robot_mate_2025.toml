@@ -59,27 +59,72 @@ Claw2 = { channel = { DcChannel = 1 }, signal_type = "Velocity", constraints = {
 Claw3 = { channel = { DcChannel = 2 }, signal_type = "Velocity", constraints = { min = -1.0, max = 1.0 }, slew_rate = { Percent = 5.0 } }
 Lights = { channel = { DcChannel = 3 }, signal_type = "Position", control_mode = "FirstOrder", constraints = { min = 0.0, max = 0.75 } }
 
-
-[camera_config.cameras."/dev/video2"]
-name = "Top Left"
+[camera_config.cameras."Top Left"]
+camera = { width = 1920, height = 1080, frame_rate = [30, 1], device = "Test" }
 transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
 
-[camera_config.cameras."/dev/video6"]
-name = "Top Right"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+# [camera_config.cameras."Top Left"]
+# camera = { width = 1920, height = 1080, frame_rate = [
+#   30,
+#   1,
+# ], device = { H264V4l2 = "/dev/video2" } }
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."Top Right"]
+# camera = { width = 1920, height = 1080, frame_rate = [
+#   30,
+#   1,
+# ], device = { H264V4l2 = "/dev/video6" } }
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."Front Bottom"]
+# camera = { width = 1920, height = 1080, frame_rate = [
+#   30,
+#   1,
+# ], device = { H264V4l2 = "/dev/video10" } }
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."Bottom Right"]
+# camera = { width = 1920, height = 1080, frame_rate = [
+#   30,
+#   1,
+# ], device = { H264V4l2 = "/dev/video14" } }
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."Bottom"]
+# camera = { width = 1920, height = 1080, frame_rate = [
+#   30,
+#   1,
+# ], device = { H264V4l2 = "/dev/video18" } }
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."Front"]
+# camera = { width = 1920, height = 1080, frame_rate = [
+#   30,
+#   1,
+# ], device = { H264V4l2 = "/dev/video41" } }
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
 
-[camera_config.cameras."/dev/video10"]
-name = "Front Bottom"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
-
-[camera_config.cameras."/dev/video14"]
-name = "Bottom Right"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
-
-[camera_config.cameras."/dev/video18"]
-name = "Bottom"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
-
-[camera_config.cameras."/dev/video41"]
-name = "Front"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+# [camera_config.cameras."/dev/video2"]
+# name = "Top Left"
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."/dev/video6"]
+# name = "Top Right"
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."/dev/video10"]
+# name = "Front Bottom"
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."/dev/video14"]
+# name = "Bottom Right"
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."/dev/video18"]
+# name = "Bottom"
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+#
+# [camera_config.cameras."/dev/video41"]
+# name = "Front"
+# transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }

@@ -9,7 +9,10 @@ use motor_math::{
 use nalgebra::vector;
 use serde::{Deserialize, Serialize};
 
-use crate::plugins::actuators::{hardware::motor_id_map::LocalMotorId, stabilize::PidAxis};
+use crate::plugins::{
+    actuators::{hardware::motor_id_map::LocalMotorId, stabilize::PidAxis},
+    sensors::cameras::gstreamer::{GstCamera, GstCameraDevice},
+};
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]
 pub struct RobotConfig {
@@ -264,12 +267,13 @@ pub struct ConfigServoConstraints {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CameraConfigDefinition {
+    // Name -> Camera
     pub cameras: HashMap<String, ConfigCamera>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigCamera {
-    pub name: String,
+    pub camera: GstCamera,
     pub transform: ConfigTransform,
 }
 

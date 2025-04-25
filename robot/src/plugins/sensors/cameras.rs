@@ -1,4 +1,5 @@
 pub mod camera_handler;
+pub mod gstreamer;
 
 use std::{net::SocketAddr, thread};
 

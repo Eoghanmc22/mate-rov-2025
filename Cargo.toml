@@ -74,11 +74,13 @@ rand = "0.9"
 rgb = "0.8"
 ahash = "0.8"
 time = { version = "0.3", features = ["local-offset", "formatting"] }
-opencv = "0.94"
+# Enable `clang-runtime` to workaround https://github.com/twistedfall/opencv-rust/issues/635
+opencv = { version = "0.94", features = ["clang-runtime"] }
 itertools = "0.14"
 tokio = { version = "1", features = ["full"] }
 crossbeam = "0.8"
 vergen-gix = "1"
+v4l = "0.14"
 
 
 # Enable code optimization in debug

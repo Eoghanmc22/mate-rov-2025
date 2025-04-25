@@ -10,11 +10,10 @@ pub struct SensorPlugins;
 
 impl PluginGroup for SensorPlugins {
     fn build(self) -> PluginGroupBuilder {
-        let builder = PluginGroupBuilder::start::<Self>();
+        let builder = PluginGroupBuilder::start::<Self>().add(cameras::CameraPlugin);
 
         #[cfg(rpi)]
         let builder = builder
-            .add(cameras::CameraPlugin)
             .add(orientation::OrientationPlugin)
             .add(power::PowerPlugin)
             .add(depth::DepthPlugin)

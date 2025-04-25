@@ -68,10 +68,7 @@ pub struct TempertureMeasurement {
 pub struct Leak(pub bool);
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Eq)]
-#[reflect(from_reflect = false)]
-#[reflect(SerdeAdapter, /*Serialize, Deserialize,*/ Debug, PartialEq)]
+#[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
 pub struct CameraDefinition {
-    // TODO(low): This bad
-    #[reflect(ignore)]
-    pub location: SocketAddr,
+    pub preliminary_pipeline: String,
 }

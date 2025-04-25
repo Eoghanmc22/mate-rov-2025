@@ -35,5 +35,7 @@ ahash = { workspace = true }
 tokio = { workspace = true }
 bevy-tokio-tasks = { workspace = true }
 
+v4l = { workspace = true }
+
 [features]
 tracy = ["bevy/trace_tracy", "common/tracy_frame_mark"]
