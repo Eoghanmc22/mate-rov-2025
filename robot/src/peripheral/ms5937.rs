@@ -8,9 +8,14 @@ use common::{
 use rppal::i2c::I2c;
 use tracing::{debug, info, instrument};
 
+use crate::utils::average::RunningAverage;
+
 pub struct Ms5837 {
     i2c: I2c,
     calibration: [u16; 8],
+
+    // FIXME: I think id rather move this to a higher level of abstraction
+    filter: RunningAverage<10>,
 
     pub fluid_density: f32,
     pub sea_level: Mbar,
@@ -32,6 +37,7 @@ impl Ms5837 {
         let mut this = Self {
             i2c,
             calibration: [0; 8],
+            filter: RunningAverage::new(),
             fluid_density: 1000.0,
             sea_level: Mbar(1013.25),
         };
@@ -46,6 +52,8 @@ impl Ms5837 {
         let raw = self.read_raw().context("Read raw frame")?;
 
         let (pressure, temperature) = calculate_pressure_and_temperature(raw, &self.calibration);
+        let pressure = Mbar(self.filter.add_reading(pressure.0));
+
         let altitude = pressure_to_altitude(pressure, self.sea_level.0);
         let depth = pressure_to_depth(pressure, self.fluid_density, self.sea_level.0);
 

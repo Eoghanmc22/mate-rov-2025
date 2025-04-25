@@ -4,6 +4,7 @@
 pub mod config;
 pub mod peripheral;
 pub mod plugins;
+pub mod utils;
 
 use std::{fs, time::Duration};
 
