@@ -1,4 +1,5 @@
 use bevy::{
+    ecs::{component::ComponentId, world::DeferredWorld},
     math::f32,
     prelude::*,
     render::{camera::Camera as BevyCamera, view::RenderLayers},
@@ -25,7 +26,8 @@ impl Plugin for VideoDisplay2DPlugin {
                     handle_new_masters,
                     enable_camera,
                 ),
-            );
+            )
+            .add_observer(remove_other_master_markers);
     }
 }
 
@@ -51,6 +53,21 @@ struct MakeMaster(Entity);
 #[derive(Resource, Default)]
 pub struct VideoDisplay2DSettings {
     pub enabled: bool,
+}
+
+#[derive(Component, Clone, Copy)]
+pub struct VideoMasterMarker;
+
+fn remove_other_master_markers(
+    event: Trigger<OnInsert, VideoMasterMarker>,
+    mut cmds: Commands,
+    query: Query<Entity, With<VideoMasterMarker>>,
+) {
+    for entity in query.iter() {
+        if entity != event.entity() {
+            cmds.entity(entity).remove::<VideoMasterMarker>();
+        }
+    }
 }
 
 fn setup(mut cmds: Commands, mut meshes: ResMut<Assets<Mesh>>) {
@@ -127,8 +144,11 @@ fn create_display(
                     RENDER_LAYERS,
                 ))
                 .observe(
-                    |event: Trigger<Pointer<Click>>, mut events: EventWriter<MakeMaster>| {
+                    |event: Trigger<Pointer<Click>>,
+                     mut cmds: Commands,
+                     mut events: EventWriter<MakeMaster>| {
                         events.send(MakeMaster(event.entity()));
+                        cmds.entity(event.entity()).insert(VideoMasterMarker);
                     },
                 );
             cmds.entity(parent).add_child(camera);

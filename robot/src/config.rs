@@ -266,6 +266,8 @@ pub struct ServoConstraints {
 pub struct CameraDefinition {
     pub name: String,
     pub transform: ConfigTransform,
+    #[serde(default)]
+    pub movement_rotation: ConfigRotation,
 }
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize)]

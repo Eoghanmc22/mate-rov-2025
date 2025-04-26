@@ -75,3 +75,6 @@ pub struct CameraDefinition {
     #[reflect(ignore)]
     pub location: SocketAddr,
 }
+
+#[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
+pub struct CameraInputRotation(pub Quat);

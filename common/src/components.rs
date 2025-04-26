@@ -68,6 +68,7 @@ components! {
         TempertureMeasurement,
         Leak,
         CameraDefinition,
+        CameraInputRotation,
     },
 
     system_monitor::{

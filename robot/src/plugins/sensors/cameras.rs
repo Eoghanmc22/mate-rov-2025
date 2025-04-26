@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail, Context};
 use bevy::{app::AppExit, prelude::*};
 use common::{
     bundles::CameraBundle,
-    components::{CameraDefinition, RobotId},
+    components::{CameraDefinition, CameraInputRotation, RobotId},
     ecs_sync::{NetId, Replicate},
     error::{self, Errors},
     events::ResyncCameras,
@@ -393,12 +393,17 @@ fn camera_list(
     let mut list = Vec::new();
 
     for (name, &(_, location)) in cameras {
-        let (name, transform) = match config.cameras.get(name) {
+        let (name, transform, input_rotation) = match config.cameras.get(name) {
             Some(definition) => (
                 format!("{} ({})", definition.name, name),
                 definition.transform.flatten(),
+                CameraInputRotation(definition.movement_rotation.flatten()),
             ),
-            None => (name.to_owned(), Transform::default()),
+            None => (
+                name.to_owned(),
+                Transform::default(),
+                CameraInputRotation(Quat::default()),
+            ),
         };
 
         list.push(CameraBundle {
@@ -406,6 +411,7 @@ fn camera_list(
             camera: CameraDefinition { location },
             robot,
             transform,
+            input_rotation,
         });
     }
 

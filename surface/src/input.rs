@@ -8,9 +8,9 @@ use bevy::{
 use common::{
     bundles::MovementContributionBundle,
     components::{
-        Armed, DepthMeasurement, DepthTarget, GenericMotorId, MotorContribution, Motors,
-        MovementAxisMaximums, MovementContribution, Orientation, OrientationTarget, Robot, RobotId,
-        Thrusters,
+        Armed, CameraInputRotation, DepthMeasurement, DepthTarget, GenericMotorId,
+        MotorContribution, Motors, MovementAxisMaximums, MovementContribution, Orientation,
+        OrientationTarget, Robot, RobotId, Thrusters,
     },
     ecs_sync::{NetId, Replicate},
     events::ResetServo,
@@ -22,6 +22,8 @@ use leafwing_input_manager::{
     InputManagerBundle,
 };
 use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
+
+use crate::video_display_2d_master::VideoMasterMarker;
 
 // TODO(low): Handle multiple gamepads better
 pub struct InputPlugin;
@@ -292,6 +294,7 @@ fn movement(
         ),
         With<Robot>,
     >,
+    selected_camera: Query<(&CameraInputRotation, &RobotId), With<VideoMasterMarker>>,
 ) {
     for (entity, robot, action_state, interpolation) in &inputs {
         let Some((
@@ -309,6 +312,13 @@ fn movement(
             continue;
         };
 
+        let input_rotation = selected_camera
+            .iter()
+            .filter(|(_, robot_id)| robot_id.0 == robot.0)
+            .map(|(it, _)| it.0)
+            .next()
+            .unwrap_or_default();
+
         let translate_gain = if depth_target.is_some() {
             interpolation.translate_gain_depth_hold
         } else {
@@ -321,33 +331,47 @@ fn movement(
             interpolation.torque_gain
         };
 
-        let x = interpolation.interpolate_input(
-            action_state.value(&Action::Sway) - action_state.value(&Action::SwayInverted),
-        ) * maximums[&Axis::X].0
-            * translate_gain.x;
-        let y = interpolation.interpolate_input(
-            action_state.value(&Action::Surge) - action_state.value(&Action::SurgeInverted),
-        ) * maximums[&Axis::Y].0
-            * translate_gain.y;
-        let z = interpolation.interpolate_input(
-            action_state.value(&Action::Heave) - action_state.value(&Action::HeaveInverted),
-        ) * maximums[&Axis::Z].0
-            * translate_gain.z;
+        let force = vec3a(
+            interpolation.interpolate_input(
+                action_state.value(&Action::Sway) - action_state.value(&Action::SwayInverted),
+            ),
+            interpolation.interpolate_input(
+                action_state.value(&Action::Surge) - action_state.value(&Action::SurgeInverted),
+            ),
+            interpolation.interpolate_input(
+                action_state.value(&Action::Heave) - action_state.value(&Action::HeaveInverted),
+            ),
+        );
+        let force = input_rotation * force;
+        let force = force
+            * vec3a(
+                maximums[&Axis::X].0,
+                maximums[&Axis::Y].0,
+                maximums[&Axis::Z].0,
+            )
+            * translate_gain;
 
-        let x_rot = interpolation.interpolate_input(
-            action_state.button_value(&Action::Pitch)
-                - action_state.button_value(&Action::PitchInverted),
-        ) * maximums[&Axis::XRot].0
-            * torque_gain.x;
-        let y_rot = interpolation.interpolate_input(
-            action_state.button_value(&Action::Roll)
-                - action_state.button_value(&Action::RollInverted),
-        ) * maximums[&Axis::YRot].0
-            * torque_gain.y;
-        let z_rot = interpolation.interpolate_input(
-            -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
-        ) * maximums[&Axis::ZRot].0
-            * torque_gain.z;
+        let torque = vec3a(
+            interpolation.interpolate_input(
+                action_state.button_value(&Action::Pitch)
+                    - action_state.button_value(&Action::PitchInverted),
+            ),
+            interpolation.interpolate_input(
+                action_state.button_value(&Action::Roll)
+                    - action_state.button_value(&Action::RollInverted),
+            ),
+            interpolation.interpolate_input(
+                -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
+            ),
+        );
+        let torque = input_rotation * torque;
+        let torque = torque
+            * vec3a(
+                maximums[&Axis::XRot].0,
+                maximums[&Axis::YRot].0,
+                maximums[&Axis::ZRot].0,
+            )
+            * torque_gain;
 
         // TODO: We should never zero the z input, this should instead allow switching between
         // interperting z as local vs global
@@ -368,14 +392,14 @@ fn movement(
                     // yaw *= Quat::from_rotation_y(180f32.to_radians()).inverse();
                 }
 
-                let world_force = yaw * vec3a(x, y, z);
+                let world_force = yaw * force;
 
                 orientation.0.inverse() * world_force
             } else {
-                vec3a(x, y, z)
+                force
             }
         } else {
-            vec3a(x, y, z)
+            force
         };
 
         // TODO: torque vector should always be applied to act as feed forward for pid
@@ -384,7 +408,6 @@ fn movement(
         // } else {
         //     vec3a(x_rot, y_rot, z_rot)
         // };
-        let torque = vec3a(x_rot, y_rot, z_rot);
 
         let movement = MovementGlam { force, torque };
 
@@ -509,20 +532,32 @@ fn trim_orientation(
     mut cmds: Commands,
     inputs: Query<(&RobotId, &ActionState<Action>, &InputInterpolation), With<InputMarker>>,
     robots: Query<(Entity, &Orientation, Option<&OrientationTarget>, &RobotId), With<Robot>>,
+    selected_camera: Query<(&CameraInputRotation, &RobotId), With<VideoMasterMarker>>,
     time: Res<Time<Real>>,
 ) {
     for (robot, action_state, interpolation) in &inputs {
-        let pitch = interpolation.interpolate_input(
-            action_state.button_value(&Action::Pitch)
-                - action_state.button_value(&Action::PitchInverted),
+        let input_rotation = selected_camera
+            .iter()
+            .filter(|(_, robot_id)| robot_id.0 == robot.0)
+            .map(|(it, _)| it.0)
+            .next()
+            .unwrap_or_default();
+
+        let torque = vec3a(
+            interpolation.interpolate_input(
+                action_state.button_value(&Action::Pitch)
+                    - action_state.button_value(&Action::PitchInverted),
+            ),
+            interpolation.interpolate_input(
+                action_state.button_value(&Action::Roll)
+                    - action_state.button_value(&Action::RollInverted),
+            ),
+            interpolation.interpolate_input(
+                -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
+            ),
         );
-        let roll = interpolation.interpolate_input(
-            action_state.button_value(&Action::Roll)
-                - action_state.button_value(&Action::RollInverted),
-        );
-        let yaw = interpolation.interpolate_input(
-            -(action_state.value(&Action::Yaw) - action_state.value(&Action::YawInverted)),
-        );
+        let torque = input_rotation * torque;
+        let torque = torque * interpolation.trim_dps;
 
         let robot = robots
             .iter()
@@ -533,26 +568,26 @@ fn trim_orientation(
                 continue;
             };
 
-            if pitch.abs() >= 0.05 {
-                let input = pitch * interpolation.trim_dps.x * time.delta_secs();
+            if torque.x.abs() >= 0.05 {
+                let input = torque.x * time.delta_secs();
                 orientation_target = orientation_target * Quat::from_rotation_x(input.to_radians());
             }
 
-            if roll.abs() >= 0.05 {
-                let input = roll * interpolation.trim_dps.y * time.delta_secs();
+            if torque.y.abs() >= 0.05 {
+                let input = torque.y * time.delta_secs();
                 orientation_target = orientation_target * Quat::from_rotation_y(input.to_radians());
             }
 
-            if yaw.abs() >= 0.05 {
-                let input = yaw * interpolation.trim_dps.z * time.delta_secs();
+            if torque.z.abs() >= 0.05 {
+                let input = torque.z * time.delta_secs();
                 orientation_target = Quat::from_rotation_z(input.to_radians()) * orientation_target;
             }
 
-            if pitch != 0.0 || roll != 0.0 || yaw != 0.0 {
+            if torque.x.abs() >= 0.05 || torque.y.abs() >= 0.05 || torque.z.abs() >= 0.05 {
                 cmds.entity(robot)
                     .insert(OrientationTarget(orientation_target));
             }
-        } else if pitch != 0.0 || roll != 0.0 || yaw != 0.0 {
+        } else if torque.x.abs() >= 0.05 || torque.y.abs() >= 0.05 || torque.z.abs() >= 0.05 {
             warn!("No ROV attached");
         }
     }

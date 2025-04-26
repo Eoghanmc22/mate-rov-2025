@@ -36,6 +36,7 @@ mod movement_api {
 
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
     #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+    // TODO: Store this as a MovementGlam
     pub struct MovementAxisMaximums(pub StableHashMap<Axis, Newtons>);
 
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
