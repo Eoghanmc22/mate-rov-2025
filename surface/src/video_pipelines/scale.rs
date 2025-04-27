@@ -54,7 +54,7 @@ impl<const BASE: u32, const EXPONENT: i32> Pipeline for ScalePipeline<BASE, EXPO
         Ok(&mut self.scaled)
     }
 
-    fn cleanup(_entity_world: &mut EntityWorldMut) {
+    fn cleanup(self, _entity_world: &mut EntityWorldMut) {
         // No-op
     }
 }

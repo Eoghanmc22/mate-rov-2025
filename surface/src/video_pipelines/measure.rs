@@ -207,7 +207,7 @@ impl Pipeline for MeasurePipeline {
         Ok(img)
     }
 
-    fn cleanup(_entity_world: &mut EntityWorldMut) {
+    fn cleanup(self, _entity_world: &mut EntityWorldMut) {
         // No-op
     }
 }

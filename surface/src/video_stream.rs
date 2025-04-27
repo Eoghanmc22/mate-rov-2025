@@ -49,7 +49,7 @@ pub trait VideoProcessor: Send + 'static {
     fn should_end(&self) -> bool {
         false
     }
-    fn end(&mut self);
+    fn end(self: Box<Self>);
 }
 type BoxedVideoProcessor = Box<dyn VideoProcessor>;
 
@@ -131,7 +131,7 @@ fn handle_added_camera(
                     };
 
                     if let Some(mut new_proc) = rx_proc.try_iter().last() {
-                        if let Some(proc) = &mut proc {
+                        if let Some(proc) = proc.take() {
                             proc.end();
                         }
 
@@ -155,8 +155,11 @@ fn handle_added_camera(
                                     }
                                 }
                             } else {
-                                proc_local.end();
-                                proc = None;
+                                // TODO: Is there any way we can get rig of this if?
+                                // it should always be true
+                                if let Some(it) = proc.take() {
+                                    it.end()
+                                }
 
                                 &mat
                             }
@@ -178,7 +181,7 @@ fn handle_added_camera(
                     }
                 }
 
-                if let Some(proc) = &mut proc {
+                if let Some(proc) = proc {
                     proc.end();
                 }
             })

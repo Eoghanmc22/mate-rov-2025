@@ -38,7 +38,7 @@ impl Pipeline for EdgesPipeline {
         Ok(&mut self.edges)
     }
 
-    fn cleanup(_entity_world: &mut EntityWorldMut) {
+    fn cleanup(self, _entity_world: &mut EntityWorldMut) {
         // No-op
     }
 }

@@ -1,6 +1,7 @@
 pub mod edges;
 pub mod marker;
 pub mod measure;
+pub mod photosphere;
 pub mod save;
 pub mod scale;
 pub mod squares;
@@ -32,6 +33,7 @@ use crossbeam::{
     channel::{bounded, Receiver, Sender},
 };
 use opencv::core::Mat;
+use photosphere::PhotoSpherePipelinePlugin;
 use tracing::{debug, error};
 
 use crate::{
@@ -54,8 +56,12 @@ impl PluginGroup for VideoPipelinePlugins {
             })
             .add(EdgesPipelinePlugin)
             .add(MarkerPipelinePlugin)
-            .add(SquarePipelinePlugin)
+            // .add(MeasurePipelinePlugin)
+            .add(PhotoSpherePipelinePlugin)
             .add(SavePipelinePlugin)
+            // .add(ScalePipelinePlugin)
+            .add(SquarePipelinePlugin)
+        // .add(UndistortPipelinePlugin)
     }
 }
 
@@ -100,8 +106,8 @@ pub struct VideoPipeline {
     pub factory: VideoProcessorFactory,
 }
 
-pub type WorldCallback = Box<dyn FnOnce(&mut World) + Send + Sync + 'static>;
-pub type EntityWorldCallback = Box<dyn FnOnce(EntityWorldMut) + Send + Sync + 'static>;
+pub type WorldCallback = Box<dyn FnOnce(&mut World) + Send + 'static>;
+pub type EntityWorldCallback = Box<dyn FnOnce(EntityWorldMut) + Send + 'static>;
 
 pub struct SerialPipeline<T>(pub(crate) T);
 
@@ -123,7 +129,7 @@ pub trait Pipeline: FromWorldEntity + Send + 'static {
 
     /// Entity is implicitly despawned after this function returns
     // TODO: Expose camera entity as well
-    fn cleanup(entity_world: &mut EntityWorldMut);
+    fn cleanup(self, entity_world: &mut EntityWorldMut);
 }
 
 pub trait FromWorldEntity {
@@ -255,17 +261,18 @@ impl<P: Pipeline> VideoProcessor for PipelineHandler<P> {
         self.should_end || Arc::strong_count(&self.bevy_handle) == 1
     }
 
-    fn end(&mut self) {
+    fn end(self: Box<Self>) {
         let Some(entity) = self.pipeline_entity.load() else {
             return;
         };
 
+        let pipeline = self.pipeline;
         let rst = self.cmds_tx.send(Box::new(move |world: &mut World| {
             let Ok(mut entity_world) = world.get_entity_mut(entity) else {
                 return;
             };
 
-            P::cleanup(&mut entity_world);
+            pipeline.cleanup(&mut entity_world);
 
             entity_world.despawn_recursive();
         }));
@@ -286,7 +293,7 @@ pub struct PipelineCallbacks<'a> {
 }
 
 impl PipelineCallbacks<'_> {
-    pub fn world<F: FnOnce(&mut World) + Send + Sync + 'static>(&mut self, f: F) {
+    pub fn world<F: FnOnce(&mut World) + Send + 'static>(&mut self, f: F) {
         let res = self.cmds_tx.send(Box::new(f));
 
         if res.is_err() {
@@ -295,7 +302,7 @@ impl PipelineCallbacks<'_> {
         }
     }
 
-    pub fn pipeline<F: FnOnce(EntityWorldMut) + Send + Sync + 'static>(&mut self, f: F) {
+    pub fn pipeline<F: FnOnce(EntityWorldMut) + Send + 'static>(&mut self, f: F) {
         let entity = self.pipeline_entity;
         let res = self.cmds_tx.send(Box::new(move |world: &mut World| {
             let Ok(entity) = world.get_entity_mut(entity) else {
@@ -315,7 +322,7 @@ impl PipelineCallbacks<'_> {
         }
     }
 
-    pub fn camera<F: FnOnce(EntityWorldMut) + Send + Sync + 'static>(&mut self, f: F) {
+    pub fn camera<F: FnOnce(EntityWorldMut) + Send + 'static>(&mut self, f: F) {
         let entity = self.camera_entity;
         let res = self.cmds_tx.send(Box::new(move |world: &mut World| {
             let Ok(entity) = world.get_entity_mut(entity) else {
@@ -412,8 +419,12 @@ macro_rules! impl_pipeline_tuples {
                 Ok(img)
             }
 
-            fn cleanup(entity_world: &mut EntityWorldMut) {
-                $($T::cleanup(entity_world);)*
+            fn cleanup(self, entity_world: &mut EntityWorldMut) {
+                let ($($p,)*) = self.0;
+
+                $(
+                    $p.cleanup(entity_world);
+                )*
             }
          }
 

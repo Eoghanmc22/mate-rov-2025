@@ -41,7 +41,7 @@ impl Pipeline for MarkerPipeline {
         Ok(img)
     }
 
-    fn cleanup(_entity_world: &mut EntityWorldMut) {
+    fn cleanup(self, _entity_world: &mut EntityWorldMut) {
         // No-op
     }
 }

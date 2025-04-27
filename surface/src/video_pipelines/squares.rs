@@ -472,7 +472,7 @@ impl Pipeline for SquareTrackingPipeline {
         Ok(img)
     }
 
-    fn cleanup(_entity_world: &mut EntityWorldMut) {
+    fn cleanup(self, _entity_world: &mut EntityWorldMut) {
         // Pipeline entity is automatically despawned
         // No-op
     }
