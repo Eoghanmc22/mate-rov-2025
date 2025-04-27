@@ -33,6 +33,7 @@ use tokio::net::lookup_host;
 use crate::{
     attitude::OrientationDisplay,
     input::{Action, InputInterpolation, InputMarker, SelectedServo},
+    video_display_2d_master::VideoMasterMarker,
     video_pipelines::VideoPipelines,
     video_stream::{VideoProcessorFactory, VideoThread},
     DARK_MODE,
@@ -410,6 +411,7 @@ fn hud(
         ),
         With<InputMarker>,
     >,
+    selected_camera: Query<(&Name, &RobotId), With<VideoMasterMarker>>,
 
     peers: Option<Res<MdnsPeers>>,
 
@@ -649,6 +651,16 @@ fn hud(
 
                     if let Some(_orientation_target) = orientation_target {
                         ui.label(RichText::new("Orientation Control").size(size));
+                    }
+
+                    let selected_camera = selected_camera
+                        .iter()
+                        .filter(|(_, robot)| robot_id.0 == robot.0)
+                        .map(|(it, _)| it.as_str())
+                        .next();
+
+                    if let Some(selected_camera) = selected_camera {
+                        ui.label(RichText::new(format!("Camera: {selected_camera}")).size(size));
                     }
                 });
 
