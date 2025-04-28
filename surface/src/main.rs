@@ -2,6 +2,8 @@
 
 pub mod attitude;
 pub mod input;
+pub mod layer_allocator;
+pub mod photosphere;
 pub mod surface;
 pub mod ui;
 pub mod video_display_2d_master;
@@ -10,7 +12,7 @@ pub mod video_display_3d;
 pub mod video_pipelines;
 pub mod video_stream;
 
-use std::time::Duration;
+use std::{sync::atomic::AtomicU64, time::Duration};
 
 use anyhow::Context;
 use attitude::AttitudePlugin;
@@ -25,6 +27,7 @@ use common::{over_run::OverRunSettings, sync::SyncRole, CommonPlugins};
 use crossbeam::channel::unbounded;
 use input::InputPlugin;
 use opencv::{highgui, imgcodecs};
+use photosphere::PhotoSpherePlugin;
 use surface::SurfacePlugin;
 use ui::{EguiUiPlugin, ShowInspector};
 // use video_display_2d_tile::{VideoDisplay2DPlugin, VideoDisplay2DSettings};
@@ -90,6 +93,7 @@ fn main() -> anyhow::Result<()> {
                 InputPlugin,
                 EguiUiPlugin,
                 AttitudePlugin,
+                PhotoSpherePlugin,
                 VideoStreamPlugin,
                 VideoDisplay2DPlugin,
                 // VideoDisplay3DPlugin,

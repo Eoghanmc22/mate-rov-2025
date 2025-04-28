@@ -33,6 +33,7 @@ use tokio::net::lookup_host;
 use crate::{
     attitude::OrientationDisplay,
     input::{Action, InputInterpolation, InputMarker, SelectedServo},
+    photosphere::{PhotoSphere, RotatePhotoSphere, SpawnPhotoSphere},
     video_display_2d_master::VideoMasterMarker,
     video_pipelines::VideoPipelines,
     video_stream::{VideoProcessorFactory, VideoThread},
@@ -49,6 +50,7 @@ impl Plugin for EguiUiPlugin {
             (
                 topbar,
                 hud.after(topbar),
+                photosphere.after(topbar),
                 movement_control.after(topbar),
                 pid_helper.after(topbar),
                 movement_debug.after(topbar),
@@ -112,6 +114,7 @@ fn topbar(
 
     robots: Query<
         (
+            Entity,
             &Name,
             &Armed,
             Option<&DepthTarget>,
@@ -281,6 +284,12 @@ fn topbar(
                         ));
                     }
                 }
+
+                if ui.button("Photo Sphere").clicked() {
+                    for (robot, ..) in robots.iter() {
+                        cmds.entity(robot).trigger(SpawnPhotoSphere);
+                    }
+                }
             });
 
             // RTL needs reverse order
@@ -288,7 +297,7 @@ fn topbar(
                 if !robots.is_empty() {
                     let mut layout_job = LayoutJob::default();
 
-                    for (robot, state, depth_target, orientation_target) in &robots {
+                    for (_entity, robot, state, depth_target, orientation_target) in &robots {
                         layout_job.append(
                             robot.as_str(),
                             20.0,
@@ -748,6 +757,39 @@ fn hud(
     }
 }
 
+fn photosphere(
+    mut cmds: Commands,
+    mut contexts: EguiContexts,
+    photospheres: Query<(Entity, &PhotoSphere)>,
+) {
+    for (entity, photosphere) in photospheres.iter() {
+        let mut open = true;
+
+        let context = contexts.ctx_mut();
+        egui::Window::new("Photo Sphere")
+            .id(Id::new(entity))
+            .constrain_to(context.available_rect().shrink(20.0))
+            .default_size((230.0, 230.0))
+            .open(&mut open)
+            .show(context, |ui| {
+                let response = ui.image(SizedTexture::new(
+                    photosphere.view_texture_egui,
+                    (ui.available_width(), ui.available_width()),
+                ));
+
+                if response.dragged() {
+                    let delta = response.drag_delta();
+                    cmds.entity(entity)
+                        .trigger(RotatePhotoSphere(Vec2::new(delta.x, delta.y)));
+                }
+            });
+
+        if !open {
+            cmds.entity(entity).despawn_recursive();
+        }
+    }
+}
+
 fn pwm_control(
     mut cmds: Commands,
     mut contexts: EguiContexts,
@@ -761,7 +803,6 @@ fn pwm_control(
         &RobotId,
     )>,
 ) {
-    let context = contexts.ctx_mut();
     let mut open = true;
 
     egui::Window::new("PWM Control")

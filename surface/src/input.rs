@@ -23,7 +23,7 @@ use leafwing_input_manager::{
 };
 use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
 
-use crate::video_display_2d_master::VideoMasterMarker;
+use crate::{photosphere::TakePhotoSphereImage, video_display_2d_master::VideoMasterMarker};
 
 // TODO(low): Handle multiple gamepads better
 pub struct InputPlugin;
@@ -47,6 +47,7 @@ impl Plugin for InputPlugin {
                     trim_depth,
                     servos,
                     robot_mode,
+                    take_photo_sphere_image,
                     // switch_pitch_roll,
                 ),
             );
@@ -154,6 +155,8 @@ pub enum Action {
     SelectImportantServo,
 
     SwitchPitchRoll,
+
+    TakePhotoSphereImage,
 }
 
 #[derive(Actionlike, PartialEq, Eq, Hash, Clone, Copy, Debug, Reflect, Default)]
@@ -187,7 +190,8 @@ fn attach_to_new_robots(mut cmds: Commands, new_robots: Query<(&NetId, &Name), A
         input_map.insert(Action::ToggleDepthHold, GamepadButton::East);
         // input_map.insert(Action::ToggleDepthHold, GamepadButton::North);
         // input_map.insert(Action::ToggleDepthHold, GamepadButton::South);
-        input_map.insert(Action::SwitchPitchRoll, GamepadButton::West);
+        // input_map.insert(Action::SwitchPitchRoll, GamepadButton::West);
+        input_map.insert(Action::TakePhotoSphereImage, GamepadButton::West);
 
         input_map.insert_axis(Action::Yaw, GamepadAxis::LeftStickX);
         input_map.insert_axis(Action::Surge, GamepadAxis::LeftStickY);
@@ -786,3 +790,25 @@ fn robot_mode(
 //         }
 //     }
 // }
+
+fn take_photo_sphere_image(
+    mut cmds: Commands,
+    inputs: Query<(&ActionState<Action>, &RobotId), With<InputMarker>>,
+    robots: Query<(Entity, &RobotId), With<Robot>>,
+) {
+    for (input, robot_id) in inputs.iter() {
+        if !input.just_pressed(&Action::TakePhotoSphereImage) {
+            continue;
+        }
+
+        let Some((robot, _)) = robots
+            .iter()
+            .find(|&(_, other_robot_id)| robot_id == other_robot_id)
+        else {
+            warn!("No ROV attached");
+            continue;
+        };
+
+        cmds.entity(robot).trigger(TakePhotoSphereImage);
+    }
+}
