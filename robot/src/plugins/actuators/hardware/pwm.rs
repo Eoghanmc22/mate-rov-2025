@@ -51,7 +51,7 @@ enum PwmEvent {
 fn start_pwm_thread(mut cmds: Commands, errors: Res<Errors>) -> anyhow::Result<()> {
     let interval = Duration::from_secs_f32(1.0 / 100.0);
     let max_inactive = Duration::from_secs_f32(1.0 / 10.0);
-    let arming_duration = Duration::from_millis(1000);
+    let arming_duration = Duration::from_millis(1500);
 
     let (tx_data, rx_data) = channel::bounded(30);
 
