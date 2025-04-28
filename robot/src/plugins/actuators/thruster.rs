@@ -5,10 +5,10 @@ use bevy::prelude::*;
 use common::{
     bundles::{ActuatorBundle, RobotThrusterBundle, ThrusterBundle},
     components::{
-        ActualForce, ActualMovement, Armed, CurrentDraw, DisableMovementApi, GenericMotorId,
-        JerkLimit, MotorRawSignalRange, MotorSignal, MotorSignalType, MovementAxisMaximums,
-        MovementContribution, MovementCurrentCap, RobotId, TargetForce, TargetMovement,
-        ThrustContribution, ThrusterDefinition, Thrusters,
+        ActualForce, ActualMovement, Armed, CenterOfMass, CurrentDraw, DisableMovementApi,
+        GenericMotorId, JerkLimit, MotorRawSignalRange, MotorSignal, MotorSignalType,
+        MovementAxisMaximums, MovementContribution, MovementCurrentCap, RobotId, TargetForce,
+        TargetMovement, ThrustContribution, ThrusterDefinition, Thrusters,
     },
     ecs_sync::{NetId, Replicate},
     types::units::{Amperes, Newtons},
@@ -43,6 +43,7 @@ impl Plugin for ThrusterPlugin {
                 Update,
                 (
                     update_axis_maximums,
+                    update_center_of_mass,
                     accumulate_movements,
                     accumulate_motor_forces.after(accumulate_movements),
                 ),
@@ -66,6 +67,7 @@ fn create_motors(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
         axis_maximums: MovementAxisMaximums(Default::default()),
         current_cap: MovementCurrentCap(config.motor_amperage_budget.into()),
         armed: Armed::Disarmed,
+        center_of_mass: CenterOfMass(config.center_of_mass),
     });
 
     for (motor_id, motor, channel) in motors {
@@ -139,6 +141,20 @@ fn update_axis_maximums(
         info!("Updated motor axis maximums to {maximums:?} at {current_cap:.2}A");
 
         cmds.entity(entity).insert(MovementAxisMaximums(maximums));
+    }
+}
+
+fn update_center_of_mass(
+    mut cmds: Commands,
+    robot: Query<(Entity, &CenterOfMass), (With<LocalRobotMarker>, Changed<CenterOfMass>)>,
+    config: Res<RobotConfig>,
+) {
+    for (entity, center_of_mass) in &robot {
+        let (_motors, motor_config) = config.motor_config.flatten(center_of_mass.0);
+
+        info!("Updated center of mass to {:.2}", center_of_mass.0);
+
+        cmds.entity(entity).insert(Thrusters(motor_config));
     }
 }
 

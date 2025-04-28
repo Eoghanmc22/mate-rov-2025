@@ -92,6 +92,7 @@ components! {
         MovementAxisMaximums,
         MovementCurrentCap,
         DisableMovementApi,
+        CenterOfMass,
 
         // Thruster Api
         TargetForce,

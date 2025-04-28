@@ -2,12 +2,13 @@ use bevy::{core::Name, ecs::bundle::Bundle, transform::components::Transform};
 
 use crate::components::{
     AccelerometerMeasurement, ActualForce, ActualMovement, Armed, CameraDefinition,
-    CameraInputRotation, CurrentDraw, DepthMeasurement, GenericMotorId, GyroMeasurement, Leak,
-    MagnetometerMeasurement, MeasuredVoltage, MotorContributionMode, MotorRawSignalRange,
-    MotorSignal, MotorSignalType, MovementAxisMaximums, MovementContribution, MovementCurrentCap,
-    Orientation, Robot, RobotId, SystemCores, SystemCpuTotal, SystemDisks, SystemLoadAverage,
-    SystemMemory, SystemNetworks, SystemOs, SystemProcesses, SystemTemperatures, SystemUptime,
-    TargetForce, TargetMovement, TempertureMeasurement, ThrusterDefinition, Thrusters,
+    CameraInputRotation, CenterOfMass, CurrentDraw, DepthMeasurement, GenericMotorId,
+    GyroMeasurement, Leak, MagnetometerMeasurement, MeasuredVoltage, MotorContributionMode,
+    MotorRawSignalRange, MotorSignal, MotorSignalType, MovementAxisMaximums, MovementContribution,
+    MovementCurrentCap, Orientation, Robot, RobotId, SystemCores, SystemCpuTotal, SystemDisks,
+    SystemLoadAverage, SystemMemory, SystemNetworks, SystemOs, SystemProcesses, SystemTemperatures,
+    SystemUptime, TargetForce, TargetMovement, TempertureMeasurement, ThrusterDefinition,
+    Thrusters,
 };
 
 #[derive(Bundle, PartialEq)]
@@ -64,6 +65,7 @@ pub struct RobotThrusterBundle {
     pub movement_target: TargetMovement,
     pub movement_actual: ActualMovement,
 
+    pub center_of_mass: CenterOfMass,
     pub thruster_config: Thrusters,
     // pub motor_config: Motors,
     pub axis_maximums: MovementAxisMaximums,

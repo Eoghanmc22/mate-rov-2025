@@ -20,6 +20,8 @@ pub use thruster_api::*;
 
 /// API for operating on the robot's net movement
 mod movement_api {
+    use glam::Vec3A;
+
     use super::*;
 
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
@@ -46,6 +48,10 @@ mod movement_api {
     #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
     #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
     pub struct DisableMovementApi;
+
+    #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
+    #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
+    pub struct CenterOfMass(pub Vec3A);
 }
 
 /// API for operating on individual thrusters, mainly read only
