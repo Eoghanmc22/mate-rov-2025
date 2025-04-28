@@ -4,21 +4,21 @@ use anyhow::{bail, Context};
 use bevy::{
     app::{App, Plugin},
     ecs::world::{EntityRef, EntityWorldMut, World},
-    hierarchy::Parent,
     math::{Quat, Vec3},
 };
-use common::components::{Orientation, OrientationTarget};
+use common::components::{Orientation, OrientationTarget, Robot, RobotId};
 use opencv::{
     core::{MatExpr, MatTraitConst, MatTraitConstManual, ToInputArray, Vector},
     imgcodecs, imgproc,
     prelude::{Mat, StitcherTrait},
     stitching::{Stitcher, Stitcher_Mode, Stitcher_Status},
+    sys::cv_detail_stitchingLogLevel,
 };
 use tracing::{info, warn};
 
 use super::{AppPipelineExt, Pipeline, PipelineCallbacks};
 
-const ORIENTATION_TOLERANCE: f32 = 2.0f32.to_radians();
+const ORIENTATION_TOLERANCE: f32 = 10.0f32.to_radians();
 const SHARPNESS_THRSHOLD: f32 = 100.0;
 
 pub struct PhotoSpherePipelinePlugin;
@@ -42,7 +42,7 @@ impl Default for PhotoSpherePipeline {
     fn default() -> Self {
         Self {
             state: PhotoSpherePipelineState::default(),
-            remaining_targets: fibonacci_sphere(20),
+            remaining_targets: fibonacci_sphere(50),
             bw: Mat::default(),
             laplacian: Mat::default(),
             images: Vector::default(),
@@ -67,8 +67,13 @@ impl Pipeline for PhotoSpherePipeline {
 
     fn collect_inputs(world: &World, entity: &EntityRef) -> Self::Input {
         let res: Option<Self::Input> = try {
-            let robot = entity.get::<Parent>().map(|it| it.get())?;
-            let robot = world.get_entity(robot).ok()?;
+            // Get id of attached robot
+            let robot_id = entity.get::<RobotId>()?;
+
+            // Find which entity is a robot and has that id
+            let robot = world.iter_entities().find(|entity| {
+                entity.contains::<Robot>() && entity.get::<RobotId>() == Some(robot_id)
+            })?;
 
             (
                 robot.get::<Orientation>().copied(),
@@ -94,21 +99,48 @@ impl Pipeline for PhotoSpherePipeline {
                 }
             }
             PhotoSpherePipelineState::SelectNextTarget => {
-                let target = self.remaining_targets.pop();
-                if let Some(target) = target {
+                let Some(orientation) = data.0 else {
+                    cmds.should_end();
+                    bail!("Robot does not have orientation");
+                };
+
+                let target = self
+                    .remaining_targets
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, target)| (idx, *target, target.angle_between(orientation.0).abs()))
+                    .min_by(|a, b| f32::total_cmp(&a.2, &b.2));
+
+                // let target = self.remaining_targets.pop();
+                if let Some((idx, target, _distance)) = target {
+                    self.remaining_targets.remove(idx);
+
                     self.state = PhotoSpherePipelineState::WaitReachTarget(target);
                     // TODO: When we get faliable systems in bevy 0.16, use the ? operator here
                     cmds.pipeline(move |entity| {
-                        let Some(robot) = entity.get::<Parent>().map(|it| it.get()) else {
-                            warn!("PhotoSpherePipeline does not have a parent");
+                        // Get id of attached robot
+                        let Some(robot_id) = entity.get::<RobotId>().copied() else {
+                            warn!("PhotoSpherePipeline does not have a RobotId");
                             return;
                         };
+
                         let world = entity.into_world_mut();
 
-                        let Some(mut robot) = world.get_entity_mut(robot).ok() else {
-                            warn!("PhotoSpherePipeline's parent does not exist in world");
+                        // Find which entity is a robot and has that id
+                        let robot = world
+                            .iter_entities()
+                            .find(|entity| {
+                                entity.contains::<Robot>()
+                                    && entity.get::<RobotId>().copied() == Some(robot_id)
+                            })
+                            .map(|it| it.id());
+
+                        let Some(mut robot) = robot.and_then(|it| world.get_entity_mut(it).ok())
+                        else {
+                            warn!("PhotoSpherePipeline's robot does not exist in world");
                             return;
                         };
+
                         robot.insert(OrientationTarget(target));
                     });
                 } else {
@@ -119,6 +151,13 @@ impl Pipeline for PhotoSpherePipeline {
                 if let (Some(observed_orientation), _, true) = data {
                     if quat.angle_between(observed_orientation.0).abs() < ORIENTATION_TOLERANCE {
                         self.state = PhotoSpherePipelineState::TakePhoto;
+                    } else {
+                        info!(
+                            "Angle error: {:.2}",
+                            quat.angle_between(observed_orientation.0)
+                                .abs()
+                                .to_degrees()
+                        );
                     }
                 } else {
                     warn!("PhotoSpherePipeline has no orientation observation");
@@ -143,10 +182,15 @@ impl Pipeline for PhotoSpherePipeline {
                 info!("Image sharpness: {sharpness:?}");
 
                 if sharpness > SHARPNESS_THRSHOLD {
+                    imgcodecs::imwrite_def(&format!("_pano/img{:4}.jpg", self.images.len()), &*img)
+                        .context("Save stiched pano")?;
                     self.images.push(img.try_clone().context("Try clone")?);
+                    self.state = PhotoSpherePipelineState::SelectNextTarget;
                 }
             }
             PhotoSpherePipelineState::Stitch => {
+                cmds.should_end();
+
                 let mut pano = Mat::default();
 
                 let mut sticher =
@@ -168,9 +212,7 @@ impl Pipeline for PhotoSpherePipeline {
                     }
                 }
 
-                imgcodecs::imwrite_def("pano.jpg", &pano).context("Save stiched pano")?;
-
-                cmds.should_end();
+                imgcodecs::imwrite_def("_pano/pano.jpg", &pano).context("Save stiched pano")?;
             }
         }
 
@@ -178,14 +220,23 @@ impl Pipeline for PhotoSpherePipeline {
     }
 
     fn cleanup(self, entity: &mut EntityWorldMut) {
-        let Some(robot) = entity.get::<Parent>().map(|it| it.get()) else {
-            warn!("PhotoSpherePipeline does not have a parent");
+        // Get id of attached robot
+        let Some(robot_id) = entity.get::<RobotId>().copied() else {
+            warn!("PhotoSpherePipeline does not have a RobotId");
             return;
         };
 
         entity.world_scope(|world| {
-            let Some(mut robot) = world.get_entity_mut(robot).ok() else {
-                warn!("PhotoSpherePipeline's parent does not exist in world");
+            // Find which entity is a robot and has that id
+            let robot = world
+                .iter_entities()
+                .find(|entity| {
+                    entity.contains::<Robot>() && entity.get::<RobotId>().copied() == Some(robot_id)
+                })
+                .map(|it| it.id());
+
+            let Some(mut robot) = robot.and_then(|it| world.get_entity_mut(it).ok()) else {
+                warn!("PhotoSpherePipeline's robot does not exist in world");
                 return;
             };
 
@@ -204,13 +255,13 @@ pub fn fibonacci_sphere(samples: usize) -> Vec<Quat> {
     let phi = f32::consts::PI * (5f32.sqrt() - 1.0); // golden angle in radians
 
     for i in 0..samples {
-        let y = 1.0 - (i as f32 / (samples as f32 - 1.0)) * 2.0; // y goes from 1 to -1
-        let radius = f32::sqrt(1.0 - y * y); // radius at y
+        let z = 0.7 - (i as f32 / (samples as f32 - 1.0)) * 1.4; // y goes from 1 to -1
+        let radius = f32::sqrt(1.0 - z * z); // radius at y
 
         let theta = phi * i as f32; // golden angle increment
 
         let x = theta.cos() * radius;
-        let z = theta.sin() * radius;
+        let y = theta.sin() * radius;
 
         points.push(Quat::from_rotation_arc(Vec3::Y, Vec3::new(x, y, z)));
     }
