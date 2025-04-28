@@ -69,8 +69,9 @@ name = "Front"
 transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
 
 [cameras."/dev/video10"]
-name = "Front Bottom"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+name = "Top Left"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
+movement_rotation = { yaw = 90.0, pitch = 0.0, roll = 0.0 }
 
 [cameras."/dev/video18"]
 name = "Top Right"
@@ -78,9 +79,8 @@ transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0
 movement_rotation = { yaw = -90.0, pitch = 0.0, roll = 0.0 }
 
 [cameras."/dev/video6"]
-name = "Top Left"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
-movement_rotation = { yaw = 90.0, pitch = 0.0, roll = 0.0 }
+name = "Front Bottom"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
 
 [cameras."/dev/video14"]
 name = "UNUSED"
