@@ -54,9 +54,9 @@ direction = "Clockwise"
 
 [servo_config.servos]
 FrontCameraRotate = { channel = { PwmChannel = 15 }, signal_type = "Position", control_mode = "FirstOrder", camera = "Front" }
-Claw1 = { channel = { DcChannel = 0 }, signal_type = "Velocity", constraints = { min = -1.0, max = 1.0 }, slew_rate = { Percent = 5.0 } }
-Claw2 = { channel = { DcChannel = 1 }, signal_type = "Velocity", constraints = { min = -1.0, max = 1.0 }, slew_rate = { Percent = 5.0 } }
-Claw3 = { channel = { DcChannel = 2 }, signal_type = "Velocity", constraints = { min = -1.0, max = 1.0 }, slew_rate = { Percent = 5.0 } }
+Claw1 = { channel = { DcChannel = 0 }, signal_type = "Velocity", constraints = { min = -0.25, max = 0.25 }, slew_rate = { Percent = 10.0 } }
+Claw2 = { channel = { DcChannel = 1 }, signal_type = "Velocity", constraints = { min = -0.25, max = 0.25 }, slew_rate = { Percent = 10.0 } }
+Claw3 = { channel = { DcChannel = 2 }, signal_type = "Velocity", constraints = { min = -0.25, max = 0.25 }, slew_rate = { Percent = 10.0 } }
 Lights = { channel = { DcChannel = 3 }, signal_type = "Position", control_mode = "FirstOrder", constraints = { min = 0.0, max = 0.75 } }
 
 
