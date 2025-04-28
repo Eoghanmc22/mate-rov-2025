@@ -100,6 +100,7 @@ fn setup(
         Transform::from_xyz(4.0, 4.0, 8.0),
         RENDER_LAYERS,
     ));
+    // FIXME: This absolutelly should not be here
     if !DARK_MODE {
         ambient_light.brightness *= 7.0;
     }

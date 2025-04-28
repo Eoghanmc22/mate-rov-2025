@@ -13,7 +13,7 @@ use bevy::{
     },
 };
 use bevy_egui::EguiContexts;
-use common::components::{Orientation, Robot};
+use common::components::{Orientation, Robot, RobotId};
 use crossbeam::channel::{Receiver, Sender};
 use egui::TextureId;
 
@@ -43,6 +43,9 @@ pub struct PhotoSphere {
     pub view_texture_egui: TextureId,
 
     pub photo_sphere: Handle<Image>,
+    pub photo_sphere_egui: TextureId,
+
+    pub material: Handle<StandardMaterial>,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -74,19 +77,17 @@ pub struct AsyncImageProcessingChannels(Sender<(Entity, Image)>, Receiver<(Entit
 fn spawn_photo_sphere(
     event: Trigger<SpawnPhotoSphere>,
 
-    robot: Query<(), With<Robot>>,
+    robot: Query<&RobotId, With<Robot>>,
 
     mut cmds: Commands,
     mut images: ResMut<Assets<Image>>,
     mut egui_context: EguiContexts,
 
-    mut ambient_light: ResMut<AmbientLight>,
-
     mut materials_pbr: ResMut<Assets<StandardMaterial>>,
     mut materials_wireframe: ResMut<Assets<WireframeMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let Ok(()) = robot.get(event.entity()) else {
+    let Ok(robot_id) = robot.get(event.entity()) else {
         error!("Tried to setup photosphere on non robot entity");
         return;
     };
@@ -150,54 +151,72 @@ fn spawn_photo_sphere(
 
     let photo_sphere_image_handle = images.add(photo_sphere_image);
 
+    let material = materials_pbr.add(StandardMaterial {
+        // base_color: Color::LinearRgba(LinearRgba::RED),
+        base_color_texture: Some(photo_sphere_image_handle.clone()),
+        unlit: true,
+        ..default()
+    });
+
     let view_image_texture = egui_context.add_image(view_image_handle.clone_weak());
-    let photo_sphere = cmds
-        .spawn(PhotoSphere {
+    let photosphere_image_texture = egui_context.add_image(photo_sphere_image_handle.clone_weak());
+    cmds.spawn((
+        Transform::default(),
+        Visibility::default(),
+        PhotoSphere {
             view_texture: view_image_handle.clone(),
             view_texture_egui: view_image_texture,
             photo_sphere: photo_sphere_image_handle.clone(),
-        })
-        .observe(update_photo_sphere)
-        .observe(rotate_camera)
-        .with_children(|cmds| {
-            cmds.spawn((
-                Camera3d::default(),
-                Camera {
-                    // render before the "main pass" camera
-                    order: -1,
-                    target: RenderTarget::Image(view_image_handle),
-                    ..default()
-                },
-                layer.clone(),
-                PhotoSphereCameraMarker,
-            ));
+            photo_sphere_egui: photosphere_image_texture,
+            material: material.clone(),
+        },
+        *robot_id,
+    ))
+    .observe(update_photo_sphere)
+    .observe(rotate_camera)
+    .with_children(|cmds| {
+        cmds.spawn((
+            Camera3d::default(),
+            Camera {
+                // render before the "main pass" camera
+                order: -1,
+                target: RenderTarget::Image(view_image_handle),
+                clear_color: ClearColorConfig::Custom(LinearRgba::BLUE.into()),
+                ..default()
+            },
+            layer.clone(),
+            PhotoSphereCameraMarker,
+        ));
 
-            cmds.spawn((
-                PointLight {
-                    shadows_enabled: false,
-                    intensity: if DARK_MODE { 1_000_000.0 } else { 4_000_000.0 },
-                    ..default()
-                },
-                layer.clone(),
-            ));
-            if !DARK_MODE {
-                ambient_light.brightness *= 7.0;
-            }
+        cmds.spawn((
+            Mesh3d(meshes.add(Sphere::new(-1.0).mesh().ico(20).unwrap())),
+            MeshMaterial3d(material),
+            // MeshMaterial3d(materials_pbr.add(photo_sphere_image_handle)),
+            layer.clone(),
+        ));
+        //
+        // cmds.spawn((
+        //     Mesh3d(meshes.add(Sphere::new(1.1).mesh().ico(5).unwrap())),
+        //     MeshMaterial3d(materials_wireframe.add(WireframeMaterial {
+        //         color: LinearRgba::BLACK,
+        //     })),
+        //     layer.clone(),
+        // ));
+        //
+        // cmds.spawn((
+        //     Mesh3d(meshes.add(Sphere::new(-1.1).mesh().ico(5).unwrap())),
+        //     MeshMaterial3d(materials_wireframe.add(WireframeMaterial {
+        //         color: LinearRgba::RED,
+        //     })),
+        //     layer.clone(),
+        // ));
 
-            cmds.spawn((
-                Mesh3d(meshes.add(Sphere::new(1.0).mesh().ico(5).unwrap())),
-                MeshMaterial3d(materials_pbr.add(photo_sphere_image_handle)),
-                layer.clone(),
-            ));
-
-            cmds.spawn((
-                Mesh3d(meshes.add(Sphere::new(-1.1).mesh().ico(5).unwrap())),
-                MeshMaterial3d(materials_wireframe.add(WireframeMaterial::default())),
-                layer.clone(),
-            ));
-        })
-        .id();
-    cmds.entity(event.entity()).add_child(photo_sphere);
+        // cmds.spawn((
+        //     Mesh3d(meshes.add(Cuboid::new(-0.5, -0.5, -0.5).mesh())),
+        //     MeshMaterial3d(materials_pbr.add(Color::BLACK)),
+        //     layer.clone(),
+        // ));
+    });
 }
 
 fn update_photo_sphere(
@@ -238,8 +257,9 @@ fn update_photo_sphere(
             continue;
         };
 
-        cmds.entity(camera)
-            .insert(Transform::from_rotation(event.event().quat));
+        // cmds.entity(camera) .insert(Transform::from_rotation(event.event().quat));
+        // cmds.entity(camera)
+        //     .insert(Transform::default().looking_at(event.event().quat * Vec3::X, Vec3::Z));
     }
 }
 
@@ -253,20 +273,32 @@ fn rotate_camera(
         return;
     };
 
+    let mut did_rotate = false;
+
     for child in children {
         let Ok(mut transform) = camera.get_mut(*child) else {
             continue;
         };
 
+        did_rotate = true;
+
+        info!("Rotate_camera by: {:?}", event.event().0);
+
         let Vec2 { x, y } = event.event().0;
-        transform.rotate_z(x);
+        transform.rotate_y(x);
         transform.rotate_local_x(y);
+    }
+
+    if !did_rotate {
+        error!("Did not rotate");
     }
 }
 
 fn image_read_back(
     channels: Res<AsyncImageProcessingChannels>,
     mut images: ResMut<Assets<Image>>,
+    mut change_notifier1: EventWriter<AssetEvent<Image>>,
+    mut change_notifier2: EventWriter<AssetEvent<StandardMaterial>>,
     query: Query<&PhotoSphere>,
 ) {
     for (entity, new_image) in channels.1.try_iter() {
@@ -281,29 +313,39 @@ fn image_read_back(
             continue;
         };
 
+        info!("Updated photosphere texture");
+
         *photo_sphere_image = new_image;
+
+        change_notifier1.send(AssetEvent::Modified {
+            id: photosphere.photo_sphere.id(),
+        });
+
+        change_notifier2.send(AssetEvent::Modified {
+            id: photosphere.material.id(),
+        });
     }
 }
 
 fn take_photo_sphere_image(
     event: Trigger<TakePhotoSphereImage>,
     mut cmds: Commands,
-    robot: Query<(&Orientation, Option<&Children>), With<Robot>>,
+    robot: Query<(&Orientation, &RobotId), With<Robot>>,
     master_camera: Query<&ImageHandle, With<VideoMasterMarker>>,
-    photo_spheres: Query<Entity, With<PhotoSphere>>,
+    photo_spheres: Query<(Entity, &RobotId), With<PhotoSphere>>,
     images: Res<Assets<Image>>,
 ) {
-    let Ok((orientation, children)) = robot.get(event.entity()) else {
+    let Ok((orientation, robot_id)) = robot.get(event.entity()) else {
         error!("Get robot orientation for image");
         return;
     };
 
     let mut is_taken = false;
 
-    for child in children.iter().flat_map(|it| it.into_iter()) {
-        let Ok(photosphere) = photo_spheres.get(*child) else {
+    for (photosphere, other_robot_id) in photo_spheres.iter() {
+        if robot_id != other_robot_id {
             continue;
-        };
+        }
 
         let Ok(image_handle) = master_camera.get_single() else {
             error!("Get image from master camera");
@@ -317,8 +359,8 @@ fn take_photo_sphere_image(
 
         cmds.entity(photosphere).trigger(UpdatePhotoSphere {
             image: image.clone(),
-            fov_degrees: 100.0,
-            quat: orientation.0,
+            fov_degrees: 50.0,
+            quat: Quat::from_rotation_x(90f32.to_radians()) * orientation.0,
         });
 
         is_taken = true;
@@ -427,5 +469,14 @@ pub fn update_photo_sphere_inner(
         }
     }
 
+    photo_sphere
+        .clone()
+        .try_into_dynamic()
+        .unwrap()
+        .save("photo_sphere.png")
+        .unwrap();
+
     Ok(())
 }
+
+// fn fill_image(image: &mut)

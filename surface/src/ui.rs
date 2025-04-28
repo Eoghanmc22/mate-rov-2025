@@ -23,7 +23,7 @@ use common::{
 };
 use egui::{
     load::SizedTexture, text::LayoutJob, widgets, Align, Color32, Id, Label, Layout, RichText,
-    TextBuffer, TextFormat, Visuals,
+    Sense, TextBuffer, TextFormat, Visuals,
 };
 use egui_plot::{Line, Plot, PlotPoint};
 use leafwing_input_manager::input_map::InputMap;
@@ -772,16 +772,23 @@ fn photosphere(
             .default_size((230.0, 230.0))
             .open(&mut open)
             .show(context, |ui| {
-                let response = ui.image(SizedTexture::new(
-                    photosphere.view_texture_egui,
-                    (ui.available_width(), ui.available_width()),
-                ));
+                let response = ui
+                    .image(SizedTexture::new(
+                        photosphere.view_texture_egui,
+                        (ui.available_width(), ui.available_width()),
+                    ))
+                    .interact(Sense::DRAG);
 
                 if response.dragged() {
+                    info!("Dragged");
                     let delta = response.drag_delta();
                     cmds.entity(entity)
-                        .trigger(RotatePhotoSphere(Vec2::new(delta.x, delta.y)));
+                        .trigger(RotatePhotoSphere(Vec2::new(delta.x, delta.y) / 100.0));
                 }
+                ui.image(SizedTexture::new(
+                    photosphere.photo_sphere_egui,
+                    (ui.available_width(), ui.available_width()),
+                ));
             });
 
         if !open {
