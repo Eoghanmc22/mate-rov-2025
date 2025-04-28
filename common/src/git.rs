@@ -9,8 +9,8 @@ pub struct GitMetadata {
     pub branch: Cow<'static, str>,
     pub commit_message: Cow<'static, str>,
     pub commit_hash: Cow<'static, str>,
-    pub commit_date: Cow<'static, str>,
-    pub commit_timestamp: Cow<'static, str>,
+    // pub commit_date: Cow<'static, str>,
+    // pub commit_timestamp: Cow<'static, str>,
     pub dirty: Cow<'static, str>,
 }
 
@@ -19,16 +19,16 @@ impl GitMetadata {
         let branch = option_env!("VERGEN_GIT_BRANCH")?.into();
         let commit_message = option_env!("VERGEN_GIT_COMMIT_MESSAGE")?.into();
         let commit_hash = option_env!("VERGEN_GIT_SHA")?.into();
-        let commit_date = option_env!("VERGEN_GIT_COMMIT_DATE")?.into();
-        let commit_timestamp = option_env!("VERGEN_GIT_COMMIT_TIMESTAMP")?.into();
+        // let commit_date = option_env!("VERGEN_GIT_COMMIT_DATE")?.into();
+        // let commit_timestamp = option_env!("VERGEN_GIT_COMMIT_TIMESTAMP")?.into();
         let dirty = option_env!("VERGEN_GIT_DIRTY")?.into();
 
         Some(Self {
             branch,
             commit_message,
             commit_hash,
-            commit_date,
-            commit_timestamp,
+            // commit_date,
+            // commit_timestamp,
             dirty,
         })
     }
