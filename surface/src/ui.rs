@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, VecDeque},
+    collections::{hash_map::Entry, BTreeMap, VecDeque},
     time::Duration,
 };
 
@@ -193,7 +193,12 @@ fn topbar(
 
                 // TODO: Hide/Show All
 
-                for (entity, name, processor) in &cameras {
+                let cameras = cameras
+                    .iter()
+                    .map(|it| (it.1.as_str(), it))
+                    .collect::<BTreeMap<_, _>>();
+
+                for (entity, name, processor) in cameras.values() {
                     ui.menu_button(name.as_str(), |ui| {
                         // TODO: Hide/Show
 
@@ -206,9 +211,9 @@ fn topbar(
                                 .clicked()
                             {
                                 if !selected {
-                                    cmds.entity(entity).insert(pipeline.factory.clone());
+                                    cmds.entity(*entity).insert(pipeline.factory.clone());
                                 } else {
-                                    cmds.entity(entity).remove::<VideoProcessorFactory>();
+                                    cmds.entity(*entity).remove::<VideoProcessorFactory>();
                                 }
                             }
                         }
