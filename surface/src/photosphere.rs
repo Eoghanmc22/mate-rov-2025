@@ -1,3 +1,5 @@
+use std::thread;
+
 use bevy::{
     image::TextureAccessError,
     math::Vec3A,
@@ -12,6 +14,7 @@ use bevy::{
 };
 use bevy_egui::EguiContexts;
 use common::components::{Orientation, Robot};
+use crossbeam::channel::{Receiver, Sender};
 use egui::TextureId;
 
 use crate::{
@@ -24,7 +27,11 @@ pub struct PhotoSpherePlugin;
 
 impl Plugin for PhotoSpherePlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(spawn_photo_sphere)
+        let (tx, rx) = crossbeam::channel::bounded(10);
+
+        app.insert_resource(AsyncImageProcessingChannels(tx, rx))
+            .add_systems(Update, image_read_back)
+            .add_observer(spawn_photo_sphere)
             .add_observer(take_photo_sphere_image)
             .add_plugins(WireframePlugin);
     }
@@ -60,6 +67,9 @@ pub struct TakePhotoSphereImage;
 // Trigger on photosphere entity
 #[derive(Event, Debug, Clone)]
 pub struct RotatePhotoSphere(pub Vec2);
+
+#[derive(Resource)]
+pub struct AsyncImageProcessingChannels(Sender<(Entity, Image)>, Receiver<(Entity, Image)>);
 
 fn spawn_photo_sphere(
     event: Trigger<SpawnPhotoSphere>,
@@ -164,7 +174,7 @@ fn spawn_photo_sphere(
 
             cmds.spawn((
                 PointLight {
-                    shadows_enabled: true,
+                    shadows_enabled: false,
                     intensity: if DARK_MODE { 1_000_000.0 } else { 4_000_000.0 },
                     ..default()
                 },
@@ -181,7 +191,7 @@ fn spawn_photo_sphere(
             ));
 
             cmds.spawn((
-                Mesh3d(meshes.add(Sphere::new(1.1).mesh().ico(5).unwrap())),
+                Mesh3d(meshes.add(Sphere::new(-1.1).mesh().ico(5).unwrap())),
                 MeshMaterial3d(materials_wireframe.add(WireframeMaterial::default())),
                 layer.clone(),
             ));
@@ -193,27 +203,41 @@ fn spawn_photo_sphere(
 fn update_photo_sphere(
     event: Trigger<UpdatePhotoSphere>,
     mut cmds: Commands,
-    query: Query<&PhotoSphere>,
+    query: Query<(&PhotoSphere, &Children)>,
     cameras: Query<Entity, With<PhotoSphereCameraMarker>>,
-    mut images: ResMut<Assets<Image>>,
+    images: Res<Assets<Image>>,
+    channels: Res<AsyncImageProcessingChannels>,
 ) {
-    let Ok(photosphere) = query.get(event.entity()) else {
+    let Ok((photosphere, children)) = query.get(event.entity()) else {
         return;
     };
 
-    let Some(photosphere) = images.get_mut(&photosphere.photo_sphere) else {
+    let Some(photosphere) = images.get(&photosphere.photo_sphere) else {
         return;
     };
 
-    let res = update_photo_sphere_inner(photosphere, event.event());
+    {
+        let entity = event.entity();
+        let event = event.event().clone();
+        let mut photosphere = photosphere.clone();
+        let tx = channels.0.clone();
 
-    match res {
-        Ok(()) => {}
-        Err(err) => panic!("Error in update_photo_sphere_inner: {err:?}"),
+        thread::spawn(move || {
+            let res = update_photo_sphere_inner(&mut photosphere, &event);
+
+            match res {
+                Ok(()) => {}
+                Err(err) => panic!("Error in update_photo_sphere_inner: {err:?}"),
+            }
+            let _ = tx.send((entity, photosphere));
+        });
     }
 
-    // TODO: relate the camera to the photosphere entity
-    for camera in cameras.iter() {
+    for child in children {
+        let Ok(camera) = cameras.get(*child) else {
+            continue;
+        };
+
         cmds.entity(camera)
             .insert(Transform::from_rotation(event.event().quat));
     }
@@ -237,6 +261,27 @@ fn rotate_camera(
         let Vec2 { x, y } = event.event().0;
         transform.rotate_z(x);
         transform.rotate_local_x(y);
+    }
+}
+
+fn image_read_back(
+    channels: Res<AsyncImageProcessingChannels>,
+    mut images: ResMut<Assets<Image>>,
+    query: Query<&PhotoSphere>,
+) {
+    for (entity, new_image) in channels.1.try_iter() {
+        let Ok(photosphere) = query.get(entity) else {
+            warn!("Got photosphere update for unknown entity");
+
+            continue;
+        };
+
+        let Some(photo_sphere_image) = images.get_mut(&photosphere.photo_sphere) else {
+            error!("Photo sphere bound to bad texture");
+            continue;
+        };
+
+        *photo_sphere_image = new_image;
     }
 }
 
