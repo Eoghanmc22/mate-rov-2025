@@ -29,7 +29,7 @@ in
       gst_all_1.gst-libav
       ffmpeg
       kitty
-      #rustup
+      rustup
       #cargo
     ];
     RUSTC_VERSION = overrides.toolchain.channel;
