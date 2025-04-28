@@ -325,7 +325,11 @@ fn net_read(
                 }
                 Protocol::GitMetadata(git_metadata) => {
                     if Some(&git_metadata) != GitMetadata::new().as_ref() {
-                        warn!("Git metadata mismatch with peer!");
+                        warn!(
+                            "Git metadata mismatch with peer! self: {:?}, peer: {:?}",
+                            GitMetadata::new(),
+                            git_metadata
+                        );
                     } else {
                         info!("Git metadata matches with peer");
                     }
