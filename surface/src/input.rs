@@ -101,7 +101,7 @@ impl InputInterpolation {
             power: 3.0,
             scale: 0.1,
             translate_gain: vec3a(1.0, 1.0, 1.0),
-            translate_gain_depth_hold: vec3a(1.0, 1.0, 0.0),
+            translate_gain_depth_hold: vec3a(2.0, 1.0, 0.0),
             torque_gain: vec3a(1.0, 1.0, 0.5),
             torque_gain_stabalize: vec3a(0.0, 0.0, 0.0),
         }
