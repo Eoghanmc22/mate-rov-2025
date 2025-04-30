@@ -1,7 +1,8 @@
 pub mod edges;
 pub mod marker;
 pub mod measure;
-pub mod photosphere;
+// pub mod photosphere;
+pub mod copy_to_ecs;
 pub mod save;
 pub mod scale;
 pub mod squares;
@@ -33,8 +34,9 @@ use crossbeam::{
     channel::{bounded, Receiver, Sender},
 };
 use opencv::core::Mat;
-use photosphere::PhotoSpherePipelinePlugin;
+// use photosphere::PhotoSpherePipelinePlugin;
 use tracing::{debug, error};
+use undistort::UndistortPipelinePlugin;
 
 use crate::{
     video_pipelines::{
@@ -57,11 +59,11 @@ impl PluginGroup for VideoPipelinePlugins {
             .add(EdgesPipelinePlugin)
             .add(MarkerPipelinePlugin)
             // .add(MeasurePipelinePlugin)
-            .add(PhotoSpherePipelinePlugin)
+            // .add(PhotoSpherePipelinePlugin)
             .add(SavePipelinePlugin)
             // .add(ScalePipelinePlugin)
             .add(SquarePipelinePlugin)
-        // .add(UndistortPipelinePlugin)
+            .add(UndistortPipelinePlugin)
     }
 }
 
