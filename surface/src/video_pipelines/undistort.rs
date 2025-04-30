@@ -109,8 +109,8 @@ impl Pipeline for UndistortPipeline {
                     size,
                     map_x,
                     map_y,
-                    rows: Range::new(roi.x, roi.x + roi.width).context("Rows Range")?,
-                    cols: Range::new(roi.y, roi.y + roi.height).context("Cols Range")?,
+                    rows: Range::new(roi.y, roi.y + roi.height).context("Rows Range")?,
+                    cols: Range::new(roi.x, roi.x + roi.width).context("Cols Range")?,
                 })
             }
         };
