@@ -93,6 +93,13 @@ impl InputInterpolation {
         }
     }
 
+    pub const fn slow() -> Self {
+        Self {
+            scale: 0.4,
+            ..Self::normal()
+        }
+    }
+
     pub const fn precision() -> Self {
         Self {
             depth_mps: 0.3,
@@ -736,6 +743,8 @@ fn robot_mode(
 
         if toggle {
             if *interpolation == InputInterpolation::normal() {
+                *interpolation = InputInterpolation::slow()
+            } else if *interpolation == InputInterpolation::slow() {
                 *interpolation = InputInterpolation::precision()
             } else {
                 *interpolation = InputInterpolation::normal()

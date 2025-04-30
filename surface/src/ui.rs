@@ -497,6 +497,8 @@ fn hud(
                             ui.label(RichText::new("Robot Mode:").size(size));
                             if *input_interpolation == InputInterpolation::normal() {
                                 ui.label(RichText::new("Normal").size(size).color(Color32::GREEN));
+                            } else if *input_interpolation == InputInterpolation::slow() {
+                                ui.label(RichText::new("Slow").size(size).color(Color32::ORANGE));
                             } else if *input_interpolation == InputInterpolation::precision() {
                                 ui.label(
                                     RichText::new("Precision").size(size).color(Color32::BLUE),
