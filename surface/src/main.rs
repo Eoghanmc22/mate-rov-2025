@@ -4,6 +4,7 @@ pub mod attitude;
 pub mod input;
 pub mod layer_allocator;
 pub mod photosphere;
+pub mod shipreck;
 pub mod surface;
 pub mod ui;
 pub mod video_display_2d_master;

@@ -297,7 +297,7 @@ fn gen_src(camera: &CameraDefinition) -> String {
 }
 
 /// Efficiently converts opencv `Mat`s to bevy `Image`s
-fn mat_to_image(mat: &Mat, image: &mut Image) -> anyhow::Result<()> {
+pub fn mat_to_image(mat: &Mat, image: &mut Image) -> anyhow::Result<()> {
     // Convert opencv size to bevy size
     let size = mat.size().context("Get size")?;
     let extent = Extent3d {

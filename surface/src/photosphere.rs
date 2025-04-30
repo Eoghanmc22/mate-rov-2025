@@ -22,7 +22,7 @@ use crate::{
     video_stream::ImageHandle, DARK_MODE,
 };
 
-// TODO: Rotate camera to current robot orientation when taking image
+// TODO: Consider switching to rendering each image to a plane instead of projecting to a sphere
 pub struct PhotoSpherePlugin;
 
 impl Plugin for PhotoSpherePlugin {
@@ -72,7 +72,7 @@ pub struct TakePhotoSphereImage;
 pub struct RotatePhotoSphere(pub Vec2);
 
 #[derive(Resource)]
-pub struct AsyncImageProcessingChannels(Sender<(Entity, Image)>, Receiver<(Entity, Image)>);
+struct AsyncImageProcessingChannels(Sender<(Entity, Image)>, Receiver<(Entity, Image)>);
 
 fn spawn_photo_sphere(
     event: Trigger<SpawnPhotoSphere>,
