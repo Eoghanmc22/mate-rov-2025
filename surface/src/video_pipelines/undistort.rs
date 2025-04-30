@@ -3,6 +3,7 @@ use bevy::{
     app::{App, Plugin},
     prelude::{Entity, EntityRef, EntityWorldMut, World},
 };
+use common::components::CameraCalibration;
 use opencv::{
     calib3d,
     core::{Range, Rect, Size},
@@ -92,14 +93,13 @@ impl Pipeline for UndistortPipeline {
 
                 let mut map_x = Mat::default();
                 let mut map_y = Mat::default();
-                // TODO: What does the 5 mean? taken from https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
                 calib3d::init_undistort_rectify_map(
                     mtx,
                     dist,
                     &Mat::default(),
                     &new_mtx,
                     size,
-                    5,
+                    opencv::core::CV_32F,
                     &mut map_x,
                     &mut map_y,
                 )
@@ -141,17 +141,21 @@ impl FromWorldEntity for UndistortPipeline {
     where
         Self: Sized,
     {
-        // TODO: Store these values on the robot and grab them from the ecs here
-        let mtx = Mat::default();
-        let dist = Mat::default();
+        let calib = world
+            .get::<CameraCalibration>(camera)
+            .context("Camera entity must exist and have calib")?;
 
-        // Self {
-        //     undistorted: Mat::default(),
-        //     cropped: Mat::default(),
-        //     mtx,
-        //     dist,
-        //     remap: None,
-        // };
-        todo!("Get real data")
+        let mtx = Mat::from_slice_2d(&calib.camera_matrix.to_cols_array_2d())
+            .context("Mat from camera matrix")?;
+        let dist = Mat::from_slice_2d(&[&calib.distortion_coefficients])
+            .context("Mat from dist coeffs")?;
+
+        Ok(Self {
+            undistorted: Mat::default(),
+            cropped: Mat::default(),
+            mtx,
+            dist,
+            remap: None,
+        })
     }
 }

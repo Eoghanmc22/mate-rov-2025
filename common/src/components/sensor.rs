@@ -4,7 +4,7 @@ use bevy::{
     ecs::component::Component,
     reflect::{prelude::ReflectDefault, Reflect, ReflectDeserialize, ReflectSerialize},
 };
-use glam::Quat;
+use glam::{Mat3A, Quat};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -78,3 +78,10 @@ pub struct CameraDefinition {
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 pub struct CameraInputRotation(pub Quat);
+
+#[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq, Default)]
+pub struct CameraCalibration {
+    pub camera_matrix: Mat3A,
+    // TODO: Figure out if this is always 5 long
+    pub distortion_coefficients: Vec<f32>,
+}

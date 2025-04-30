@@ -69,6 +69,7 @@ components! {
         Leak,
         CameraDefinition,
         CameraInputRotation,
+        CameraCalibration,
     },
 
     system_monitor::{

@@ -1,14 +1,14 @@
 use bevy::{core::Name, ecs::bundle::Bundle, transform::components::Transform};
 
 use crate::components::{
-    AccelerometerMeasurement, ActualForce, ActualMovement, Armed, CameraDefinition,
-    CameraInputRotation, CenterOfMass, CurrentDraw, DepthMeasurement, GenericMotorId,
-    GyroMeasurement, Leak, MagnetometerMeasurement, MeasuredVoltage, MotorContributionMode,
-    MotorRawSignalRange, MotorSignal, MotorSignalType, MovementAxisMaximums, MovementContribution,
-    MovementCurrentCap, Orientation, Robot, RobotId, SystemCores, SystemCpuTotal, SystemDisks,
-    SystemLoadAverage, SystemMemory, SystemNetworks, SystemOs, SystemProcesses, SystemTemperatures,
-    SystemUptime, TargetForce, TargetMovement, TempertureMeasurement, ThrusterDefinition,
-    Thrusters,
+    AccelerometerMeasurement, ActualForce, ActualMovement, Armed, CameraCalibration,
+    CameraDefinition, CameraInputRotation, CenterOfMass, CurrentDraw, DepthMeasurement,
+    GenericMotorId, GyroMeasurement, Leak, MagnetometerMeasurement, MeasuredVoltage,
+    MotorContributionMode, MotorRawSignalRange, MotorSignal, MotorSignalType, MovementAxisMaximums,
+    MovementContribution, MovementCurrentCap, Orientation, Robot, RobotId, SystemCores,
+    SystemCpuTotal, SystemDisks, SystemLoadAverage, SystemMemory, SystemNetworks, SystemOs,
+    SystemProcesses, SystemTemperatures, SystemUptime, TargetForce, TargetMovement,
+    TempertureMeasurement, ThrusterDefinition, Thrusters,
 };
 
 #[derive(Bundle, PartialEq)]
@@ -88,6 +88,8 @@ pub struct CameraBundle {
     pub name: Name,
     pub camera: CameraDefinition,
     pub input_rotation: CameraInputRotation,
+    // FIXME: This should be optional
+    pub calib: CameraCalibration,
     pub transform: Transform,
 
     pub robot: RobotId,
