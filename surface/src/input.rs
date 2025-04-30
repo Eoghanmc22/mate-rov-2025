@@ -95,11 +95,11 @@ impl InputInterpolation {
 
     pub const fn precision() -> Self {
         Self {
-            depth_mps: 0.2,
+            depth_mps: 0.3,
             trim_dps: vec3a(25.0, 25.0, 60.0),
             servo_rate: 1.0,
             power: 3.0,
-            scale: 0.1,
+            scale: 0.2,
             translate_gain: vec3a(1.0, 1.0, 1.0),
             translate_gain_depth_hold: vec3a(2.0, 1.0, 0.0),
             torque_gain: vec3a(1.0, 1.0, 0.5),
