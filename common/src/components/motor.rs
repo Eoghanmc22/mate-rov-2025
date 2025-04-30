@@ -48,7 +48,7 @@ pub struct MotorRawSignalRange {
 
 impl MotorRawSignalRange {
     pub fn clamp_raw(&self, raw: i32) -> i32 {
-        raw.clamp(self.min, self.max)
+        raw.clamp(self.min.min(self.max), self.min.max(self.max))
     }
 
     pub fn percent_from_raw(&self, raw: i32) -> f32 {
