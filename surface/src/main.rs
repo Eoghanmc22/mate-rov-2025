@@ -4,7 +4,7 @@ pub mod attitude;
 pub mod input;
 pub mod layer_allocator;
 pub mod photosphere;
-pub mod shipreck;
+pub mod shipwreck;
 pub mod surface;
 pub mod ui;
 pub mod video_display_2d_master;
@@ -29,6 +29,7 @@ use crossbeam::channel::unbounded;
 use input::InputPlugin;
 use opencv::{highgui, imgcodecs};
 use photosphere::PhotoSpherePlugin;
+use shipwreck::ShipwreckMeasurementPlugin;
 use surface::SurfacePlugin;
 use ui::{EguiUiPlugin, ShowInspector};
 // use video_display_2d_tile::{VideoDisplay2DPlugin, VideoDisplay2DSettings};
@@ -46,6 +47,10 @@ use crate::video_pipelines::{
 pub const DARK_MODE: bool = false;
 
 fn main() -> anyhow::Result<()> {
+    // opencv_shipwreck()?;
+    //
+    // return Ok(());
+
     info!("---------- Starting Control Station ----------");
 
     // FIXME(high): Times out when focus is lost
@@ -80,7 +85,7 @@ fn main() -> anyhow::Result<()> {
             // }),
             // Diagnostics
             (
-                LogDiagnosticsPlugin::default(),
+                // LogDiagnosticsPlugin::default(),
                 EntityCountDiagnosticsPlugin,
                 FrameTimeDiagnosticsPlugin,
             ),
@@ -99,6 +104,7 @@ fn main() -> anyhow::Result<()> {
                 VideoDisplay2DPlugin,
                 // VideoDisplay3DPlugin,
                 VideoPipelinePlugins,
+                ShipwreckMeasurementPlugin,
             ),
             // 3rd Party
             (
@@ -115,7 +121,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn opencv() -> anyhow::Result<()> {
+fn opencv_pipeline() -> anyhow::Result<()> {
     let mut img = imgcodecs::imread_def("test.jpg").context("Read image")?;
 
     let (cmds_tx, cmds_rx) = unbounded();
@@ -143,6 +149,15 @@ fn opencv() -> anyhow::Result<()> {
 
     highgui::imshow("Image", out).context("Gui")?;
     highgui::wait_key_def().context("Wait key")?;
+
+    Ok(())
+}
+
+fn opencv_shipwreck() -> anyhow::Result<()> {
+    let img = imgcodecs::imread_def("input1.png").context("Read image")?;
+
+    // shipwreck::find_contours(&img).context("Find contours")?;
+    // shipwreck::find_lines(&img).context("Find lines")?;
 
     Ok(())
 }

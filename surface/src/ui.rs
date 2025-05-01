@@ -34,7 +34,7 @@ use crate::{
     attitude::OrientationDisplay,
     input::{Action, InputInterpolation, InputMarker, SelectedServo},
     photosphere::{PhotoSphere, RotatePhotoSphere, SpawnPhotoSphere},
-    shipreck::{
+    shipwreck::{
         self, ComputeShipwreckMeasurement, ShipwreckImage, ShipwreckMeasurementPOIs,
         ShipwreckMeasurementResult,
     },
@@ -833,97 +833,106 @@ fn shipwreck(
             .default_size((230.0, 230.0))
             .open(&mut open)
             .show(context, |ui| {
-                let response = Plot::new("Shipwreck Plot").show(ui, |ui| {
-                    let image_size = images
-                        .get(&image.image_handle)
-                        .map(|it| it.size_f32())
-                        .unwrap_or_default();
+                let response = Plot::new("Shipwreck Plot")
+                    .data_aspect(1.0)
+                    .min_size(egui::Vec2::new(100.0, 100.0))
+                    .width(ui.available_width())
+                    .height(ui.available_width())
+                    .show(ui, |ui| {
+                        let image_size = images
+                            .get(&image.image_handle)
+                            .map(|it| it.size_f32())
+                            .unwrap_or_default();
 
-                    ui.image(PlotImage::new(
-                        "Shipwreck",
-                        image.egui_texture,
-                        PlotPoint {
-                            x: image_size.x as f64 / 2.0,
-                            y: image_size.y as f64 / 2.0,
-                        },
-                        [image_size.x, image_size.y],
-                    ));
-
-                    if let Some(reference_point) = pois.reference_point {
-                        ui.points(
-                            Points::new(
-                                "Reference Point",
-                                [reference_point.x as f64, reference_point.y as f64],
-                            )
-                            .color(Color32::RED),
-                        );
-                        ui.polygon(
-                            egui_plot::Polygon::new(
-                                "Reference Point ROI",
-                                vec![
-                                    [
-                                        reference_point.x as f64 - 100.0,
-                                        reference_point.y as f64 - 100.0,
-                                    ],
-                                    [
-                                        reference_point.x as f64 - 100.0,
-                                        reference_point.y as f64 + 100.0,
-                                    ],
-                                    [
-                                        reference_point.x as f64 + 100.0,
-                                        reference_point.y as f64 - 100.0,
-                                    ],
-                                    [
-                                        reference_point.x as f64 + 100.0,
-                                        reference_point.y as f64 - 100.0,
-                                    ],
-                                ],
-                            )
-                            .stroke((2.0, Color32::RED)),
-                        );
-                    }
-
-                    if let Some(measurement_start) = pois.measurement_start {
-                        ui.points(
-                            Points::new(
-                                "Measurement Start",
-                                [measurement_start.x as f64, measurement_start.y as f64],
-                            )
-                            .color(Color32::GREEN),
-                        );
-                    }
-
-                    if let Some(measurement_end) = pois.measurement_end {
-                        ui.points(
-                            Points::new(
-                                "Measurement End",
-                                [measurement_end.x as f64, measurement_end.y as f64],
-                            )
-                            .color(Color32::GREEN),
-                        );
-                    }
-
-                    if let (Some(start), Some(end)) = (pois.measurement_start, pois.measurement_end)
-                    {
-                        ui.line(Line::new(
-                            "Measurement Path",
-                            vec![
-                                [start.x as f64, start.y as f64],
-                                [end.x as f64, end.y as f64],
-                            ],
+                        ui.image(PlotImage::new(
+                            "Shipwreck",
+                            image.egui_texture,
+                            PlotPoint {
+                                x: image_size.x as f64 / 2.0,
+                                y: -image_size.y as f64 / 2.0,
+                            },
+                            [image_size.x, image_size.y],
                         ));
-                    }
-                });
+
+                        if let Some(reference_point) = pois.reference_point {
+                            ui.points(
+                                Points::new(
+                                    "Reference Point",
+                                    [reference_point.x as f64, -reference_point.y as f64],
+                                )
+                                .color(Color32::RED)
+                                .radius(3.0),
+                            );
+                            ui.polygon(
+                                egui_plot::Polygon::new(
+                                    "Reference Point ROI",
+                                    vec![
+                                        [
+                                            reference_point.x as f64 - crate::shipwreck::POI_SIZE,
+                                            -reference_point.y as f64 - crate::shipwreck::POI_SIZE,
+                                        ],
+                                        [
+                                            reference_point.x as f64 - crate::shipwreck::POI_SIZE,
+                                            -reference_point.y as f64 + crate::shipwreck::POI_SIZE,
+                                        ],
+                                        [
+                                            reference_point.x as f64 + crate::shipwreck::POI_SIZE,
+                                            -reference_point.y as f64 + crate::shipwreck::POI_SIZE,
+                                        ],
+                                        [
+                                            reference_point.x as f64 + crate::shipwreck::POI_SIZE,
+                                            -reference_point.y as f64 - crate::shipwreck::POI_SIZE,
+                                        ],
+                                    ],
+                                )
+                                .stroke((2.0, Color32::RED)),
+                            );
+                        }
+
+                        if let Some(measurement_start) = pois.measurement_start {
+                            ui.points(
+                                Points::new(
+                                    "Measurement Start",
+                                    [measurement_start.x as f64, -measurement_start.y as f64],
+                                )
+                                .color(Color32::GREEN)
+                                .radius(3.0),
+                            );
+                        }
+
+                        if let Some(measurement_end) = pois.measurement_end {
+                            ui.points(
+                                Points::new(
+                                    "Measurement End",
+                                    [measurement_end.x as f64, -measurement_end.y as f64],
+                                )
+                                .color(Color32::GREEN)
+                                .radius(3.0),
+                            );
+                        }
+
+                        if let (Some(start), Some(end)) =
+                            (pois.measurement_start, pois.measurement_end)
+                        {
+                            ui.line(Line::new(
+                                "Measurement Path",
+                                vec![
+                                    [start.x as f64, -start.y as f64],
+                                    [end.x as f64, -end.y as f64],
+                                ],
+                            ));
+                        }
+                    });
 
                 if let Some(pointer) = response.response.hover_pos() {
                     if response.response.clicked_by(egui::PointerButton::Secondary) {
                         let point = response.transform.value_from_position(pointer);
-                        pois.reference_point = Some(Vec2::new(point.x as f32, point.y as f32));
+                        pois.reference_point = Some(Vec2::new(point.x as f32, -point.y as f32));
                     }
 
                     if response.response.clicked_by(egui::PointerButton::Primary) {
                         let point = response.transform.value_from_position(pointer);
-                        let point = Some(Vec2::new(point.x as f32, point.y as f32));
+                        let point = Some(Vec2::new(point.x as f32, -point.y as f32));
 
                         match (pois.measurement_start, pois.measurement_end) {
                             (None, _) => {
@@ -941,7 +950,9 @@ fn shipwreck(
                 }
 
                 if ui.button("Run Computation").clicked() {
-                    cmds.entity(entity).trigger(ComputeShipwreckMeasurement);
+                    cmds.entity(entity)
+                        .remove::<ShipwreckMeasurementResult>()
+                        .trigger(ComputeShipwreckMeasurement);
                 }
 
                 if let Some(result) = result {
