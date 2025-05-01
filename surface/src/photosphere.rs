@@ -118,7 +118,7 @@ fn spawn_photo_sphere(
             view_texture_egui: view_image_texture,
             materials: vec![],
             images: vec![],
-            square_mesh: meshes.add(Plane3d::new(Vec3::Z, Vec2::splat(1.0))),
+            square_mesh: meshes.add(Plane3d::new(Vec3::NEG_Y, Vec2::splat(1.0))),
         },
         layer.clone(),
         *robot_id,
@@ -188,9 +188,10 @@ fn update_photo_sphere(
             ..default()
         })),
         Transform {
-            translation: update.quat * Vec3::NEG_Z * radius,
+            translation: update.quat * Vec3::Y * radius,
             rotation: update.quat,
-            scale: size.extend(1.0),
+            // scale: size.extend(1.0),
+            scale: Vec3::new(size.x, 1.0, size.y),
         },
         layer.clone(),
     ));
@@ -200,7 +201,7 @@ fn update_photo_sphere(
     for child in children {
         if let Ok(camera) = cameras.get(*child) {
             cmds.entity(camera)
-                .insert(Transform::default().looking_at(update.quat * Vec3::NEG_Z, Vec3::Z));
+                .insert(Transform::default().looking_at(update.quat * Vec3::Y, Vec3::Z));
         }
     }
 }
@@ -269,7 +270,7 @@ fn take_photo_sphere_image(
         cmds.entity(photosphere).trigger(UpdatePhotoSphere {
             image: image.clone(),
             fov: 100.0f32.to_radians(),
-            quat: Quat::from_rotation_x(90f32.to_radians()) * orientation.0,
+            quat: /*Quat::from_rotation_x(90f32.to_radians()) **/ orientation.0,
         });
 
         is_taken = true;

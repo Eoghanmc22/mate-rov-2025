@@ -23,7 +23,7 @@ use common::{
 };
 use egui::{
     load::SizedTexture, text::LayoutJob, widgets, Align, Color32, Id, Label, Layout, RichText,
-    ScrollArea, Sense, TextBuffer, TextFormat, Visuals,
+    ScrollArea, Sense, TextBuffer, TextFormat, Visuals, Widget,
 };
 use egui_plot::{Line, Plot, PlotPoint};
 use leafwing_input_manager::input_map::InputMap;
@@ -770,6 +770,7 @@ fn photosphere(
     mut cmds: Commands,
     mut contexts: EguiContexts,
     photospheres: Query<(Entity, &PhotoSphere)>,
+    images: Res<Assets<Image>>,
 ) {
     for (entity, photosphere) in photospheres.iter() {
         let mut open = true;
@@ -797,13 +798,18 @@ fn photosphere(
                 }
                 ui.collapsing("Raw Images", |ui| {
                     ScrollArea::vertical().show(ui, |ui| {
-                        for (_, texture) in &photosphere.images {
-                            ui.image(SizedTexture::new(
-                                *texture,
-                                (ui.available_width() / 2.0, ui.available_width() / 2.0),
-                            ));
+                        for (image_handle, texture) in &photosphere.images {
+                            if let Some(image) = images.get(image_handle) {
+                                let width = ui.available_width();
+                                let height = width * image.aspect_ratio().inverse().ratio();
+
+                                // FIXME: Instead of hard coding image rotation, get it from the ECS
+                                egui::Image::new(SizedTexture::new(*texture, (width, height)))
+                                    .rotate(180.0f32.to_radians(), egui::Vec2::splat(0.5))
+                                    .ui(ui);
+                            }
                         }
-                    })
+                    });
                 });
             });
 
