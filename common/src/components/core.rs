@@ -31,7 +31,7 @@ pub enum Armed {
 
 #[derive(Component, Serialize, Deserialize, Reflect, Debug, Copy, Clone, PartialEq, Eq)]
 #[reflect(SerdeAdapter, Serialize, Deserialize, Debug, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct RobotId(pub NetId);
 
 // #[derive(Component, Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]

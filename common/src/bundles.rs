@@ -12,7 +12,7 @@ use crate::components::{
 };
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct RobotBundle {
     pub core: RobotCoreBundle,
     pub sensors: RobotSensorBundle,
@@ -23,7 +23,7 @@ pub struct RobotBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct RobotCoreBundle {
     pub marker: Robot,
     // pub status: RobotStatus,
@@ -33,7 +33,7 @@ pub struct RobotCoreBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct RobotSensorBundle {
     pub orientation: Orientation,
     pub gyro: GyroMeasurement,
@@ -45,7 +45,7 @@ pub struct RobotSensorBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct RobotSystemBundle {
     pub processes: SystemProcesses,
     pub load_average: SystemLoadAverage,
@@ -60,7 +60,7 @@ pub struct RobotSystemBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct RobotThrusterBundle {
     pub movement_target: TargetMovement,
     pub movement_actual: ActualMovement,
@@ -74,16 +74,15 @@ pub struct RobotThrusterBundle {
     pub armed: Armed,
 }
 
-// TODO(mid): Sensor not implemented
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct RobotPowerBundle {
     pub voltage: MeasuredVoltage,
     pub current_draw: CurrentDraw,
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct CameraBundle {
     pub name: Name,
     pub camera: CameraDefinition,
@@ -96,7 +95,7 @@ pub struct CameraBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct ThrusterBundle {
     pub actuator: ActuatorBundle,
     pub motor: ThrusterDefinition,
@@ -107,7 +106,7 @@ pub struct ThrusterBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct MotorBundle {
     pub actuator: ActuatorBundle,
     // pub servo: ThrusterDefinition,
@@ -115,7 +114,7 @@ pub struct MotorBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct ActuatorBundle {
     pub name: Name,
     pub channel: GenericMotorId,
@@ -128,7 +127,7 @@ pub struct ActuatorBundle {
 }
 
 #[derive(Bundle, PartialEq)]
-#[deprecated]
+// #[deprecated]
 pub struct MovementContributionBundle {
     pub name: Name,
 
