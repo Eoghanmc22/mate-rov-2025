@@ -1,9 +1,9 @@
-use ahash::{HashMap, HashSet};
+use ahash::HashMap;
 use bevy::{ecs::system::Resource, transform::components::Transform};
 use common::components::{
     CameraCalibration, MotorContributionMode, MotorSignalType, MotorSlewRate, PidConfig,
 };
-use glam::{vec3, vec3a, EulerRot, Quat, Vec3A};
+use glam::{vec3a, EulerRot, Quat, Vec3A};
 use motor_math::{
     blue_rov::BlueRovMotorId, blue_rov_heavy::HeavyMotorId, glam::ThrusterGlam, x3d::X3dMotorId,
     ErasedMotorId, MotorConfig,

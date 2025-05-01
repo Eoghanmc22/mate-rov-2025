@@ -1,4 +1,4 @@
-use std::{borrow::Cow, mem};
+use std::borrow::Cow;
 
 use ahash::HashSet;
 use bevy::{
@@ -10,18 +10,17 @@ use common::{
     components::{
         Armed, CameraInputRotation, DepthMeasurement, DepthTarget, GenericMotorId,
         MotorContribution, Motors, MovementAxisMaximums, MovementContribution, Orientation,
-        OrientationTarget, Robot, RobotId, Thrusters,
+        OrientationTarget, Robot, RobotId,
     },
     ecs_sync::{NetId, Replicate},
     events::ResetServo,
     types::units::Meters,
 };
-use egui::TextBuffer;
 use leafwing_input_manager::{
     action_state::ActionState, input_map::InputMap, plugin::InputManagerPlugin, Actionlike,
     InputManagerBundle,
 };
-use motor_math::{glam::MovementGlam, solve::reverse::Axis, Movement};
+use motor_math::{glam::MovementGlam, solve::reverse::Axis};
 
 use crate::{photosphere::TakePhotoSphereImage, video_display_2d_master::VideoMasterMarker};
 
@@ -625,7 +624,7 @@ fn trim_depth(
             };
 
             if z != 0.0 {
-                let mut input = z * interpolation.depth_mps * time.delta_secs();
+                let input = z * interpolation.depth_mps * time.delta_secs();
 
                 // if let Some(orientation) = orientation {
                 //     input *= (orientation.0 * Vec3A::Z).z.signum();

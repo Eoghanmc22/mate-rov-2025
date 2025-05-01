@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 build = "build.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 common = { workspace = true }
 networking = { workspace = true }

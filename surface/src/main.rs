@@ -8,17 +8,17 @@ pub mod shipwreck;
 pub mod surface;
 pub mod ui;
 pub mod video_display_2d_master;
-pub mod video_display_2d_tile;
-pub mod video_display_3d;
+// pub mod video_display_2d_tile;
+// pub mod video_display_3d;
 pub mod video_pipelines;
 pub mod video_stream;
 
-use std::{sync::atomic::AtomicU64, time::Duration};
+use std::time::Duration;
 
 use anyhow::Context;
 use attitude::AttitudePlugin;
 use bevy::{
-    diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin},
     pbr::wireframe::WireframePlugin,
     prelude::*,
     render::{
@@ -43,10 +43,8 @@ use video_display_2d_master::{VideoDisplay2DPlugin, VideoDisplay2DSettings};
 use video_stream::VideoStreamPlugin;
 
 use crate::video_pipelines::{
-    edges::EdgesPipeline,
-    marker::MarkerPipeline,
     measure::{MeasurePipeline, MeasurementTarget},
-    Pipeline, PipelineCallbacks, SerialPipeline, VideoPipelinePlugins,
+    Pipeline, PipelineCallbacks, VideoPipelinePlugins,
 };
 
 pub const DARK_MODE: bool = false;
@@ -67,9 +65,9 @@ fn main() -> anyhow::Result<()> {
         .insert_resource(VideoDisplay2DSettings { enabled: true })
         // .insert_resource(VideoDisplay3DSettings { enabled: true })
         .insert_resource(if DARK_MODE {
-            ClearColor(Color::rgb_u8(33, 34, 37))
+            ClearColor(Color::srgb_u8(33, 34, 37))
         } else {
-            ClearColor(Color::rgb_u8(240, 238, 233))
+            ClearColor(Color::srgb_u8(240, 238, 233))
         })
         .add_plugins((
             // Bevy Core

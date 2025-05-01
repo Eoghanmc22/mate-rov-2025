@@ -382,7 +382,7 @@ fn topbar(
 
                     ui.label(layout_job);
                 } else {
-                    ui.label(RichText::new(format!("No Robot")).color(if DARK_MODE {
+                    ui.label(RichText::new("No Robot").color(if DARK_MODE {
                         Color32::WHITE
                     } else {
                         Color32::BLACK
@@ -603,7 +603,7 @@ fn hud(
 
                     if let Some(memory) = memory {
                         let ram_usage = memory.used_mem as f64 / memory.total_mem as f64 * 100.0;
-                        ui.label(RichText::new(format!("RAM: {:.2}%", ram_usage)).size(size));
+                        ui.label(RichText::new(format!("RAM: {ram_usage:.2}%")).size(size));
                     }
 
                     if cpu.is_some() || load.is_some() || memory.is_some() {
@@ -621,9 +621,7 @@ fn hud(
                         });
 
                         if let Some(ping) = latency.ping {
-                            ui.label(
-                                RichText::new(format!("Ping: {:.2?} frames", ping)).size(size),
-                            );
+                            ui.label(RichText::new(format!("Ping: {ping:.2?} frames")).size(size));
                         }
 
                         ui.add_space(10.0);
@@ -748,7 +746,7 @@ fn hud(
                                 .unwrap_or("Unknown");
                             let host = peer.info.get_hostname();
 
-                            ui.label(format!("{}@{}", name, host));
+                            ui.label(format!("{name}@{host}"));
 
                             ui.indent(peer.info.get_fullname(), |ui| {
                                 for addrs in &peer.addresses {
@@ -1000,9 +998,9 @@ fn movement_debug(
     mut cmds: Commands,
     mut contexts: EguiContexts,
 
-    mut controllers: Query<(Entity, &mut RobotId), (With<MovementDebugger>)>,
+    mut controllers: Query<(Entity, &mut RobotId), With<MovementDebugger>>,
 
-    mut contributors: Query<(&Name, &MovementContribution, &RobotId), (Without<MovementDebugger>)>,
+    contributors: Query<(&Name, &MovementContribution, &RobotId), Without<MovementDebugger>>,
     robots: Query<
         (&Name, &RobotId, &TargetMovement, &ActualMovement),
         (With<Robot>, Without<MovementDebugger>),
@@ -1071,9 +1069,9 @@ fn current_draw_debug(
     mut cmds: Commands,
     mut contexts: EguiContexts,
 
-    mut controllers: Query<(Entity, &mut RobotId), (With<CurrentDrawDebugger>)>,
+    mut controllers: Query<(Entity, &mut RobotId), With<CurrentDrawDebugger>>,
 
-    mut components: Query<
+    components: Query<
         (&Name, &CurrentDraw, &RobotId, Option<&ThrusterDefinition>),
         (Without<Robot>, Without<CurrentDrawDebugger>),
     >,
@@ -1137,15 +1135,13 @@ fn current_draw_debug(
                 }
 
                 ui.label(format!(
-                    "Thruster Current Draw: {:.2?}",
-                    current_draw_thrusters
+                    "Thruster Current Draw: {current_draw_thrusters:.2?}"
                 ));
-                ui.label(format!("Other Current Draw: {:.2?}", current_draw_other));
+                ui.label(format!("Other Current Draw: {current_draw_other:.2?}"));
 
                 let total_predicted = current_draw_thrusters + current_draw_other;
                 ui.label(format!(
-                    "Total Predicted Current Draw: {:.2?}",
-                    total_predicted
+                    "Total Predicted Current Draw: {total_predicted:.2?}"
                 ));
 
                 if let Some(current_draw) = current_draw {

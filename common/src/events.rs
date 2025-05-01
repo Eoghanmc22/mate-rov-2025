@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use bevy::{
     app::App,
     ecs::event::Event,

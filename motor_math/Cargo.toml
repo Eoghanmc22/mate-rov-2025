@@ -3,6 +3,9 @@ name = "motor_math"
 version = "0.1.0"
 edition = "2021"
 
+[lints]
+workspace = true
+
 [dependencies]
 stable_hashmap = { workspace = true }
 

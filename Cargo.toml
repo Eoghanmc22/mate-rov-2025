@@ -10,6 +10,11 @@ members = [
     "waterlinked",
 ]
 
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+type_complexity = "allow"
+assign_op_pattern = "allow"
+
 [workspace.dependencies]
 
 # Our crates

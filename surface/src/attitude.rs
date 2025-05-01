@@ -13,9 +13,7 @@ use bevy::{
 use bevy_egui::EguiContexts;
 use common::components::{Orientation, OrientationTarget, Robot, Thrusters};
 use egui::TextureId;
-use motor_math::{
-    glam::ThrusterGlam, x3d::X3dMotorId, Direction, ErasedMotorId, MotorConfig, Thruster,
-};
+use motor_math::{glam::ThrusterGlam, x3d::X3dMotorId, Direction, ErasedMotorId, MotorConfig};
 
 use crate::DARK_MODE;
 
