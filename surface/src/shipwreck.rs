@@ -1,15 +1,14 @@
-use bevy::prelude::*;
-use bevy_egui::EguiContexts;
+use anyhow::Context;
+use bevy::{math::Mat3A, prelude::*};
+use bevy_egui::{EguiContexts, EguiUserTextures};
 use egui::{Color32, Id, TextureId};
 use egui_plot::{Plot, PlotImage, PlotPoints, Points};
-use opencv::{core::Mat, imgcodecs};
 
-use crate::{
-    video_pipelines::{
-        copy_to_ecs::CopyToEcsPipeline, undistort::UndistortPipeline, AppPipelineExt,
-        SerialPipeline,
-    },
-    video_stream,
+use crate::video_pipelines::{
+    copy_to_ecs::{CopyToEcsPipeline, CopyToEcsState},
+    save::SavePipeline,
+    undistort::{CroppedCameraMatrix, UndistortPipeline},
+    AppPipelineExt, SerialPipeline,
 };
 
 const POINT_COUNT: usize = 4;
@@ -19,26 +18,24 @@ pub struct ShipwreckMeasurementPlugin;
 
 impl Plugin for ShipwreckMeasurementPlugin {
     fn build(&self, app: &mut App) {
-        app .register_video_pipeline::<SerialPipeline<(UndistortPipeline, CopyToEcsPipeline<ShipwreckImageOpenCV>)>>("Measure Shipwreck")
-            .add_observer(init_shipwreck_entity)
+        app.register_video_pipeline::<SerialPipeline<(
+            UndistortPipeline,
+            SavePipeline,
+            CopyToEcsPipeline<ShipwreckBundle>,
+        )>>("Measure Shipwreck")
             .add_systems(Update, shipwreck_ui);
 
-        app.world_mut().spawn(ShipwreckImageOpenCV {
-            mat: imgcodecs::imread_def("input1.png").unwrap(),
-        });
+        // app.world_mut().spawn(ShipwreckImageOpenCV {
+        //     mat: imgcodecs::imread_def("input1.png").unwrap(),
+        // });
     }
 }
 
-#[derive(Component)]
-// TODO: Get rid of
-pub struct ShipwreckImageOpenCV {
-    mat: Mat,
-}
-
-impl From<&Mat> for ShipwreckImageOpenCV {
-    fn from(mat: &Mat) -> Self {
-        Self { mat: mat.clone() }
-    }
+#[derive(Bundle)]
+pub struct ShipwreckBundle {
+    pub image: ShipwreckImage,
+    pub pois: ShipwreckMeasurementPOIs,
+    pub camera_mat: CroppedCameraMatrix,
 }
 
 #[derive(Component, Clone)]
@@ -47,48 +44,55 @@ pub struct ShipwreckImage {
     pub egui_texture: TextureId,
 }
 
+impl<'a> TryFrom<CopyToEcsState<'a>> for ShipwreckBundle {
+    type Error = anyhow::Error;
+
+    fn try_from(state: CopyToEcsState<'a>) -> anyhow::Result<Self> {
+        let mut image_assets = state
+            .world
+            .get_resource_mut::<Assets<Image>>()
+            .context("Get image asset manager")?;
+        let image_handle = image_assets.add(state.img);
+
+        let mut egui_textures = state
+            .world
+            .get_resource_mut::<EguiUserTextures>()
+            .context("Get egui texture manager")?;
+        let egui_texture = egui_textures.add_image(image_handle.clone_weak());
+
+        let camera_mat = *state
+            .world
+            .get::<CroppedCameraMatrix>(state.camera_entity)
+            .context("Get camera matrix")?;
+
+        Ok(Self {
+            image: ShipwreckImage {
+                image_handle,
+                egui_texture,
+            },
+            pois: ShipwreckMeasurementPOIs::default(),
+            camera_mat,
+        })
+    }
+}
+
 #[derive(Component, Default, Clone)]
 pub struct ShipwreckMeasurementPOIs {
     points: Vec<Vec2>,
 }
 
-fn init_shipwreck_entity(
-    trigger: Trigger<OnInsert, ShipwreckImageOpenCV>,
-    mut cmds: Commands,
-    mut egui_contexts: EguiContexts,
-    mut images: ResMut<Assets<Image>>,
-    query: Query<&ShipwreckImageOpenCV>,
-) {
-    let Ok(image_opencv) = query.get(trigger.entity()) else {
-        error!("Got bad oninsert for ShipwreckImageOpenCV");
-        return;
-    };
-
-    let mut image = Image::default();
-    let Ok(()) = video_stream::mat_to_image(&image_opencv.mat, &mut image) else {
-        error!("error converting mat to image");
-        return;
-    };
-
-    let image_handle = images.add(image);
-    let egui_texture = egui_contexts.add_image(image_handle.clone_weak());
-
-    cmds.entity(trigger.entity()).insert((
-        ShipwreckImage {
-            image_handle,
-            egui_texture,
-        },
-        ShipwreckMeasurementPOIs::default(),
-    ));
-}
-
 fn shipwreck_ui(
     mut cmds: Commands,
     mut contexts: EguiContexts,
-    mut shiprecks: Query<(Entity, &ShipwreckImage, &mut ShipwreckMeasurementPOIs)>,
+    mut shiprecks: Query<(
+        Entity,
+        &ShipwreckImage,
+        &mut ShipwreckMeasurementPOIs,
+        &CroppedCameraMatrix,
+    )>,
     images: Res<Assets<Image>>,
 ) {
-    for (entity, image, mut pois) in shiprecks.iter_mut() {
+    for (entity, image, mut pois, camera_mat) in shiprecks.iter_mut() {
         let mut open = true;
 
         let context = contexts.ctx_mut();
@@ -115,7 +119,7 @@ fn shipwreck_ui(
                         ui.image(PlotImage::new(
                             "Shipwreck",
                             image.egui_texture,
-                            [0.0, 0.0].into(),
+                            [image_size.x as f64 / 2.0, -image_size.y as f64 / 2.0].into(),
                             [image_size.x, image_size.y],
                         ));
 
@@ -123,7 +127,7 @@ fn shipwreck_ui(
                             ui.points(
                                 Points::new(
                                     format!("Point {idx}"),
-                                    [point.x as f64, point.y as f64],
+                                    [point.x as f64, -point.y as f64],
                                 )
                                 .color(Color32::RED)
                                 .radius(3.0)
@@ -136,7 +140,7 @@ fn shipwreck_ui(
                                 "Reference Point ROI",
                                 pois.points
                                     .iter()
-                                    .map(|it| [it.x as f64, it.y as f64])
+                                    .map(|it| [it.x as f64, -it.y as f64])
                                     .collect::<PlotPoints>(),
                             )
                             .stroke((2.0, Color32::RED)),
@@ -146,7 +150,7 @@ fn shipwreck_ui(
                 if let Some(pointer) = response.response.hover_pos() {
                     if response.response.clicked() {
                         let point = response.transform.value_from_position(pointer);
-                        let point = Vec2::new(point.x as f32, point.y as f32);
+                        let point = Vec2::new(point.x as f32, -point.y as f32);
 
                         if pois.points.len() < POINT_COUNT {
                             pois.points.push(point);
@@ -169,7 +173,8 @@ fn shipwreck_ui(
 
                 if pois.points.len() == POINT_COUNT {
                     let length =
-                        measure_length_calibrated(&pois.points, WIDTH_METERS).unwrap_or(-1.0);
+                        measure_length_calibrated(&pois.points, WIDTH_METERS, camera_mat.mat)
+                            .unwrap_or(-1.0);
                     ui.label(format!("Shipwreck Length: {length:.2}m"));
                 }
             });
@@ -183,11 +188,13 @@ fn shipwreck_ui(
 /// corners: bottom-left, bottom-right, top-right, top-left
 /// width: the known real length of the bottom edge (in whatever units you like)
 /// returns the real length of the right edge
-pub fn measure_length_calibrated(corners: &[Vec2], width: f32) -> Option<f32> {
+pub fn measure_length_calibrated(corners: &[Vec2], width: f32, camera_mat: Mat3A) -> Option<f32> {
+    dbg!(&camera_mat);
+
     // build homogeneous points p[i] and rays r[i]=p[i]
     let mut p = [Vec3::ZERO; 4];
     for i in 0..4 {
-        p[i] = temp_map_point(corners[i]).extend(1.0)
+        p[i] = normalize_point(corners[i], camera_mat).extend(1.0)
     }
     let r = p; // back-projected rays coincide with p
 
@@ -223,9 +230,9 @@ pub fn measure_length_calibrated(corners: &[Vec2], width: f32) -> Option<f32> {
     Some(scale * numer)
 }
 
-fn temp_map_point(point: Vec2) -> Vec2 {
+fn normalize_point(point: Vec2, camera_mat: Mat3A) -> Vec2 {
     Vec2::new(
-        (point.x - 1.02063281e+03) / 1.28825187e+03,
-        (point.y - 5.70232589e+02) / 1.29015809e+03,
+        (point.x - camera_mat.x_axis.z) / camera_mat.x_axis.x,
+        (point.y - camera_mat.y_axis.z) / camera_mat.y_axis.y,
     )
 }

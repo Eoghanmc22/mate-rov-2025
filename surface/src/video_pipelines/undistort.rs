@@ -1,6 +1,8 @@
 use anyhow::Context;
 use bevy::{
     app::{App, Plugin},
+    ecs::component::Component,
+    math::Mat3A,
     prelude::{Entity, EntityRef, EntityWorldMut, World},
 };
 use common::components::CameraCalibration;
@@ -21,6 +23,11 @@ impl Plugin for UndistortPipelinePlugin {
     }
 }
 
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct CroppedCameraMatrix {
+    pub mat: Mat3A,
+}
+
 pub struct UndistortPipeline {
     undistorted: Mat,
     cropped: Mat,
@@ -29,6 +36,9 @@ pub struct UndistortPipeline {
     dist: Mat,
 
     remap: Option<RemapData>,
+
+    // TODO: Is this approch the cleanest?
+    camera_entity: Entity,
 }
 
 struct RemapData {
@@ -37,8 +47,7 @@ struct RemapData {
     map_x: Mat,
     map_y: Mat,
 
-    rows: Range,
-    cols: Range,
+    roi: Rect,
 }
 
 impl Pipeline for UndistortPipeline {
@@ -50,7 +59,7 @@ impl Pipeline for UndistortPipeline {
 
     fn process<'b, 'a: 'b>(
         &'a mut self,
-        _cmds: &mut PipelineCallbacks,
+        cmds: &mut PipelineCallbacks,
         _data: &Self::Input,
         img: &'b mut Mat,
     ) -> anyhow::Result<&'b mut Mat> {
@@ -68,14 +77,13 @@ impl Pipeline for UndistortPipeline {
             mtx,
             dist,
             remap,
+            camera_entity,
         } = self;
 
+        *camera_entity = cmds.camera_entity;
+
         let RemapData {
-            map_x,
-            map_y,
-            rows,
-            cols,
-            ..
+            map_x, map_y, roi, ..
         } = match remap {
             Some(remap) => remap,
             None => {
@@ -90,6 +98,12 @@ impl Pipeline for UndistortPipeline {
                     false,
                 )
                 .context("Get optimal matrix")?;
+
+                let new_mtx_glam =
+                    Mat3A::from_cols_slice(new_mtx.data_typed().context("new_mtx as slice")?);
+                cmds.camera(move |mut camera| {
+                    camera.insert(CroppedCameraMatrix { mat: new_mtx_glam });
+                });
 
                 let mut map_x = Mat::default();
                 let mut map_y = Mat::default();
@@ -109,8 +123,7 @@ impl Pipeline for UndistortPipeline {
                     size,
                     map_x,
                     map_y,
-                    rows: Range::new(roi.y, roi.y + roi.height).context("Rows Range")?,
-                    cols: Range::new(roi.x, roi.x + roi.width).context("Cols Range")?,
+                    roi,
                 })
             }
         };
@@ -118,21 +131,19 @@ impl Pipeline for UndistortPipeline {
         imgproc::remap_def(img, undistorted, map_x, map_y, imgproc::INTER_LINEAR)
             .context("Remap")?;
 
-        // FIXME: These clones are bad
-        *cropped = undistorted
-            .row_range(rows)
-            .context("Crop Rows")?
-            .clone_pointee();
-        *cropped = cropped
-            .col_range(cols)
-            .context("Crop Cols")?
-            .clone_pointee();
+        // FIXME: This clones is bad
+        *cropped = undistorted.roi(*roi).context("Crop ROI")?.clone_pointee();
 
         Ok(cropped)
     }
 
-    fn cleanup(self, _entity_world: &mut EntityWorldMut) {
-        // No-op
+    fn cleanup(self, entity_world: &mut EntityWorldMut) {
+        entity_world.world_scope(|world| {
+            let Ok(mut camera) = world.get_entity_mut(self.camera_entity) else {
+                return;
+            };
+            camera.remove::<CroppedCameraMatrix>();
+        });
     }
 }
 
@@ -156,6 +167,7 @@ impl FromWorldEntity for UndistortPipeline {
             mtx,
             dist,
             remap: None,
+            camera_entity: camera,
         })
     }
 }

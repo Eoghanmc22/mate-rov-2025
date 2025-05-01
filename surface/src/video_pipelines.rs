@@ -288,6 +288,8 @@ impl<P: Pipeline> VideoProcessor for PipelineHandler<P> {
 pub struct PipelineCallbacks<'a> {
     pub(crate) cmds_tx: &'a Sender<WorldCallback>,
 
+    // TODO: These should be exposed via getters to prevent mutation, and then visibility should be
+    // smaller than crate
     pub(crate) pipeline_entity: Entity,
     pub(crate) camera_entity: Entity,
 
