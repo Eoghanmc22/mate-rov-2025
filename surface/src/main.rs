@@ -19,7 +19,12 @@ use anyhow::Context;
 use attitude::AttitudePlugin;
 use bevy::{
     diagnostic::{EntityCountDiagnosticsPlugin, FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin},
+    pbr::wireframe::WireframePlugin,
     prelude::*,
+    render::{
+        settings::{RenderCreation, WgpuFeatures, WgpuSettings},
+        RenderPlugin,
+    },
 };
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::PanOrbitCameraPlugin;
@@ -68,7 +73,18 @@ fn main() -> anyhow::Result<()> {
         })
         .add_plugins((
             // Bevy Core
-            DefaultPlugins.build().disable::<bevy::audio::AudioPlugin>(),
+            DefaultPlugins
+                .build()
+                .disable::<bevy::audio::AudioPlugin>()
+                .set(RenderPlugin {
+                    render_creation: RenderCreation::Automatic(WgpuSettings {
+                        // WARN this is a native only feature. It will not work with webgl or webgpu
+                        features: WgpuFeatures::POLYGON_MODE_LINE,
+                        ..default()
+                    }),
+                    ..default()
+                }),
+            WireframePlugin,
             MeshPickingPlugin,
             // .set(TaskPoolPlugin {
             //     task_pool_options: TaskPoolOptions {

@@ -155,6 +155,7 @@ fn add_motor_conf(
 
     commands
         .spawn((
+            Name::new("Attitude Scene"),
             Mesh3d(meshes.add(Cuboid::new(
                 (frt.position.x * 2.0 * 1.5).abs(),
                 (frt.position.y * 2.0 * 1.5).abs(),

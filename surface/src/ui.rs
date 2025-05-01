@@ -23,7 +23,7 @@ use common::{
 };
 use egui::{
     load::SizedTexture, text::LayoutJob, widgets, Align, Color32, Id, Label, Layout, RichText,
-    Sense, TextBuffer, TextFormat, Visuals,
+    ScrollArea, Sense, TextBuffer, TextFormat, Visuals,
 };
 use egui_plot::{Line, Plot, PlotPoint};
 use leafwing_input_manager::input_map::InputMap;
@@ -297,6 +297,7 @@ fn topbar(
                     for (robot, ..) in robots.iter() {
                         cmds.entity(robot).trigger(SpawnPhotoSphere);
                     }
+                    // cmds.trigger(SpawnPhotoSphere);
                 }
             });
 
@@ -792,13 +793,20 @@ fn photosphere(
                 if response.dragged() {
                     info!("Dragged");
                     let delta = response.drag_delta();
-                    cmds.entity(entity)
-                        .trigger(RotatePhotoSphere(Vec2::new(delta.x, delta.y) / 100.0));
+                    cmds.entity(entity).trigger(RotatePhotoSphere(
+                        Vec2::new(delta.x, delta.y) / response.interact_rect.width(),
+                    ));
                 }
-                ui.image(SizedTexture::new(
-                    photosphere.photo_sphere_egui,
-                    (ui.available_width(), ui.available_width()),
-                ));
+                ui.collapsing("Raw Images", |ui| {
+                    ScrollArea::vertical().show(ui, |ui| {
+                        for (_, texture) in &photosphere.images {
+                            ui.image(SizedTexture::new(
+                                *texture,
+                                (ui.available_width() / 2.0, ui.available_width() / 2.0),
+                            ));
+                        }
+                    })
+                });
             });
 
         if !open {
