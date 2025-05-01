@@ -1,3 +1,5 @@
+use core::f32;
+
 use anyhow::Context;
 use bevy::{math::Mat3A, prelude::*};
 use bevy_egui::{EguiContexts, EguiUserTextures};
@@ -13,6 +15,7 @@ use crate::video_pipelines::{
 
 const POINT_COUNT: usize = 4;
 const WIDTH_METERS: f32 = 0.47;
+const BOW_LENGTH: f32 = 0.30 * f32::consts::FRAC_1_SQRT_2;
 
 pub struct ShipwreckMeasurementPlugin;
 
@@ -174,7 +177,8 @@ fn shipwreck_ui(
                 if pois.points.len() == POINT_COUNT {
                     let length =
                         measure_length_calibrated(&pois.points, WIDTH_METERS, camera_mat.mat)
-                            .unwrap_or(-1.0);
+                            .unwrap_or(f32::NEG_INFINITY)
+                            + BOW_LENGTH;
                     ui.label(format!("Shipwreck Length: {length:.2}m"));
                 }
             });

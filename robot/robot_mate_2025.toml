@@ -79,26 +79,44 @@ transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0
 movement_rotation = { yaw = -90.0, pitch = 0.0, roll = 0.0 }
 
 [cameras."/dev/video6"]
+name = "Front Bottom"
+transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+# calib = { camera_matrix = [
+#   1.28825187e+03,
+#   0.00000000e+00,
+#   1.02063281e+03,
+#   0.00000000e+00,
+#   1.29015809e+03,
+#   5.70232589e+02,
+#   0.00000000e+00,
+#   0.00000000e+00,
+#   1.00000000e+00,
+# ], distortion_coefficients = [
+#   -0.41843633,
+#   0.18308179,
+#   -0.00215106,
+#   0.0020818,
+#   -0.03667367,
+# ] }
 calib = { camera_matrix = [
-  1.28825187e+03,
+  1.71579896e+03,
   0.00000000e+00,
-  1.02063281e+03,
+  1.09945137e+03,
   0.00000000e+00,
-  1.29015809e+03,
-  5.70232589e+02,
+  1.72666686e+03,
+  5.52559402e+02,
   0.00000000e+00,
   0.00000000e+00,
   1.00000000e+00,
 ], distortion_coefficients = [
-  -0.41843633,
-  0.18308179,
-  -0.00215106,
-  0.0020818,
-  -0.03667367,
+  -0.44280965,
+  0.24588563,
+  0.0022086,
+  -0.00055473,
+  -0.07746473,
 ] }
 
-name = "Front Bottom"
-transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 0.0, pitch = 0.0, roll = 0.0 } }
+
 [cameras."/dev/video14"]
 name = "UNUSED"
 transform = { position = { x = 0.0, y = 0.0, z = 0.0 }, rotation = { yaw = 180.0, pitch = 0.0, roll = 0.0 } }
