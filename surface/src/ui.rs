@@ -25,7 +25,7 @@ use egui::{
     load::SizedTexture, text::LayoutJob, widgets, Align, Color32, Id, Label, Layout, RichText,
     Sense, TextBuffer, TextFormat, Visuals,
 };
-use egui_plot::{Line, Plot, PlotImage, PlotPoint, Points};
+use egui_plot::{Line, Plot, PlotPoint};
 use leafwing_input_manager::input_map::InputMap;
 use motor_math::{glam::MovementGlam, solve::reverse::Axis};
 use tokio::net::lookup_host;
@@ -34,10 +34,6 @@ use crate::{
     attitude::OrientationDisplay,
     input::{Action, InputInterpolation, InputMarker, SelectedServo},
     photosphere::{PhotoSphere, RotatePhotoSphere, SpawnPhotoSphere},
-    shipwreck::{
-        self, ComputeShipwreckMeasurement, ShipwreckImage, ShipwreckMeasurementPOIs,
-        ShipwreckMeasurementResult,
-    },
     video_display_2d_master::VideoMasterMarker,
     video_pipelines::VideoPipelines,
     video_stream::{VideoProcessorFactory, VideoThread},
@@ -58,7 +54,6 @@ impl Plugin for EguiUiPlugin {
                 hud.after(topbar),
                 // TODO: Move to photosphere.rs
                 photosphere.after(topbar),
-                shipwreck,
                 movement_control.after(topbar),
                 pid_helper.after(topbar),
                 movement_debug.after(topbar),
@@ -804,160 +799,6 @@ fn photosphere(
                     photosphere.photo_sphere_egui,
                     (ui.available_width(), ui.available_width()),
                 ));
-            });
-
-        if !open {
-            cmds.entity(entity).despawn_recursive();
-        }
-    }
-}
-
-fn shipwreck(
-    mut cmds: Commands,
-    mut contexts: EguiContexts,
-    mut shiprecks: Query<(
-        Entity,
-        &ShipwreckImage,
-        &mut ShipwreckMeasurementPOIs,
-        Option<&ShipwreckMeasurementResult>,
-    )>,
-    images: Res<Assets<Image>>,
-) {
-    for (entity, image, mut pois, result) in shiprecks.iter_mut() {
-        let mut open = true;
-
-        let context = contexts.ctx_mut();
-        egui::Window::new("Shipwreck")
-            .id(Id::new(entity))
-            .constrain_to(context.available_rect().shrink(20.0))
-            .default_size((230.0, 230.0))
-            .open(&mut open)
-            .show(context, |ui| {
-                let response = Plot::new("Shipwreck Plot")
-                    .data_aspect(1.0)
-                    .min_size(egui::Vec2::new(100.0, 100.0))
-                    .width(ui.available_width())
-                    .height(ui.available_width())
-                    .show(ui, |ui| {
-                        let image_size = images
-                            .get(&image.image_handle)
-                            .map(|it| it.size_f32())
-                            .unwrap_or_default();
-
-                        ui.image(PlotImage::new(
-                            "Shipwreck",
-                            image.egui_texture,
-                            PlotPoint {
-                                x: image_size.x as f64 / 2.0,
-                                y: -image_size.y as f64 / 2.0,
-                            },
-                            [image_size.x, image_size.y],
-                        ));
-
-                        if let Some(reference_point) = pois.reference_point {
-                            ui.points(
-                                Points::new(
-                                    "Reference Point",
-                                    [reference_point.x as f64, -reference_point.y as f64],
-                                )
-                                .color(Color32::RED)
-                                .radius(3.0),
-                            );
-                            ui.polygon(
-                                egui_plot::Polygon::new(
-                                    "Reference Point ROI",
-                                    vec![
-                                        [
-                                            reference_point.x as f64 - crate::shipwreck::POI_SIZE,
-                                            -reference_point.y as f64 - crate::shipwreck::POI_SIZE,
-                                        ],
-                                        [
-                                            reference_point.x as f64 - crate::shipwreck::POI_SIZE,
-                                            -reference_point.y as f64 + crate::shipwreck::POI_SIZE,
-                                        ],
-                                        [
-                                            reference_point.x as f64 + crate::shipwreck::POI_SIZE,
-                                            -reference_point.y as f64 + crate::shipwreck::POI_SIZE,
-                                        ],
-                                        [
-                                            reference_point.x as f64 + crate::shipwreck::POI_SIZE,
-                                            -reference_point.y as f64 - crate::shipwreck::POI_SIZE,
-                                        ],
-                                    ],
-                                )
-                                .stroke((2.0, Color32::RED)),
-                            );
-                        }
-
-                        if let Some(measurement_start) = pois.measurement_start {
-                            ui.points(
-                                Points::new(
-                                    "Measurement Start",
-                                    [measurement_start.x as f64, -measurement_start.y as f64],
-                                )
-                                .color(Color32::GREEN)
-                                .radius(3.0),
-                            );
-                        }
-
-                        if let Some(measurement_end) = pois.measurement_end {
-                            ui.points(
-                                Points::new(
-                                    "Measurement End",
-                                    [measurement_end.x as f64, -measurement_end.y as f64],
-                                )
-                                .color(Color32::GREEN)
-                                .radius(3.0),
-                            );
-                        }
-
-                        if let (Some(start), Some(end)) =
-                            (pois.measurement_start, pois.measurement_end)
-                        {
-                            ui.line(Line::new(
-                                "Measurement Path",
-                                vec![
-                                    [start.x as f64, -start.y as f64],
-                                    [end.x as f64, -end.y as f64],
-                                ],
-                            ));
-                        }
-                    });
-
-                if let Some(pointer) = response.response.hover_pos() {
-                    if response.response.clicked_by(egui::PointerButton::Secondary) {
-                        let point = response.transform.value_from_position(pointer);
-                        pois.reference_point = Some(Vec2::new(point.x as f32, -point.y as f32));
-                    }
-
-                    if response.response.clicked_by(egui::PointerButton::Primary) {
-                        let point = response.transform.value_from_position(pointer);
-                        let point = Some(Vec2::new(point.x as f32, -point.y as f32));
-
-                        match (pois.measurement_start, pois.measurement_end) {
-                            (None, _) => {
-                                pois.measurement_start = point;
-                            }
-                            (Some(_), None) => {
-                                pois.measurement_end = point;
-                            }
-                            (Some(_), Some(_)) => {
-                                pois.measurement_start = point;
-                                pois.measurement_end = None;
-                            }
-                        }
-                    }
-                }
-
-                if ui.button("Run Computation").clicked() {
-                    cmds.entity(entity)
-                        .remove::<ShipwreckMeasurementResult>()
-                        .trigger(ComputeShipwreckMeasurement);
-                }
-
-                if let Some(result) = result {
-                    ui.label(format!("Shipwreck Length: {}", result.length));
-                }
             });
 
         if !open {

@@ -1,15 +1,8 @@
-use std::thread;
-
-use anyhow::{bail, Context};
 use bevy::prelude::*;
 use bevy_egui::EguiContexts;
-use common::types::units::Meters;
-use crossbeam::channel::{Receiver, Sender};
-use egui::TextureId;
-use opencv::{
-    core::{Mat, MatTraitConst, Point, Point2f, Point3f, Size, Vector},
-    imgcodecs, imgproc,
-};
+use egui::{Color32, Id, TextureId};
+use egui_plot::{Plot, PlotImage, PlotPoints, Points};
+use opencv::{core::Mat, imgcodecs};
 
 use crate::{
     video_pipelines::{
@@ -19,28 +12,16 @@ use crate::{
     video_stream,
 };
 
-pub const POI_SIZE: f64 = 50.0;
-
-const CONTOUR_MIN_AREA: f64 = 20.0;
-const MIN_CONTOUR_LENGTH: f64 = 35.0;
-const MIN_CONTOUR_POINTS: usize = 25;
-
-const MIN_LINE_SEPERATION: f32 = 4.0;
-const MAX_LINE_SEPERATION: f32 = 25.0;
-const MAX_LINE_ANGLE_DIFFERENCE: f32 = 5.0f32.to_radians();
-
-const PVC_PIPE_WIDTH_METERS: f32 = 0.021336;
+const POINT_COUNT: usize = 4;
+const WIDTH_METERS: f32 = 0.47;
 
 pub struct ShipwreckMeasurementPlugin;
 
 impl Plugin for ShipwreckMeasurementPlugin {
     fn build(&self, app: &mut App) {
-        let (tx, rx) = crossbeam::channel::bounded(10);
-
-        app.insert_resource(AsyncImageProcessingChannels(tx, rx))
-            .register_video_pipeline::<SerialPipeline<(UndistortPipeline, CopyToEcsPipeline<ShipwreckImageOpenCV>)>>("Measure Shipwreck")
+        app .register_video_pipeline::<SerialPipeline<(UndistortPipeline, CopyToEcsPipeline<ShipwreckImageOpenCV>)>>("Measure Shipwreck")
             .add_observer(init_shipwreck_entity)
-            .add_systems(Update, read_back_results);
+            .add_systems(Update, shipwreck_ui);
 
         app.world_mut().spawn(ShipwreckImageOpenCV {
             mat: imgcodecs::imread_def("input1.png").unwrap(),
@@ -49,6 +30,7 @@ impl Plugin for ShipwreckMeasurementPlugin {
 }
 
 #[derive(Component)]
+// TODO: Get rid of
 pub struct ShipwreckImageOpenCV {
     mat: Mat,
 }
@@ -67,24 +49,8 @@ pub struct ShipwreckImage {
 
 #[derive(Component, Default, Clone)]
 pub struct ShipwreckMeasurementPOIs {
-    pub reference_point: Option<Vec2>,
-    pub measurement_start: Option<Vec2>,
-    pub measurement_end: Option<Vec2>,
+    points: Vec<Vec2>,
 }
-
-#[derive(Component, Default, Clone)]
-pub struct ShipwreckMeasurementResult {
-    pub length: Meters,
-}
-
-#[derive(Resource)]
-struct AsyncImageProcessingChannels(
-    Sender<(Entity, ShipwreckMeasurementResult)>,
-    Receiver<(Entity, ShipwreckMeasurementResult)>,
-);
-
-#[derive(Event, Debug)]
-pub struct ComputeShipwreckMeasurement;
 
 fn init_shipwreck_entity(
     trigger: Trigger<OnInsert, ShipwreckImageOpenCV>,
@@ -107,203 +73,159 @@ fn init_shipwreck_entity(
     let image_handle = images.add(image);
     let egui_texture = egui_contexts.add_image(image_handle.clone_weak());
 
-    cmds.entity(trigger.entity())
-        .insert((
-            ShipwreckImage {
-                image_handle,
-                egui_texture,
-            },
-            ShipwreckMeasurementPOIs::default(),
-        ))
-        .observe(compute_measurements);
+    cmds.entity(trigger.entity()).insert((
+        ShipwreckImage {
+            image_handle,
+            egui_texture,
+        },
+        ShipwreckMeasurementPOIs::default(),
+    ));
 }
 
-fn compute_measurements(
-    trigger: Trigger<ComputeShipwreckMeasurement>,
-    query: Query<(&ShipwreckImageOpenCV, &ShipwreckMeasurementPOIs)>,
-    channels: Res<AsyncImageProcessingChannels>,
+fn shipwreck_ui(
+    mut cmds: Commands,
+    mut contexts: EguiContexts,
+    mut shiprecks: Query<(Entity, &ShipwreckImage, &mut ShipwreckMeasurementPOIs)>,
+    images: Res<Assets<Image>>,
 ) {
-    let Ok((image, pois)) = query.get(trigger.entity()) else {
-        error!("Got bad ComputeShipwreckMeasurement");
-        return;
-    };
+    for (entity, image, mut pois) in shiprecks.iter_mut() {
+        let mut open = true;
 
-    let entity = trigger.entity();
-    let mat = image.mat.clone();
-    let pois = pois.clone();
-    let tx = channels.0.clone();
+        let context = contexts.ctx_mut();
+        egui::Window::new("Shipwreck")
+            .id(Id::new(entity))
+            .constrain_to(context.available_rect().shrink(20.0))
+            .default_size((230.0, 230.0))
+            .open(&mut open)
+            .show(context, |ui| {
+                ui.label("Corner Order: bottom-left, bottom-right, top-right, top-left");
+                ui.label("Known side is bottom/top");
 
-    thread::spawn(move || {
-        let res = measurement_algo(&mat, pois);
+                let response = Plot::new("Shipwreck Plot")
+                    .data_aspect(1.0)
+                    .min_size(egui::Vec2::new(100.0, 100.0))
+                    .width(ui.available_width())
+                    .height(ui.available_width())
+                    .show(ui, |ui| {
+                        let image_size = images
+                            .get(&image.image_handle)
+                            .map(|it| it.size_f32())
+                            .unwrap_or_default();
 
-        match res {
-            Ok(res) => {
-                let _ = tx.send((entity, res));
-            }
-            Err(err) => error!("Shipwreck measurement failed: {err:?}"),
+                        ui.image(PlotImage::new(
+                            "Shipwreck",
+                            image.egui_texture,
+                            [0.0, 0.0].into(),
+                            [image_size.x, image_size.y],
+                        ));
+
+                        for (idx, point) in pois.points.iter().enumerate() {
+                            ui.points(
+                                Points::new(
+                                    format!("Point {idx}"),
+                                    [point.x as f64, point.y as f64],
+                                )
+                                .color(Color32::RED)
+                                .radius(3.0)
+                                .id(Id::new(idx)),
+                            );
+                        }
+
+                        ui.polygon(
+                            egui_plot::Polygon::new(
+                                "Reference Point ROI",
+                                pois.points
+                                    .iter()
+                                    .map(|it| [it.x as f64, it.y as f64])
+                                    .collect::<PlotPoints>(),
+                            )
+                            .stroke((2.0, Color32::RED)),
+                        );
+                    });
+
+                if let Some(pointer) = response.response.hover_pos() {
+                    if response.response.clicked() {
+                        let point = response.transform.value_from_position(pointer);
+                        let point = Vec2::new(point.x as f32, point.y as f32);
+
+                        if pois.points.len() < POINT_COUNT {
+                            pois.points.push(point);
+                        } else {
+                            let closest = pois
+                                .points
+                                .iter_mut()
+                                .min_by(|a, b| {
+                                    f32::total_cmp(
+                                        &a.distance_squared(point),
+                                        &b.distance_squared(point),
+                                    )
+                                })
+                                .unwrap();
+
+                            *closest = point;
+                        }
+                    }
+                }
+
+                if pois.points.len() == POINT_COUNT {
+                    let length =
+                        measure_length_calibrated(&pois.points, WIDTH_METERS).unwrap_or(-1.0);
+                    ui.label(format!("Shipwreck Length: {length:.2}m"));
+                }
+            });
+
+        if !open {
+            cmds.entity(entity).despawn_recursive();
         }
-    });
-}
-
-fn read_back_results(mut cmds: Commands, channels: Res<AsyncImageProcessingChannels>) {
-    for (entity, measurement) in channels.1.try_iter() {
-        cmds.entity(entity).insert(measurement);
     }
 }
 
-pub fn measurement_algo(
-    mat: &Mat,
-    pois: ShipwreckMeasurementPOIs,
-) -> anyhow::Result<ShipwreckMeasurementResult> {
-    imgcodecs::imwrite_def("input.png", &mat).context("save")?;
+/// corners: bottom-left, bottom-right, top-right, top-left
+/// width: the known real length of the bottom edge (in whatever units you like)
+/// returns the real length of the right edge
+pub fn measure_length_calibrated(corners: &[Vec2], width: f32) -> Option<f32> {
+    // build homogeneous points p[i] and rays r[i]=p[i]
+    let mut p = [Vec3::ZERO; 4];
+    for i in 0..4 {
+        p[i] = temp_map_point(corners[i]).extend(1.0)
+    }
+    let r = p; // back-projected rays coincide with p
 
-    let reference_poi = pois
-        .reference_point
-        .context("Reference point not specified")?;
-    let measurement_start = pois
-        .measurement_start
-        .context("Measurement start not specified")?;
-    let measurement_end = pois
-        .measurement_end
-        .context("Measurement end not specified")?;
+    // vanishing in width direction = intersection of lines (p0,p1) and (p3,p2)
+    let l01 = p[0].cross(p[1]);
+    let l32 = p[3].cross(p[2]);
+    let v_w = l01.cross(l32);
 
-    let roi_small = mat
-        .roi(opencv::core::Rect::new(
-            (reference_poi.x - POI_SIZE as f32) as i32,
-            (reference_poi.y - POI_SIZE as f32) as i32,
-            (POI_SIZE * 2.0) as i32,
-            (POI_SIZE * 2.0) as i32,
-        ))
-        .context("Get ROI")?
-        // TODO: Figure out how to avoid this
-        .clone_pointee();
+    // vanishing in length direction = intersection of lines (p1,p2) and (p0,p3)
+    let l12 = p[1].cross(p[2]);
+    let l03 = p[0].cross(p[3]);
+    let v_l = l12.cross(l03);
 
-    let lines = find_lines(&roi_small).context("Find Lines")?;
-    let [line_a, line_b] = choose_parallel_lines(&lines).context("Choose parallel lines")?;
+    // plane normal (in camera space)
+    let n = v_w.cross(v_l).normalize();
 
-    vis_lines(
-        &roi_small,
-        &Vector::from_slice(&[line_a, line_b]),
-        "lines_coarse.png",
+    // αᵢ = 1 / (n·rᵢ)
+    let alpha: Vec<f32> = r.iter().map(|ri| 1.0 / n.dot(*ri)).collect();
+
+    // length in camera‐space of the known edge (p0→p1)
+    let denom = (r[1] * alpha[1] - r[0] * alpha[0]).length();
+    if denom.abs() < 1e-6 {
+        return None; // degenerate
+    }
+
+    // global scale to make that edge == width
+    let scale = width / denom;
+
+    // camera‐space length of the opposite edge (p1→p2)
+    let numer = (r[2] * alpha[2] - r[1] * alpha[1]).length();
+
+    // real‐world length
+    Some(scale * numer)
+}
+
+fn temp_map_point(point: Vec2) -> Vec2 {
+    Vec2::new(
+        (point.x - 1.02063281e+03) / 1.28825187e+03,
+        (point.y - 5.70232589e+02) / 1.29015809e+03,
     )
-    .context("Vis lines")?;
-
-    let measurement_px = measurement_start.distance(measurement_end);
-    Ok(ShipwreckMeasurementResult {
-        length: Meters(measurement_px / (line_a.x - line_b.x).abs() * PVC_PIPE_WIDTH_METERS),
-    })
-}
-
-pub fn choose_parallel_lines(lines: &Vector<Point3f>) -> anyhow::Result<[Point3f; 2]> {
-    if lines.len() < 2 {
-        bail!("Not enough lines found");
-    }
-
-    let mut first_line = 0;
-    while first_line < lines.len() {
-        let line_a = lines.get(first_line).unwrap();
-        let Point3f {
-            x: radius_a,
-            y: theta_a,
-            z: votes_a,
-        } = line_a;
-        info!("Votes Line A: {votes_a}");
-
-        let mut line_b = None;
-        for line in lines.iter().skip(first_line + 1) {
-            if (line.x - radius_a).abs() > MAX_LINE_SEPERATION {
-                continue;
-            }
-            if (line.x - radius_a).abs() > MIN_LINE_SEPERATION {
-                line_b = Some(line);
-                break;
-            }
-        }
-
-        let Some(line_b) = line_b else {
-            bail!("Secondary line not found");
-        };
-        let Point3f {
-            x: radius_b,
-            y: theta_b,
-            z: votes_b,
-        } = line_b;
-
-        info!("Votes Line B: {votes_b}");
-
-        if (theta_b - theta_a).abs() > MAX_LINE_ANGLE_DIFFERENCE {
-            first_line += 1;
-            warn!("Lines are not parallel");
-            continue;
-        }
-
-        return Ok([line_a, line_b]);
-    }
-    bail!("No parallel lines were found");
-}
-
-// TODO: consider using the probalistic verson of hough lines
-pub fn find_lines(mat: &Mat) -> anyhow::Result<Vector<Point3f>> {
-    let mut lines = Vector::<Point3f>::default();
-
-    let edges = canny(mat).context("Edges")?;
-
-    imgproc::hough_lines_def(&edges, &mut lines, 1.0, 1.0f64.to_radians(), 50)
-        .context("Hough Lines")?;
-
-    println!("Found {} lines", lines.len());
-
-    Ok(lines)
-}
-
-pub fn canny(mat: &Mat) -> anyhow::Result<Mat> {
-    let mut blur = Mat::default();
-    let mut edges = Mat::default();
-
-    imgproc::blur_def(&mat, &mut blur, Size::new(3, 3)).context("Blur")?;
-    imgproc::canny_def(&blur, &mut edges, 50.0, 200.0).context("Canny")?;
-
-    imgcodecs::imwrite_def("canny.png", &edges).context("save")?;
-
-    Ok(edges)
-}
-
-pub fn vis_lines(mat: &Mat, lines: &Vector<Point3f>, file: &str) -> anyhow::Result<()> {
-    let mut vis = mat.clone();
-
-    for line in lines.iter() {
-        let radius = line.x;
-        let theta = line.y;
-        let votes = line.z;
-
-        info!(
-            "radius: {:.2}, theta: {:.2}, votes: {votes}",
-            radius,
-            theta.to_degrees()
-        );
-
-        let a = theta.cos();
-        let b = theta.sin();
-
-        let x_0 = a * radius;
-        let y_0 = b * radius;
-
-        let x_1 = x_0 + 1000.0 * -b;
-        let y_1 = y_0 + 1000.0 * a;
-
-        let x_2 = x_0 - 1000.0 * -b;
-        let y_2 = y_0 - 1000.0 * a;
-
-        imgproc::line_def(
-            &mut vis,
-            Point::new(x_1 as i32, y_1 as i32),
-            Point::new(x_2 as i32, y_2 as i32),
-            (0, 0, 255).into(),
-        )
-        .context("draw line")?;
-    }
-
-    imgcodecs::imwrite_def(file, &vis).context("write img")?;
-
-    Ok(())
 }
