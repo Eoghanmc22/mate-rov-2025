@@ -116,8 +116,9 @@ fn create_motors(mut cmds: Commands, robot: Res<LocalRobot>, config: Res<RobotCo
 }
 
 fn setup_motor_math(mut cmds: Commands, config: Res<RobotConfig>, robot: Res<LocalRobot>) {
-    cmds.entity(robot.entity)
-        .insert(JerkLimit(config.jerk_limit));
+    if let Some(jerk_limit) = config.jerk_limit {
+        cmds.entity(robot.entity).insert(JerkLimit(jerk_limit));
+    }
 }
 
 fn update_axis_maximums(
@@ -197,7 +198,13 @@ fn accumulate_motor_forces(
     mut last_movement: Local<StableHashMap<ErasedMotorId, MotorRecord<motor_math::FloatType>>>,
 
     robot: Query<
-        (Entity, &NetId, &Thrusters, &MovementCurrentCap, &JerkLimit),
+        (
+            Entity,
+            &NetId,
+            &Thrusters,
+            &MovementCurrentCap,
+            Option<&JerkLimit>,
+        ),
         (With<LocalRobotMarker>, Without<DisableMovementApi>),
     >,
     thruster_forces: Query<(&RobotId, &ThrustContribution)>,
@@ -211,7 +218,7 @@ fn accumulate_motor_forces(
         &net_id,
         Thrusters(thruster_config),
         &MovementCurrentCap(current_cap),
-        &JerkLimit(jerk_limit),
+        jerk_limit,
     )) = robot.get_single()
     else {
         return;
@@ -259,7 +266,7 @@ fn accumulate_motor_forces(
     );
 
     // Implement slew rate limiting
-    let motor_cmds = {
+    let motor_cmds = if let Some(JerkLimit(jerk_limit)) = jerk_limit {
         let slew_motor_cmds = motor_cmds
             .iter()
             .map(|(motor, record)| {
@@ -296,6 +303,8 @@ fn accumulate_motor_forces(
             current_cap.0 as _,
             0.01,
         )
+    } else {
+        motor_cmds
     };
 
     let motor_forces = motor_cmds

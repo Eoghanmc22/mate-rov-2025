@@ -23,7 +23,8 @@ pub struct RobotConfig {
     pub servo_config: ServoConfigDefinition,
 
     pub motor_amperage_budget: f32,
-    pub jerk_limit: f32,
+    #[serde(default)]
+    pub jerk_limit: Option<f32>,
     #[serde(default)]
     pub center_of_mass: Vec3A,
 
